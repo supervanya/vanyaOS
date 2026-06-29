@@ -26,9 +26,10 @@ export const DEFAULT_CONFIG: Config = {
   activeTheme: 'recovery',
   themes: ['recovery', 'deep-work'],
   metrics: [
-    { id: 'eating_health', label: 'Eating health', group: 'Discipline', higherIsBetter: true, scale: 5 },
-    { id: 'movement_health', label: 'Movement health', group: 'Discipline', higherIsBetter: true, scale: 5 },
+    { id: 'eating_health', label: 'Eating healthy', group: 'Discipline', higherIsBetter: true, scale: 5 },
+    { id: 'movement_health', label: 'Movement', group: 'Discipline', higherIsBetter: true, scale: 5 },
     { id: 'iq_stimulation', label: 'IQ stimulation', group: 'Stimulation', higherIsBetter: true, scale: 5 },
+    { id: 'reading', label: 'Reading', group: 'Stimulation', higherIsBetter: true, scale: 5 },
     { id: 'brain_fog', label: 'Brain fog', group: 'Symptoms', higherIsBetter: false, scale: 5 },
     { id: 'lower_back_pain', label: 'Lower back pain', group: 'Symptoms', higherIsBetter: false, scale: 5 },
   ],

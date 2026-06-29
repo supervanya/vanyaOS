@@ -26,6 +26,8 @@ import type { DayEntry } from "../lib/storage";
 import { wellness, dayToMarkdown, exportAll } from "../lib/markdown";
 import type { Config, Metric } from "../lib/config";
 import { MetricSlider } from "@/components/MetricSlider";
+import { HabitChip } from "@/components/HabitChip";
+import { HapticToggle } from "@/components/HapticToggle";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -208,10 +210,10 @@ function Reflection() {
   // Color-code wellness on the 0-5 scale.
   const scoreColor =
     score >= 3.75
-      ? "text-emerald-400"
+      ? "text-emerald-600 dark:text-emerald-400"
       : score >= 2.5
-        ? "text-amber-400"
-        : "text-rose-400";
+        ? "text-amber-600 dark:text-amber-400"
+        : "text-rose-600 dark:text-rose-400";
   const delta = prevScore == null ? null : score - prevScore;
 
   return (
@@ -226,7 +228,7 @@ function Reflection() {
       </div>
 
       <h1 className="mt-3 flex items-center gap-2 text-[15px] font-medium">
-        <Moon size={17} className="text-indigo-300" />
+        <Moon size={17} className="text-indigo-500 dark:text-indigo-300" />
         Evening reflection
       </h1>
 
@@ -240,9 +242,9 @@ function Reflection() {
           <span
             className={`text-xs font-medium ${
               delta > 0.05
-                ? "text-emerald-400"
+                ? "text-emerald-600 dark:text-emerald-400"
                 : delta < -0.05
-                  ? "text-rose-400"
+                  ? "text-rose-600 dark:text-rose-400"
                   : "text-muted-foreground"
             }`}
           >
@@ -260,7 +262,7 @@ function Reflection() {
       {groups.map(({ group, metrics, inverted }) => (
         <section key={group} className="mt-5">
           <p
-            className={`mb-3 flex items-center gap-1.5 text-xs ${inverted ? "text-rose-300" : "text-muted-foreground"}`}
+            className={`mb-3 flex items-center gap-1.5 text-xs ${inverted ? "text-rose-700 dark:text-rose-300" : "text-muted-foreground"}`}
           >
             {inverted ? (
               <Activity size={14} />
@@ -276,7 +278,7 @@ function Reflection() {
             const val = entry.metrics[m.id] ?? 0;
             return (
               <div key={m.id} className="mb-4 flex items-center gap-3">
-                <span className="w-24 shrink-0 text-[13px] text-neutral-300">
+                <span className="w-24 shrink-0 text-[13px] text-foreground/85">
                   {m.label}
                 </span>
                 <div className="flex-1">
@@ -309,7 +311,7 @@ function Reflection() {
         </p>
         {config.goals.map((g) => (
           <div key={g.id} className="mb-2 flex items-center gap-3">
-            <span className="w-24 shrink-0 text-xs text-neutral-300">
+            <span className="w-24 shrink-0 text-xs text-foreground/85">
               {g.label}
             </span>
             <div className="bg-muted h-1.5 flex-1 overflow-hidden rounded-full">
@@ -331,22 +333,14 @@ function Reflection() {
           <Repeat size={14} /> Habits
         </p>
         <div className="flex flex-wrap gap-2">
-          {config.habits.map((h) => {
-            const on = !!entry.habits[h.id];
-            return (
-              <button
-                key={h.id}
-                onClick={() => toggleHabit(h.id)}
-                className={`rounded-full border px-3.5 py-2 text-[13px] transition-colors ${
-                  on
-                    ? "border-emerald-500/60 bg-emerald-500/15 text-emerald-300"
-                    : "text-muted-foreground border-neutral-700"
-                }`}
-              >
-                {h.label}
-              </button>
-            );
-          })}
+          {config.habits.map((h) => (
+            <HabitChip
+              key={h.id}
+              label={h.label}
+              on={!!entry.habits[h.id]}
+              onToggle={() => toggleHabit(h.id)}
+            />
+          ))}
         </div>
       </section>
 
@@ -360,13 +354,20 @@ function Reflection() {
             <div className="flex flex-col gap-2">
               {entry.todos[scope].map((t, i) => (
                 <div key={i} className="flex items-center gap-2.5">
-                  <Checkbox
+                  <HapticToggle
                     checked={t.done}
-                    onCheckedChange={() => toggleTodo(scope, i)}
-                    className="size-5"
-                  />
+                    onToggle={() => toggleTodo(scope, i)}
+                    ariaLabel={t.text}
+                    className="size-5 rounded-[4px]"
+                  >
+                    <Checkbox
+                      checked={t.done}
+                      tabIndex={-1}
+                      className="pointer-events-none size-5"
+                    />
+                  </HapticToggle>
                   <span
-                    className={`flex-1 text-[13px] ${t.done ? "text-muted-foreground line-through" : "text-neutral-200"}`}
+                    className={`flex-1 text-[13px] ${t.done ? "text-muted-foreground line-through" : "text-foreground"}`}
                   >
                     {t.text}
                   </span>

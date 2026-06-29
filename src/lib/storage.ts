@@ -17,7 +17,6 @@ export type DayEntry = {
   updatedAt: string
 }
 
-const CONFIG_KEY = 'vanyaos:config'
 const DAY_PREFIX = 'vanyaos:day:'
 const dayKey = (date: string) => `${DAY_PREFIX}${date}`
 const hasWindow = () => typeof window !== 'undefined'
@@ -28,22 +27,11 @@ export function todayISO(): string {
   return local.toISOString().slice(0, 10)
 }
 
+// Config lives in code (config.ts). There's no in-app settings UI, so reading
+// it straight from DEFAULT_CONFIG means edits to config.ts show up immediately
+// (no stale localStorage copy shadowing your changes).
 export function loadConfig(): Config {
-  if (!hasWindow()) return DEFAULT_CONFIG
-  const raw = localStorage.getItem(CONFIG_KEY)
-  if (!raw) {
-    localStorage.setItem(CONFIG_KEY, JSON.stringify(DEFAULT_CONFIG))
-    return DEFAULT_CONFIG
-  }
-  try {
-    return { ...DEFAULT_CONFIG, ...(JSON.parse(raw) as Partial<Config>) }
-  } catch {
-    return DEFAULT_CONFIG
-  }
-}
-
-export function saveConfig(c: Config): void {
-  if (hasWindow()) localStorage.setItem(CONFIG_KEY, JSON.stringify(c))
+  return DEFAULT_CONFIG
 }
 
 export function listDayDates(): string[] {

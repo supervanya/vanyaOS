@@ -44,7 +44,7 @@ export function MetricSlider({
         onValueChange(next)
       }}
     >
-      <SliderPrimitive.Track className="relative h-2.5 grow overflow-hidden rounded-full bg-white/10">
+      <SliderPrimitive.Track className="bg-foreground/15 relative h-2.5 grow overflow-hidden rounded-full">
         <SliderPrimitive.Range
           className="absolute h-full rounded-full"
           style={{ backgroundColor: accent }}
@@ -54,8 +54,8 @@ export function MetricSlider({
         <motion.div
           whileTap={{ scale: 1.3 }}
           transition={{ type: "spring", stiffness: 500, damping: 28 }}
-          className="block size-7 cursor-grab rounded-full border-[3px] shadow-[0_2px_10px_rgba(0,0,0,0.55)] outline-none focus-visible:ring-4 focus-visible:ring-white/25 active:cursor-grabbing"
-          style={{ backgroundColor: accent, borderColor: "#0b0b0f" }}
+          className="border-background focus-visible:ring-foreground/30 block size-7 cursor-grab rounded-full border-[3px] shadow-[0_2px_10px_rgba(0,0,0,0.4)] outline-none focus-visible:ring-4 active:cursor-grabbing"
+          style={{ backgroundColor: accent }}
         />
       </SliderPrimitive.Thumb>
     </SliderPrimitive.Root>
