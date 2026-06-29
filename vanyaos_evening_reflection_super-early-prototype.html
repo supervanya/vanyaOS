@@ -18,17 +18,17 @@
 <span style="font-size:12px;color:var(--color-text-tertiary);">Tue, Jun 9</span>
 </div>
 <div style="display:flex;align-items:baseline;gap:8px;margin:8px 0 4px;">
-<span style="font-size:24px;font-weight:500;" id="score">6.6</span>
+<span style="font-size:24px;font-weight:500;" id="score">3.8</span>
 <span style="font-size:12px;color:var(--color-text-secondary);">wellness · symptoms inverted</span>
 </div>
 <p class="gh"><i class="ti ti-target-arrow" style="font-size:14px;" aria-hidden="true"></i>Discipline</p>
-<div class="frow"><span class="flab">Eating health</span><input type="range" min="0" max="10" step="1" value="7" class="pos" style="flex:1;"><span class="fval">7</span></div>
-<div class="frow"><span class="flab">Movement health</span><input type="range" min="0" max="10" step="1" value="6" class="pos" style="flex:1;"><span class="fval">6</span></div>
+<div class="frow"><span class="flab">Eating health</span><input type="range" min="1" max="5" step="1" value="4" class="pos" style="flex:1;"><span class="fval">4</span></div>
+<div class="frow"><span class="flab">Movement health</span><input type="range" min="1" max="5" step="1" value="3" class="pos" style="flex:1;"><span class="fval">3</span></div>
 <p class="gh"><i class="ti ti-bulb" style="font-size:14px;" aria-hidden="true"></i>Stimulation</p>
-<div class="frow"><span class="flab">IQ stimulation</span><input type="range" min="0" max="10" step="1" value="7" class="pos" style="flex:1;"><span class="fval">7</span></div>
-<p class="gh" style="color:var(--color-text-danger);"><i class="ti ti-activity" style="font-size:14px;" aria-hidden="true"></i>Symptoms · 0 is best</p>
-<div class="frow"><span class="flab">Brain fog</span><input type="range" min="0" max="10" step="1" value="3" class="neg" style="flex:1;"><span class="fval">3</span></div>
-<div class="frow"><span class="flab">Lower back pain</span><input type="range" min="0" max="10" step="1" value="4" class="neg" style="flex:1;"><span class="fval">4</span></div>
+<div class="frow"><span class="flab">IQ stimulation</span><input type="range" min="1" max="5" step="1" value="4" class="pos" style="flex:1;"><span class="fval">4</span></div>
+<p class="gh" style="color:var(--color-text-danger);"><i class="ti ti-activity" style="font-size:14px;" aria-hidden="true"></i>Symptoms · 1 is best</p>
+<div class="frow"><span class="flab">Brain fog</span><input type="range" min="1" max="5" step="1" value="2" class="neg" style="flex:1;"><span class="fval">2</span></div>
+<div class="frow"><span class="flab">Lower back pain</span><input type="range" min="1" max="5" step="1" value="2" class="neg" style="flex:1;"><span class="fval">2</span></div>
 <p class="gh"><i class="ti ti-flag" style="font-size:14px;" aria-hidden="true"></i>Goal check · what you're building toward</p>
 <div class="goal"><span style="font-size:12px;width:92px;color:var(--color-text-secondary);">VO2 max → 48</span><div class="gbar"><div class="gfill" style="width:62%;"></div></div><span style="font-size:11px;color:var(--color-text-tertiary);">62%</span></div>
 <div class="goal"><span style="font-size:12px;width:92px;color:var(--color-text-secondary);">Yoga month</span><div class="gbar"><div class="gfill" style="width:40%;"></div></div><span style="font-size:11px;color:var(--color-text-tertiary);">day 12</span></div>
@@ -48,7 +48,7 @@
 const pos=[...document.querySelectorAll('.pos')],neg=[...document.querySelectorAll('.neg')];
 function recalc(){
 [...pos,...neg].forEach(s=>s.parentElement.querySelector('.fval').textContent=s.value);
-const p=pos.map(s=>+s.value),n=neg.map(s=>10-+s.value);
+const p=pos.map(s=>+s.value),n=neg.map(s=>6-+s.value);
 const w=[...p,...n].reduce((a,b)=>a+b,0)/(p.length+n.length);
 document.getElementById('score').textContent=w.toFixed(1);
 }

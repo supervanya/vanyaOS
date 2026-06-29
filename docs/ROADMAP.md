@@ -18,8 +18,8 @@ Prove the plumbing before building features.
 ---
 
 ## M1 — The nightly ritual  *(the core; port the existing mockup)*
-Turn `vanyaos_evening_reflection_v2.html` into the real `/reflect` screen, wired to `/api/day`.
-- Grouped 0–10 sliders + live composite wellness score (symptoms inverted).
+Turn `vanyaos_evening_reflection_super-early-prototype.html` into the real `/reflect` screen, wired to `/api/day`.
+- Grouped 1–5 sliders + live composite wellness score (symptoms inverted).
 - Habit chips (binary, from `config/habits.json`).
 - Goal glance with manual progress bars (`config/goals.json`).
 - Free-text reflection + "Copy to notes".

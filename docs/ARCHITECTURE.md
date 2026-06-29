@@ -4,7 +4,7 @@
 
 | Layer | Choice | Why |
 |---|---|---|
-| Frontend | **Next.js (App Router) + React**, mobile-first, PWA (manifest + service worker) | One repo for UI + API, installable on phone, port the existing `v2.html` screen directly |
+| Frontend | **Next.js (App Router) + React**, mobile-first, PWA (manifest + service worker) | One repo for UI + API, installable on phone, port the existing prototype screen directly |
 | Backend | **Next.js API routes** (serverless) | No separate server to run; holds the git token server-side |
 | Storage / source of truth | **Private GitHub repo**, one `.md` per day, written via the **GitHub Contents API** | Honors "markdown in a git repo I own"; no database; versioned for free |
 | Auth | **Single passcode** (one env-var secret, signed cookie) | It's a public URL with intimate data; full accounts are overkill for one user |
@@ -49,13 +49,13 @@ The split is the whole point: **frontmatter = machine-readable** (powers the fut
 ---
 date: 2026-06-19
 theme: recovery               # active_theme stamped from config (for later filtering)
-wellness: 6.6                 # computed composite (symptoms inverted)
+wellness: 3.8                 # computed composite on 1–5 (symptoms inverted)
 metrics:
-  eating_health: 7
-  movement_health: 6
-  iq_stimulation: 7
-  brain_fog: 3                # raw value; direction lives in config
-  lower_back_pain: 4
+  eating_health: 4
+  movement_health: 3
+  iq_stimulation: 4
+  brain_fog: 2                # raw value 1–5; direction lives in config
+  lower_back_pain: 2
 habits:                       # only the ones done today
   strength: true
   breathwork: true
@@ -80,8 +80,8 @@ Todos live in each day's frontmatter. When a **new day's entry is first opened**
 ```jsonc
 // config/metrics.json
 [
-  { "id": "eating_health",   "label": "Eating health",   "group": "Discipline",   "higher_is_better": true,  "scale": 10 },
-  { "id": "brain_fog",       "label": "Brain fog",       "group": "Symptoms",     "higher_is_better": false, "scale": 10 }
+  { "id": "eating_health",   "label": "Eating health",   "group": "Discipline",   "higher_is_better": true,  "scale": 5 },
+  { "id": "brain_fog",       "label": "Brain fog",       "group": "Symptoms",     "higher_is_better": false, "scale": 5 }
 ]
 
 // config/habits.json
@@ -94,7 +94,7 @@ Todos live in each day's frontmatter. When a **new day's entry is first opened**
 { "active_theme": "recovery", "themes": ["recovery", "deep-work"] }
 ```
 
-`higher_is_better: false` is how symptom inversion is handled — no special-casing in code. The wellness score = mean of `value` for positive metrics and `scale − value` for inverted ones.
+`higher_is_better: false` is how symptom inversion is handled — no special-casing in code. The wellness score = mean of `value` for positive metrics and `(min + max) − value` for inverted ones. On the 1–5 scale that's `6 − value` (1 = best symptom day → contributes 5).
 
 ## Save flow
 
