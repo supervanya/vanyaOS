@@ -12,7 +12,7 @@ export type DayEntry = {
   theme: string
   metrics: Record<string, number>
   habits: Record<string, boolean>
-  todos: { today: TodoItem[]; week: TodoItem[] }
+  todos: { tomorrow: TodoItem[]; week: TodoItem[] }
   reflection: string
   updatedAt: string
 }
@@ -56,12 +56,24 @@ export function listDayDates(): string[] {
   return dates.sort() // ascending
 }
 
+// Back-compat: an earlier build keyed tomorrow's todos as `today`.
+function normalizeDay(e: DayEntry): DayEntry {
+  const todos = (e.todos ?? {}) as { tomorrow?: TodoItem[]; today?: TodoItem[]; week?: TodoItem[] }
+  return {
+    ...e,
+    todos: {
+      tomorrow: todos.tomorrow ?? todos.today ?? [],
+      week: todos.week ?? [],
+    },
+  }
+}
+
 export function loadDay(date: string): DayEntry | null {
   if (!hasWindow()) return null
   const raw = localStorage.getItem(dayKey(date))
   if (!raw) return null
   try {
-    return JSON.parse(raw) as DayEntry
+    return normalizeDay(JSON.parse(raw) as DayEntry)
   } catch {
     return null
   }
@@ -92,7 +104,7 @@ export function newEntry(date: string, config: Config): DayEntry {
     metrics: Object.fromEntries(config.metrics.map((m) => [m.id, Math.ceil(m.scale / 2)])),
     habits: Object.fromEntries(config.habits.map((h) => [h.id, false])),
     todos: {
-      today: prev ? carryForward(prev.todos?.today) : [],
+      tomorrow: prev ? carryForward(prev.todos?.tomorrow) : [],
       week: prev ? carryForward(prev.todos?.week) : [],
     },
     reflection: '',

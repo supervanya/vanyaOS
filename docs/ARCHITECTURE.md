@@ -68,7 +68,7 @@ habits:                       # only the ones done today
   breathwork: true
   no_dessert: true
 todos:                        # each item tracks done-state for roll-forward
-  today:
+  tomorrow:
     - { text: "Call dentist", done: false }
   week:
     - { text: "Draft Q3 plan", done: false }
@@ -80,7 +80,7 @@ Felt sharp after the morning walk; back tightened up by evening...
 
 ### Todo roll-forward
 
-Todos live in each day's frontmatter. When a **new day's entry is first opened**, the app reads the most recent prior day and copies forward every item with `done: false` (preserving its `today`/`week` scope). Completed items stay in their original day's file as history. This is purely load-time behavior — no separate todo store.
+Todos live in each day's frontmatter. When a **new day's entry is first opened**, the app reads the most recent prior day and copies forward every item with `done: false` (preserving its `tomorrow`/`week` scope). Completed items stay in their original day's file as history. This is purely load-time behavior — no separate todo store.
 
 ## Config schemas
 

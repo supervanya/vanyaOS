@@ -36,7 +36,7 @@ Turn `vanyaos_evening_reflection_super-early-prototype.html` into the real `/ref
 - Habit chips (binary, from `config/habits.json`).
 - Goal glance with manual progress bars (`config/goals.json`).
 - Free-text reflection + "Copy to notes".
-- Tomorrow's todos (today / this week), checkable; **unfinished items roll forward** from the most recent prior day on open.
+- Tomorrow's todos (tomorrow / this week), checkable; **unfinished items roll forward** from the most recent prior day on open.
 - Save → today's `.md`; reopening loads & edits today's entry. Active life-theme (`config/app.json`) is stamped into frontmatter.
 
 **DoD:** You complete a **real reflection tonight on your phone**, it commits to git, and reopening shows it. This is the moment VanyaOS becomes real.

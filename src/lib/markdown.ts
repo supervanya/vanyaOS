@@ -35,8 +35,8 @@ export function dayToMarkdown(entry: DayEntry, config: Config): string {
   for (const h of doneHabits) lines.push(`  ${h.id}: true`)
 
   lines.push('todos:')
-  lines.push(entry.todos.today.length ? '  today:' : '  today: []')
-  if (entry.todos.today.length) lines.push(todoYaml(entry.todos.today))
+  lines.push(entry.todos.tomorrow.length ? '  tomorrow:' : '  tomorrow: []')
+  if (entry.todos.tomorrow.length) lines.push(todoYaml(entry.todos.tomorrow))
   lines.push(entry.todos.week.length ? '  week:' : '  week: []')
   if (entry.todos.week.length) lines.push(todoYaml(entry.todos.week))
 

@@ -44,7 +44,7 @@ Everything below is filled on **one screen** (the prototype is the visual spec):
 2. **Habit check-off** — tap chips on/off for the day's habits.
 3. **Goal glance** — read-only list of goals with a manually-set progress bar (what you're building toward).
 4. **Free-text reflection** — a textarea + **"Copy to notes"** button (plain-text export to your notes app).
-5. **Tomorrow's todos** — quick capture, split into *must-do today* / *this week*, each a checkable item. **Unfinished items roll forward** to the next day automatically. (The TODO half of the core.)
+5. **Tomorrow's todos** — quick capture, split into *must-do tomorrow* / *this week*, each a checkable item. **Unfinished items roll forward** to the next day automatically. (The TODO half of the core.)
 6. **Save** — writes/overwrites today's `.md` file (frontmatter + body) and commits it. The current **`active_theme`** (from config) is stamped into the entry's frontmatter.
 
 **Done for the night** = sliders set, habits ticked, reflection written, saved → a commit lands in the repo and reopening the app shows today's entry.

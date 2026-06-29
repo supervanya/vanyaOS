@@ -27,13 +27,13 @@ import type { Config, Metric } from '../lib/config'
 
 export const Route = createFileRoute('/')({ component: Reflection })
 
-type Scope = 'today' | 'week'
+type Scope = 'tomorrow' | 'week'
 
 function Reflection() {
   const [config, setConfig] = useState<Config | null>(null)
   const [entry, setEntry] = useState<DayEntry | null>(null)
   const [toast, setToast] = useState('')
-  const [drafts, setDrafts] = useState<Record<Scope, string>>({ today: '', week: '' })
+  const [drafts, setDrafts] = useState<Record<Scope, string>>({ tomorrow: '', week: '' })
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const taRef = useRef<HTMLTextAreaElement>(null)
 
@@ -284,9 +284,9 @@ function Reflection() {
 
       {/* Todos */}
       <section className="mt-5 grid grid-cols-1 gap-4">
-        {(['today', 'week'] as Scope[]).map((scope) => (
+        {(['tomorrow', 'week'] as Scope[]).map((scope) => (
           <div key={scope}>
-            <p className="mb-2 text-xs text-neutral-400">{scope === 'today' ? 'Must do today' : 'This week'}</p>
+            <p className="mb-2 text-xs text-neutral-400">{scope === 'tomorrow' ? 'Must do tomorrow' : 'This week'}</p>
             <div className="flex flex-col gap-2">
               {entry.todos[scope].map((t, i) => (
                 <div key={i} className="flex items-center gap-2.5">
