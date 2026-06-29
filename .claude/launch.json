@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "vanyaos-dev",
+      "runtimeExecutable": "mise",
+      "runtimeArgs": ["exec", "node@24.14.1", "--", "bun", "--bun", "run", "dev"],
+      "port": 3000
+    }
+  ]
+}
