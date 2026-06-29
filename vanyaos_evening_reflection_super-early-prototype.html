@@ -1,0 +1,73 @@
+<style>
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+.gh{font-size:12px;color:var(--color-text-tertiary);margin:14px 0 8px;display:flex;align-items:center;gap:6px;}
+.frow{display:flex;align-items:center;gap:10px;margin:0 0 10px;}
+.flab{font-size:13px;color:var(--color-text-secondary);width:92px;flex-shrink:0;}
+.fval{font-size:13px;font-weight:500;width:18px;text-align:right;}
+.chip{font-size:13px;padding:6px 12px;border:0.5px solid var(--color-border-secondary);border-radius:999px;cursor:pointer;user-select:none;color:var(--color-text-secondary);background:transparent;}
+.chip.on{background:var(--color-background-success);color:var(--color-text-success);border-color:var(--color-border-success);}
+.goal{display:flex;align-items:center;gap:10px;margin-bottom:8px;}
+.gbar{flex:1;height:5px;border-radius:3px;background:var(--color-background-secondary);overflow:hidden;}
+.gfill{height:100%;border-radius:3px;background:var(--color-text-info);}
+</style>
+<h2 class="sr-only">Mockup of an evening reflection screen with grouped wellbeing sliders, inverted symptom sliders, a verbal reflection box with copy button, goal progress, and habit toggles.</h2>
+<div style="background:var(--color-background-secondary);border-radius:var(--border-radius-lg);padding:14px;">
+<div style="background:var(--color-background-primary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-lg);padding:1rem 1.25rem;">
+<div style="display:flex;align-items:center;justify-content:space-between;">
+<p style="font-size:15px;font-weight:500;margin:0;"><i class="ti ti-moon" style="font-size:18px;vertical-align:-3px;margin-right:6px;" aria-hidden="true"></i>Evening reflection</p>
+<span style="font-size:12px;color:var(--color-text-tertiary);">Tue, Jun 9</span>
+</div>
+<div style="display:flex;align-items:baseline;gap:8px;margin:8px 0 4px;">
+<span style="font-size:24px;font-weight:500;" id="score">6.6</span>
+<span style="font-size:12px;color:var(--color-text-secondary);">wellness · symptoms inverted</span>
+</div>
+<p class="gh"><i class="ti ti-target-arrow" style="font-size:14px;" aria-hidden="true"></i>Discipline</p>
+<div class="frow"><span class="flab">Eating health</span><input type="range" min="0" max="10" step="1" value="7" class="pos" style="flex:1;"><span class="fval">7</span></div>
+<div class="frow"><span class="flab">Movement health</span><input type="range" min="0" max="10" step="1" value="6" class="pos" style="flex:1;"><span class="fval">6</span></div>
+<p class="gh"><i class="ti ti-bulb" style="font-size:14px;" aria-hidden="true"></i>Stimulation</p>
+<div class="frow"><span class="flab">IQ stimulation</span><input type="range" min="0" max="10" step="1" value="7" class="pos" style="flex:1;"><span class="fval">7</span></div>
+<p class="gh" style="color:var(--color-text-danger);"><i class="ti ti-activity" style="font-size:14px;" aria-hidden="true"></i>Symptoms · 0 is best</p>
+<div class="frow"><span class="flab">Brain fog</span><input type="range" min="0" max="10" step="1" value="3" class="neg" style="flex:1;"><span class="fval">3</span></div>
+<div class="frow"><span class="flab">Lower back pain</span><input type="range" min="0" max="10" step="1" value="4" class="neg" style="flex:1;"><span class="fval">4</span></div>
+<p class="gh"><i class="ti ti-flag" style="font-size:14px;" aria-hidden="true"></i>Goal check · what you're building toward</p>
+<div class="goal"><span style="font-size:12px;width:92px;color:var(--color-text-secondary);">VO2 max → 48</span><div class="gbar"><div class="gfill" style="width:62%;"></div></div><span style="font-size:11px;color:var(--color-text-tertiary);">62%</span></div>
+<div class="goal"><span style="font-size:12px;width:92px;color:var(--color-text-secondary);">Yoga month</span><div class="gbar"><div class="gfill" style="width:40%;"></div></div><span style="font-size:11px;color:var(--color-text-tertiary);">day 12</span></div>
+<div class="goal" style="margin-bottom:4px;"><span style="font-size:12px;width:92px;color:var(--color-text-secondary);">No brain fog</span><div class="gbar"><div class="gfill" style="width:70%;"></div></div><span style="font-size:11px;color:var(--color-text-tertiary);">trend ↑</span></div>
+<p class="gh"><i class="ti ti-repeat" style="font-size:14px;" aria-hidden="true"></i>Habits</p>
+<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;">
+<span class="chip hb on">Strength</span><span class="chip hb on">Breathwork</span><span class="chip hb">7k steps</span><span class="chip hb on">No dessert</span><span class="chip hb">Book at night</span>
+</div>
+<textarea id="verbal" rows="3" placeholder="Verbal reflection: speak or type, then copy to notes…" style="width:100%;box-sizing:border-box;resize:vertical;font-size:14px;"></textarea>
+<div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:10px;">
+<button id="copy" style="font-size:13px;"><i class="ti ti-copy" style="font-size:15px;vertical-align:-2px;margin-right:4px;" aria-hidden="true"></i>Copy to notes</button>
+<button id="log" style="font-size:13px;">Log day ↗</button>
+</div>
+</div>
+</div>
+<script>
+const pos=[...document.querySelectorAll('.pos')],neg=[...document.querySelectorAll('.neg')];
+function recalc(){
+[...pos,...neg].forEach(s=>s.parentElement.querySelector('.fval').textContent=s.value);
+const p=pos.map(s=>+s.value),n=neg.map(s=>10-+s.value);
+const w=[...p,...n].reduce((a,b)=>a+b,0)/(p.length+n.length);
+document.getElementById('score').textContent=w.toFixed(1);
+}
+[...pos,...neg].forEach(s=>s.addEventListener('input',recalc));recalc();
+document.querySelectorAll('.hb').forEach(c=>c.addEventListener('click',()=>c.classList.toggle('on')));
+function noteText(){
+const names=['Eating health','Movement health','IQ stimulation'],snames=['Brain fog','Lower back pain'];
+const a=pos.map((s,i)=>names[i]+': '+s.value).join('\n');
+const b=neg.map((s,i)=>snames[i]+': '+s.value).join('\n');
+const h=[...document.querySelectorAll('.hb.on')].map(c=>c.textContent).join(', ')||'none';
+return '## Evening reflection — 2026-06-09\nWellness: '+document.getElementById('score').textContent+'\n'+a+'\n'+b+'\nHabits: '+h+'\n\n'+(document.getElementById('verbal').value.trim()||'(no verbal reflection)');
+}
+document.getElementById('copy').addEventListener('click',async e=>{
+const t=noteText();let ok=false;
+try{await navigator.clipboard.writeText(t);ok=true;}catch(err){
+const ta=document.createElement('textarea');ta.value=t;document.body.appendChild(ta);ta.select();
+try{ok=document.execCommand('copy');}catch(e2){}document.body.removeChild(ta);}
+e.target.textContent=ok?'Copied':'Copy failed — select manually';
+setTimeout(()=>{e.target.innerHTML='<i class="ti ti-copy" style="font-size:15px;vertical-align:-2px;margin-right:4px;" aria-hidden="true"></i>Copy to notes';},1500);
+});
+document.getElementById('log').addEventListener('click',()=>sendPrompt('Log my evening reflection:\n'+noteText()+'\nWhich goal or habit should I nudge tomorrow?'));
+</script>
