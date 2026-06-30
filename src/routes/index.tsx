@@ -11,6 +11,9 @@ import {
   Download,
   Plus,
   X,
+  ChevronLeft,
+  ChevronRight,
+  Info,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -20,6 +23,8 @@ import {
   listDayDates,
   saveDay,
   todayISO,
+  shiftISO,
+  defaultEntryDate,
   loadAllDays,
 } from "../lib/storage";
 import type { DayEntry } from "../lib/storage";
@@ -43,14 +48,21 @@ function Reflection() {
     tomorrow: "",
     week: "",
   });
+  const [selectedDate, setSelectedDate] = useState<string>(() =>
+    defaultEntryDate(),
+  );
+  const [showDateInfo, setShowDateInfo] = useState(false);
   const taRef = useRef<HTMLTextAreaElement>(null);
 
-  // Load config + today's entry on the client (localStorage is browser-only).
+  // Load config on mount (localStorage is browser-only).
   useEffect(() => {
-    const c = loadConfig();
-    setConfig(c);
-    setEntry(loadOrInitDay(todayISO(), c));
+    setConfig(loadConfig());
   }, []);
+
+  // Load the entry for the selected date whenever it (or config) changes.
+  useEffect(() => {
+    if (config) setEntry(loadOrInitDay(selectedDate, config));
+  }, [config, selectedDate]);
 
   // Autosave on every change — localStorage is the only store this phase.
   useEffect(() => {
@@ -202,7 +214,9 @@ function Reflection() {
     toast.success("Exported all entries (.md)");
   };
 
-  const prettyDate = new Date(entry.date + "T00:00:00").toLocaleDateString(
+  const actualToday = todayISO();
+  const isPast = selectedDate < actualToday;
+  const prettyDate = new Date(selectedDate + "T00:00:00").toLocaleDateString(
     undefined,
     { weekday: "short", month: "short", day: "numeric" },
   );
@@ -218,14 +232,64 @@ function Reflection() {
 
   return (
     <div className="mx-auto min-h-dvh max-w-md px-4 py-5">
-      {/* Brand + date */}
+      {/* Brand + date navigator */}
       <div className="flex items-center justify-between">
         <span className="flex items-center gap-1.5 text-sm font-semibold tracking-tight">
           <span className="inline-block size-2 rounded-full bg-indigo-400" />
           VanyaOS
         </span>
-        <span className="text-muted-foreground text-xs">{prettyDate}</span>
+        <div className="text-muted-foreground flex items-center gap-0.5 text-xs">
+          <button
+            type="button"
+            aria-label="Previous day"
+            onClick={() => setSelectedDate((d) => shiftISO(d, -1))}
+            className="hover:text-foreground rounded p-1"
+          >
+            <ChevronLeft size={16} />
+          </button>
+          <span className="min-w-[88px] text-center tabular-nums">
+            {prettyDate}
+          </span>
+          <button
+            type="button"
+            aria-label="Next day"
+            disabled={selectedDate >= actualToday}
+            onClick={() => setSelectedDate((d) => shiftISO(d, 1))}
+            className="hover:text-foreground rounded p-1 disabled:opacity-30"
+          >
+            <ChevronRight size={16} />
+          </button>
+        </div>
       </div>
+
+      {/* Past-date warning (e.g. auto-set to yesterday after midnight) */}
+      {isPast && (
+        <div className="mt-2">
+          <div
+            onClick={() => setShowDateInfo((v) => !v)}
+            className="flex cursor-pointer items-center gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-1.5 text-[12px] font-medium text-amber-700 dark:text-amber-300"
+          >
+            <Info size={14} className="shrink-0" />
+            <span>Logging for {prettyDate}, not today.</span>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setSelectedDate(actualToday);
+              }}
+              className="ml-auto whitespace-nowrap underline"
+            >
+              Use today
+            </button>
+          </div>
+          {showDateInfo && (
+            <p className="text-muted-foreground mt-1 px-1 text-[11px]">
+              It's the early hours after midnight, so the reflection defaults to
+              the previous day. Use the ‹ › arrows to pick another date.
+            </p>
+          )}
+        </div>
+      )}
 
       <h1 className="mt-3 flex items-center gap-2 text-[15px] font-medium">
         <Moon size={17} className="text-indigo-500 dark:text-indigo-300" />
@@ -286,7 +350,7 @@ function Reflection() {
                     value={val}
                     min={0}
                     max={m.scale}
-                    accent={inverted ? "#fb7185" : "#818cf8"}
+                    accent={inverted ? "#fb7185" : "#16a34a"}
                     onValueChange={(v) => setMetric(m.id, v)}
                   />
                   <div className="text-muted-foreground mt-1 flex justify-between px-1 text-[9px] tabular-nums">
@@ -316,7 +380,7 @@ function Reflection() {
             </span>
             <div className="bg-muted h-1.5 flex-1 overflow-hidden rounded-full">
               <div
-                className="h-full rounded-full bg-sky-400"
+                className="h-full rounded-full bg-blue-700 dark:bg-sky-400"
                 style={{ width: `${Math.round(g.progress * 100)}%` }}
               />
             </div>

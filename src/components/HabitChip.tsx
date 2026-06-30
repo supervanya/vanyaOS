@@ -1,12 +1,12 @@
-import { motion, AnimatePresence, useAnimationControls } from "motion/react"
-import { Check } from "lucide-react"
+import { useRef } from "react"
+import confetti from "canvas-confetti"
 
 import { cn } from "@/lib/utils"
 
 /**
- * A habit chip that feels satisfying to complete: a spring "pop" + a checkmark
- * that springs in when you mark it done. Haptics come from an invisible native
- * <input switch> overlay (iOS Taptic Engine on tap) + navigator.vibrate (Android).
+ * A habit chip that throws confetti from its center when completed — satisfying
+ * and with no layout shift. Haptics come from an invisible native <input switch>
+ * overlay (iOS Taptic Engine on tap) + navigator.vibrate (Android).
  */
 export function HabitChip({
   label,
@@ -17,7 +17,7 @@ export function HabitChip({
   on: boolean
   onToggle: () => void
 }) {
-  const controls = useAnimationControls()
+  const ref = useRef<HTMLSpanElement>(null)
 
   const handleChange = () => {
     const willComplete = !on
@@ -25,39 +25,32 @@ export function HabitChip({
       navigator.vibrate?.(7)
     }
     onToggle()
-    // pop only on completion — the satisfying moment
-    if (willComplete) {
-      controls.start({
-        scale: [1, 1.16, 1],
-        transition: { duration: 0.34, ease: "easeOut" },
+    if (willComplete && ref.current) {
+      const r = ref.current.getBoundingClientRect()
+      confetti({
+        particleCount: 70,
+        spread: 75,
+        startVelocity: 30,
+        ticks: 120,
+        scalar: 0.8,
+        origin: {
+          x: (r.left + r.width / 2) / window.innerWidth,
+          y: (r.top + r.height / 2) / window.innerHeight,
+        },
       })
     }
   }
 
   return (
-    <motion.span
-      animate={controls}
+    <span
+      ref={ref}
       className={cn(
-        "relative inline-flex items-center gap-1 rounded-full border px-3.5 py-2 text-[13px] transition-colors",
+        "relative inline-flex items-center justify-center rounded-full border px-3.5 py-2 text-[13px] transition-colors",
         on
-          ? "border-emerald-600/50 bg-emerald-500/15 text-emerald-700 dark:border-emerald-500/60 dark:text-emerald-300"
+          ? "border-emerald-700/60 bg-emerald-600/20 text-emerald-800 dark:border-emerald-500/60 dark:bg-emerald-500/15 dark:text-emerald-300"
           : "text-muted-foreground border-border",
       )}
     >
-      <AnimatePresence initial={false}>
-        {on && (
-          <motion.span
-            key="check"
-            initial={{ width: 0, opacity: 0, scale: 0 }}
-            animate={{ width: "auto", opacity: 1, scale: 1 }}
-            exit={{ width: 0, opacity: 0, scale: 0 }}
-            transition={{ type: "spring", stiffness: 500, damping: 30 }}
-            className="inline-flex overflow-hidden"
-          >
-            <Check size={14} className="shrink-0" />
-          </motion.span>
-        )}
-      </AnimatePresence>
       {label}
       <input
         type="checkbox"
@@ -67,6 +60,6 @@ export function HabitChip({
         onChange={handleChange}
         className="absolute inset-0 m-0 size-full cursor-pointer opacity-0 [clip-path:inset(0)]"
       />
-    </motion.span>
+    </span>
   )
 }
