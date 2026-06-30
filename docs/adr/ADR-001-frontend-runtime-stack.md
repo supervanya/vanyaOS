@@ -1,9 +1,14 @@
 # ADR-001: Frontend & runtime stack — TanStack Start (SPA mode)
 
-**Status:** Accepted
+**Status:** Partially superseded (see 2026-06-29 revision below)
 **Date:** 2026-06-29
 **Deciders:** Vanya (solo)
 **Supersedes:** the Next.js choice in the initial ARCHITECTURE.md draft
+
+> **Revision (2026-06-29) — M0 went static, dropped TanStack *Start*.**
+> M0 scope changed to **localStorage-only data + a static deploy on GitHub Pages** (no server, no GitHub-API writes, no passcode — nothing on a server to protect). That removes the entire reason for TanStack *Start* (SSR + server functions). On top of that, TanStack Start's static build is **broken on the pinned version** — its SPA build still tries to build an SSR/Nitro server environment and errors (`rolldownOptions.input should not be an html file when building for SSR`), emitting empty prerendered HTML. This is exactly the maturity risk this ADR's Consequences called out.
+>
+> **Decision:** keep **TanStack Router** (file-based routing) but run it on **plain Vite** (`@tanstack/router-plugin/vite` + a standard `index.html`/`main.tsx`), drop `@tanstack/react-start` + Nitro. Result: a clean `vite build → dist/` static SPA + `vite-plugin-pwa`, deployed to GitHub Pages. The server-held-token / GitHub-API-sync path (the original Option A) is **deferred to a future cross-device-sync milestone**; `src/lib/storage.ts` remains the swap seam.
 
 ## Context
 

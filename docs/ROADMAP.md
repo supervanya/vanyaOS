@@ -4,29 +4,30 @@ Sequenced to get you reflecting on your phone **as fast as possible**, then to m
 
 ---
 
-## Phase 0 — Local UI prototype  *(CURRENT — settle the experience before any deploy)*
-Prove the *feel* on your phone before investing in deploy/sync plumbing.
-- TanStack Start (`ssr: false`) running **locally**, viewed on the phone over LAN (`http://<mac-lan-ip>:3000`).
-- **localStorage** persistence, no backend — `src/lib/storage.ts` is the single swap point for the future GitHub layer.
-- Full reflection screen: 0–5 grouped sliders + wellness, habit chips, goal bars, todos (with roll-forward), journal.
-- **Copy today** + **Export all (.md)** → the canonical day-file markdown. Doubles as the **AI bridge**: paste into an AI for action items / goal progress.
+## Phase 0 — Local UI prototype  ✅ **DONE** (closed 2026-06-29)
+Settled the *feel* on-device before investing in deploy/sync plumbing.
+- TanStack Start (`ssr: false`) on **localStorage**, viewed on the phone over LAN. `src/lib/storage.ts` remains the single swap point for the GitHub layer.
+- Full reflection screen — this ended up covering **M1's UI scope** too: 0–5 grouped sliders + composite wellness, habit chips, goal bars, todos with roll-forward, auto-growing journal.
+- Plus polish that wasn't even planned: shadcn/ui, device-driven light/dark theme, semantic color tokens (success/warning/error/info), iOS Taptic haptics, confetti habit completion, a date navigator with post-midnight default, and **Copy/Export** as the manual **AI bridge**.
 
-**DoD:** You reflect on your phone for a few nights, the UI feels right, and you're exporting markdown to back up + feed an AI. Only then graduate to M0.
+**✅ Met:** the nightly screen is one worth opening; markdown export works as backup + AI input.
 
-> Why first: you reprioritized the AI coaching loop and "settle the UI first." localStorage + export delivers both with zero infra. Deploy/GitHub/passcode (M0) is wasted effort until the nightly screen is one you actually want to open.
+> Because the full UI shipped here, **M1 below is effectively folded into M0** — the only thing left is to persist it to GitHub and deploy it.
 
 ---
 
-## M0 — Deploy & persistence pipeline  *(graduate here once Phase 0's UI is settled)*
-Prove the plumbing before building features.
-- TanStack Start app (`ssr: false`) deployed (Cloudflare Workers / Netlify) with a live HTTPS URL.
-- PWA manifest + service worker (`vite-plugin-pwa`) → installable to phone home screen.
-- Single **passcode gate** — passcode server fn → signed HTTP-only cookie.
-- A `day` **server function** can **write and read a `.md` file** in the private GitHub repo (round-trip a dummy entry).
+## M0 — Static deploy (on-device data)  *(CURRENT)*
+Ship the existing UI to a public URL as an installable PWA, with data staying in
+**localStorage on each device** — no server, no GitHub-API writes, no passcode
+(nothing on a server to protect). Cross-device sync is deferred to a later
+milestone (the server/GitHub-API path from ADR-001).
+- **Vite + TanStack Router** static build (`vite build → dist/`) — TanStack *Start* dropped (its static build is broken on the pinned version; see ADR-001 revision).
+- **PWA** (`vite-plugin-pwa`) manifest + service worker → installable on the home screen.
+- Deploy to **GitHub Pages** (public repo, free) at `https://supervanya.github.io/vanyaOS/` via a GitHub Actions workflow; base path `/vanyaOS/`.
 
-**DoD:** Open the URL on your phone, install it, log in with the passcode, hit "save," and see a commit appear in your journal repo. No real UI yet.
+**DoD:** open the URL on your phone, install it to the home screen, complete a reflection, and have it persist in that device's localStorage. No server, no login.
 
-> Why first: GitHub-API auth + deploy env vars (`GITHUB_TOKEN`, `APP_PASSCODE`) + PWA install are exactly the things that quietly eat a weekend. Find the friction now, not after you've built the UI.
+> Tradeoff: localStorage-only means **no phone↔Mac sync** — each device keeps its own data; Copy/Export markdown is the bridge. Adding sync later = the deferred server path.
 
 ---
 

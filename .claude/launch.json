@@ -4,8 +4,8 @@
     {
       "name": "vanyaos-dev",
       "runtimeExecutable": "mise",
-      "runtimeArgs": ["exec", "node@24.14.1", "--", "bun", "--bun", "run", "dev"],
-      "port": 3000
+      "runtimeArgs": ["exec", "node@24.14.1", "--", "bun", "x", "vite", "--port", "5273", "--host"],
+      "port": 5273
     }
   ]
 }
