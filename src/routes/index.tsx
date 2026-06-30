@@ -350,7 +350,7 @@ function Reflection() {
                     value={val}
                     min={0}
                     max={m.scale}
-                    tone={inverted ? "destructive" : "success"}
+                    tone={inverted ? "danger" : "success"}
                     onValueChange={(v) => setMetric(m.id, v)}
                   />
                   <div className="text-muted-foreground mt-1 flex justify-between px-1 text-[9px] tabular-nums">

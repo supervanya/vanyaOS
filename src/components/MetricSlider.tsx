@@ -18,9 +18,14 @@ export function MetricSlider({
   min?: number
   max?: number
   onValueChange: (value: number) => void
-  tone: "success" | "destructive"
+  tone: "success" | "danger"
   className?: string
 }) {
+  const toneCls =
+    tone === "danger"
+      ? "[&_[data-slot=slider-range]]:bg-destructive/60 [&_[data-slot=slider-thumb]]:border-destructive"
+      : "[&_[data-slot=slider-range]]:bg-success/60 [&_[data-slot=slider-thumb]]:border-success"
+
   return (
     <Slider
       value={[value]}
@@ -34,13 +39,7 @@ export function MetricSlider({
         }
         onValueChange(v[0])
       }}
-      className={cn(
-        `
-        [&_[data-slot=slider-range]]:bg-${tone}/60 
-        [&_[data-slot=slider-thumb]]:border-${tone}
-        `,
-        className,
-      )}
+      className={cn(toneCls, className)}
     />
   )
 }
