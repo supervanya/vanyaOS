@@ -105,7 +105,9 @@ export function newEntry(date: string, config: Config): DayEntry {
   return {
     date,
     theme: config.activeTheme,
-    metrics: Object.fromEntries(config.metrics.map((m) => [m.id, Math.ceil(m.scale / 2)])),
+    // start every slider at 0 so untouched days don't masquerade as a flat
+    // baseline (they'd otherwise seed at the mid-point and look like real data)
+    metrics: Object.fromEntries(config.metrics.map((m) => [m.id, 0])),
     habits: Object.fromEntries(config.habits.map((h) => [h.id, false])),
     todos: {
       tomorrow: prev ? carryForward(prev.todos?.tomorrow) : [],
