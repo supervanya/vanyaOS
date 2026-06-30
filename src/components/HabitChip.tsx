@@ -47,7 +47,7 @@ export function HabitChip({
       className={cn(
         "relative inline-flex items-center justify-center rounded-full border px-3.5 py-2 text-[13px] transition-colors",
         on
-          ? "border-emerald-700/60 bg-emerald-600/20 text-emerald-800 dark:border-emerald-500/60 dark:bg-emerald-500/15 dark:text-emerald-300"
+          ? "border-success/85 bg-success/15 text-success"
           : "text-muted-foreground border-border",
       )}
     >

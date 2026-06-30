@@ -30,16 +30,20 @@ body,
   --muted-foreground: oklch(0.556 0 0);
   --accent: oklch(0.97 0 0);
   --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
+  --destructive: oklch(0.4151 0.116 26.17); /* red-700 */
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
   --ring: oklch(0.708 0 0);
+  /* semantic status colors — light-mode values (darker so they read on white) */
+  --success: #15803d; /* green-700 */
+  --warning: #d97706; /* amber-600 */
+  --info: #405898; /* blue-700 */
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
     /* a deep, slightly cool near-black for the evening ritual */
-    --background: oklch(0.12 0.004 285);
+    --background: oklch(23.116% 0.00193 286.052);
     --foreground: oklch(0.985 0 0);
     --card: oklch(0.2 0 0);
     --card-foreground: oklch(0.985 0 0);
@@ -53,10 +57,15 @@ body,
     --muted-foreground: oklch(0.708 0 0);
     --accent: oklch(0.269 0 0);
     --accent-foreground: oklch(0.985 0 0);
-    --destructive: oklch(0.704 0.191 22.216);
+    --destructive: var(--color-rose-400);
     --border: oklch(1 0 0 / 10%);
     --input: oklch(1 0 0 / 15%);
     --ring: oklch(0.556 0 0);
+    /* dark-mode values — brighter so they pop on the near-black bg */
+    /* --success: oklch(62.7% 0.194 149.214); */
+    --success: var(--color-green-400);
+    --warning: var(--color-amber-600);
+    --info: var(--color-slate-500);
   }
 }
 
@@ -80,6 +89,9 @@ body,
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-info: var(--info);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
@@ -96,6 +108,10 @@ body,
 
 body {
   margin: 0;
-  font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+  font-family:
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    sans-serif;
   -webkit-font-smoothing: antialiased;
 }
