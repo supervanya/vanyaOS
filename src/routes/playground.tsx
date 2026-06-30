@@ -306,7 +306,7 @@ const VARIANTS: { name: string; desc: string; el: React.ReactNode }[] = [
 
 function Playground() {
   return (
-    <div className="mx-auto min-h-dvh max-w-md px-4 pt-[max(1.5rem,env(safe-area-inset-top))] pb-[max(1.5rem,env(safe-area-inset-bottom))]">
+    <>
       <Link
         to="/"
         className="text-muted-foreground hover:text-foreground mb-4 inline-flex items-center gap-1 text-xs"
@@ -333,6 +333,6 @@ function Playground() {
           </div>
         ))}
       </div>
-    </div>
+    </>
   );
 }

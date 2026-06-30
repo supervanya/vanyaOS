@@ -231,7 +231,7 @@ function Reflection() {
   const delta = prevScore == null ? null : score - prevScore
 
   return (
-    <div className="mx-auto min-h-dvh max-w-md px-4 pt-[max(1.25rem,env(safe-area-inset-top))] pb-[max(1.25rem,env(safe-area-inset-bottom))]">
+    <>
       {/* Brand + date navigator */}
       <div className="flex items-center justify-between">
         <span className="flex items-center gap-1.5 text-sm font-semibold tracking-tight">
@@ -508,6 +508,6 @@ function Reflection() {
           Animation playground
         </Link>
       </p>
-    </div>
+    </>
   )
 }
