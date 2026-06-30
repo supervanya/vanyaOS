@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router"
+import { createFileRoute, Link } from "@tanstack/react-router"
 import { useEffect, useMemo, useRef, useState } from "react"
 import {
   Moon,
@@ -499,6 +499,14 @@ function Reflection() {
 
       <p className="text-muted-foreground mt-3 text-center text-[11px]">
         Saved locally · theme: {entry.theme}
+      </p>
+      <p className="mt-1 text-center text-[11px]">
+        <Link
+          to="/playground"
+          className="text-muted-foreground hover:text-foreground underline"
+        >
+          Animation playground
+        </Link>
       </p>
     </div>
   )
