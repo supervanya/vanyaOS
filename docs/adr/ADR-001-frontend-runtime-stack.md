@@ -1,6 +1,6 @@
 # ADR-001: Frontend & runtime stack — TanStack Start (SPA mode)
 
-**Status:** Partially superseded (see 2026-06-29 revision below)
+**Status:** Superseded by [ADR-002](ADR-002-supabase-backend-pivot.md) (2026-06-30) — the GitHub-markdown storage model this ADR was built around is dropped entirely in favor of Supabase (Postgres + Auth). The **frontend** decision below (TanStack Router on plain Vite, static deploy to GitHub Pages) still stands unchanged; only the backend/storage sections are superseded.
 **Date:** 2026-06-29
 **Deciders:** Vanya (solo)
 **Supersedes:** the Next.js choice in the initial ARCHITECTURE.md draft
