@@ -25,6 +25,11 @@ jobs:
       - uses: oven-sh/setup-bun@v2
       - run: bun install --frozen-lockfile
       - run: bun run build
+        env:
+          # Publishable, not secret — RLS is the security boundary (ADR-002).
+          # Set via `gh variable set` (repo Settings > Secrets and variables > Actions > Variables).
+          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}
       - name: SPA fallback + .nojekyll
         run: |
           cp dist/index.html dist/404.html
