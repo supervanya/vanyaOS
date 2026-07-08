@@ -7,8 +7,6 @@ import {
   Repeat,
   Lightbulb,
   Target,
-  Copy,
-  Download,
   Plus,
   X,
   ChevronLeft,
@@ -19,17 +17,18 @@ import { toast } from "sonner"
 import {
   loadConfig,
   loadOrInitDay,
-  loadDay,
   listDayDates,
+  loadDay,
   saveDay,
+  saveDraft,
+  clearDraft,
   todayISO,
   shiftISO,
   defaultEntryDate,
-  loadAllDays,
 } from "../lib/storage"
-import type { DayEntry } from "../lib/storage"
-import { wellness, dayToMarkdown, exportAll } from "../lib/markdown"
-import type { Config, Metric } from "../lib/config"
+import type { DayEntry, LoadedConfig } from "../lib/storage"
+import { wellness } from "../lib/wellness"
+import type { Metric } from "../lib/config"
 import { MetricSlider } from "@/components/MetricSlider"
 import { HabitChip } from "@/components/HabitChip"
 import { HapticToggle } from "@/components/HapticToggle"
@@ -41,8 +40,13 @@ export const Route = createFileRoute("/")({ component: Reflection })
 
 type Scope = "tomorrow" | "week"
 
+// How long to wait after the last edit before syncing to Postgres. The local
+// draft buffer (localStorage) is written every change, instantly — this only
+// debounces the network round-trip.
+const SYNC_DEBOUNCE_MS = 800
+
 function Reflection() {
-  const [config, setConfig] = useState<Config | null>(null)
+  const [config, setConfig] = useState<LoadedConfig | null>(null)
   const [entry, setEntry] = useState<DayEntry | null>(null)
   const [drafts, setDrafts] = useState<Record<Scope, string>>({
     tomorrow: "",
@@ -53,21 +57,46 @@ function Reflection() {
   )
   const [showDateInfo, setShowDateInfo] = useState(false)
   const taRef = useRef<HTMLTextAreaElement>(null)
+  const syncTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // Load config on mount (localStorage is browser-only).
+  // Load config once the account is known (the root layout only renders this
+  // route once a session exists).
   useEffect(() => {
-    setConfig(loadConfig())
+    loadConfig()
+      .then(setConfig)
+      .catch((err) => toast.error(`Couldn't load config: ${err.message}`))
   }, [])
 
   // Load the entry for the selected date whenever it (or config) changes.
   useEffect(() => {
-    if (config) setEntry(loadOrInitDay(selectedDate, config))
+    if (!config) return
+    let cancelled = false
+    loadOrInitDay(selectedDate, config)
+      .then((e) => {
+        if (!cancelled) setEntry(e)
+      })
+      .catch((err) => toast.error(`Couldn't load entry: ${err.message}`))
+    return () => {
+      cancelled = true
+    }
   }, [config, selectedDate])
 
-  // Autosave on every change — localStorage is the only store this phase.
+  // Every change writes the local draft instantly (survives a dropped
+  // connection), then syncs to Postgres after a short debounce.
   useEffect(() => {
-    if (entry) saveDay(entry)
-  }, [entry])
+    if (!entry) return
+    saveDraft(entry)
+    if (!config) return
+    if (syncTimer.current) clearTimeout(syncTimer.current)
+    syncTimer.current = setTimeout(() => {
+      saveDay(entry, config)
+        .then(() => clearDraft(entry.date))
+        .catch((err) => toast.error(`Sync failed, kept locally: ${err.message}`))
+    }, SYNC_DEBOUNCE_MS)
+    return () => {
+      if (syncTimer.current) clearTimeout(syncTimer.current)
+    }
+  }, [entry, config])
 
   // Auto-grow the reflection textarea to fit its content (no drag handle).
   useEffect(() => {
@@ -83,11 +112,29 @@ function Reflection() {
   )
 
   // Wellness of the most recent prior day, for the "vs last" delta.
-  const prevScore = useMemo(() => {
-    if (!config || !entry) return null
-    const priors = listDayDates().filter((d) => d < entry.date)
-    const p = priors.length ? loadDay(priors[priors.length - 1]) : null
-    return p ? wellness(p, config) : null
+  const [prevScore, setPrevScore] = useState<number | null>(null)
+  useEffect(() => {
+    if (!config || !entry) {
+      setPrevScore(null)
+      return
+    }
+    let cancelled = false
+    const date = entry.date
+    listDayDates()
+      .then((dates) => {
+        const priors = dates.filter((d) => d < date)
+        if (!priors.length) return null
+        return loadDay(priors[priors.length - 1], config)
+      })
+      .then((p) => {
+        if (!cancelled) setPrevScore(p ? wellness(p, config) : null)
+      })
+      .catch(() => {
+        if (!cancelled) setPrevScore(null)
+      })
+    return () => {
+      cancelled = true
+    }
   }, [config, entry?.date])
 
   const groups = useMemo(() => {
@@ -173,46 +220,6 @@ function Reflection() {
           }
         : e,
     )
-
-  async function copyText(text: string, msg: string) {
-    try {
-      await navigator.clipboard.writeText(text)
-    } catch {
-      const ta = document.createElement("textarea")
-      ta.value = text
-      document.body.appendChild(ta)
-      ta.select()
-      try {
-        document.execCommand("copy")
-      } catch {
-        /* ignore */
-      }
-      ta.remove()
-    }
-    toast.success(msg)
-  }
-
-  function downloadMd(filename: string, text: string) {
-    const url = URL.createObjectURL(new Blob([text], { type: "text/markdown" }))
-    const a = document.createElement("a")
-    a.href = url
-    a.download = filename
-    a.click()
-    URL.revokeObjectURL(url)
-  }
-
-  const copyToday = () =>
-    copyText(
-      dayToMarkdown(entry, config),
-      "Today copied — paste into notes or an AI",
-    )
-  const exportEverything = () => {
-    downloadMd(
-      `vanyaos-export-${todayISO()}.md`,
-      exportAll(loadAllDays(), config),
-    )
-    toast.success("Exported all entries (.md)")
-  }
 
   const actualToday = todayISO()
   const isPast = selectedDate < actualToday
@@ -481,24 +488,8 @@ function Reflection() {
         />
       </section>
 
-      {/* Actions */}
-      <section className="mt-3 grid grid-cols-2 gap-2">
-        <div className="dark:">
-          <Button
-            onClick={copyToday}
-            // className="h-11 bg-slate-700 text-white hover:bg-indigo-400"
-          >
-            <Copy /> Copy today
-          </Button>
-        </div>
-
-        <Button onClick={exportEverything} variant="outline" className="h-11">
-          <Download /> Export all
-        </Button>
-      </section>
-
       <p className="text-muted-foreground mt-3 text-center text-[11px]">
-        Saved locally · theme: {entry.theme}
+        Synced to your account · theme: {entry.theme}
       </p>
       <p className="mt-1 text-center text-[11px]">
         <Link
