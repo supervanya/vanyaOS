@@ -250,6 +250,14 @@ otp_expiry = 3600
 # subject = "You have been invited"
 # content_path = "./supabase/templates/invite.html"
 
+# Sign-in email carries the 6-digit {{ .Token }} code — the default template
+# is link-only, and a magic link can't authenticate the installed PWA (separate
+# storage partition from the browser on iOS). Mirror any edits here in the
+# hosted project's Auth > Email Templates > Magic Link.
+[auth.email.template.magic_link]
+subject = "Your VanyaOS sign-in code"
+content_path = "./supabase/templates/magic_link.html"
+
 # Uncomment to customize notification email template
 # [auth.email.notification.password_changed]
 # enabled = true
