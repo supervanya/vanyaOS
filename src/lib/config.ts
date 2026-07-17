@@ -32,6 +32,9 @@ export const DEFAULT_CONFIG: Config = {
     { id: 'reading', label: 'Reading', group: 'Stimulation', higherIsBetter: true, scale: 5 },
     { id: 'brain_fog', label: 'Brain fog', group: 'Symptoms', higherIsBetter: false, scale: 5 },
     { id: 'lower_back_pain', label: 'Lower back pain', group: 'Symptoms', higherIsBetter: false, scale: 5 },
+    // Appended last: sort_order is the array index, and existing accounts keep
+    // their persisted sort_order — inserting mid-list would collide with it.
+    { id: 'sleep_quality', label: 'Sleep quality', group: 'Recovery', higherIsBetter: true, scale: 5 },
   ],
   habits: [
     { id: 'strength', label: 'Strength' },
