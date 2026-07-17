@@ -339,6 +339,8 @@ function Reflection() {
               <Activity size={14} />
             ) : group === "Stimulation" ? (
               <Lightbulb size={14} />
+            ) : group === "Recovery" ? (
+              <Moon size={14} />
             ) : (
               <Target size={14} />
             )}

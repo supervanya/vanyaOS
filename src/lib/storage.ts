@@ -55,50 +55,54 @@ async function currentUserId(): Promise<string> {
   return data.user.id
 }
 
-// First login for this account: no metrics/habits/goals rows yet. Seed them
-// from the old hardcoded config.ts defaults so the app isn't empty on day one.
-async function seedConfigIfEmpty(userId: string): Promise<void> {
-  const { count } = await supabase
-    .from('metrics')
-    .select('id', { count: 'exact', head: true })
-  if ((count ?? 0) > 0) return
+// Seed any config.ts defaults this account doesn't have yet — first login gets
+// everything, and a default added later (e.g. a new metric) reaches existing
+// accounts on their next load. Existing rows are never touched, so DB-side
+// edits to labels/ordering survive.
+async function seedMissingDefaults(userId: string): Promise<void> {
+  const [{ data: metricKeys }, { data: habitKeys }, { data: goalKeys }] = await Promise.all([
+    supabase.from('metrics').select('key'),
+    supabase.from('habits').select('key'),
+    supabase.from('goals').select('key'),
+  ])
+  const has = (rows: { key: string }[] | null) => new Set((rows ?? []).map((r) => r.key))
+  const [metricSet, habitSet, goalSet] = [has(metricKeys), has(habitKeys), has(goalKeys)]
+
+  const missingMetrics = DEFAULT_CONFIG.metrics
+    .map((m, i) => ({
+      user_id: userId,
+      key: m.id,
+      label: m.label,
+      group_name: m.group,
+      higher_is_better: m.higherIsBetter,
+      scale: m.scale,
+      sort_order: i,
+    }))
+    .filter((r) => !metricSet.has(r.key))
+  const missingHabits = DEFAULT_CONFIG.habits
+    .map((h, i) => ({ user_id: userId, key: h.id, label: h.label, sort_order: i }))
+    .filter((r) => !habitSet.has(r.key))
+  const missingGoals = DEFAULT_CONFIG.goals
+    .map((g, i) => ({
+      user_id: userId,
+      key: g.id,
+      label: g.label,
+      progress: g.progress,
+      note: g.note ?? null,
+      sort_order: i,
+    }))
+    .filter((r) => !goalSet.has(r.key))
 
   await Promise.all([
-    supabase.from('metrics').insert(
-      DEFAULT_CONFIG.metrics.map((m, i) => ({
-        user_id: userId,
-        key: m.id,
-        label: m.label,
-        group_name: m.group,
-        higher_is_better: m.higherIsBetter,
-        scale: m.scale,
-        sort_order: i,
-      })),
-    ),
-    supabase.from('habits').insert(
-      DEFAULT_CONFIG.habits.map((h, i) => ({
-        user_id: userId,
-        key: h.id,
-        label: h.label,
-        sort_order: i,
-      })),
-    ),
-    supabase.from('goals').insert(
-      DEFAULT_CONFIG.goals.map((g, i) => ({
-        user_id: userId,
-        key: g.id,
-        label: g.label,
-        progress: g.progress,
-        note: g.note ?? null,
-        sort_order: i,
-      })),
-    ),
+    missingMetrics.length ? supabase.from('metrics').insert(missingMetrics) : null,
+    missingHabits.length ? supabase.from('habits').insert(missingHabits) : null,
+    missingGoals.length ? supabase.from('goals').insert(missingGoals) : null,
   ])
 }
 
 export async function loadConfig(): Promise<LoadedConfig> {
   const userId = await currentUserId()
-  await seedConfigIfEmpty(userId)
+  await seedMissingDefaults(userId)
 
   const [{ data: metricRows }, { data: habitRows }, { data: goalRows }] = await Promise.all([
     supabase.from('metrics').select('*').order('sort_order'),
