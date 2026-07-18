@@ -38,8 +38,9 @@
 Normalized, not a document blob — history queries (streaks, sparklines, M3) become plain SQL instead of hand-parsed markdown. Every table is scoped by `user_id` and gated by a Row-Level Security policy `using (user_id = auth.uid())` for select/insert/update/delete — single-tenant today, but the isolation is free.
 
 ```sql
--- Config, now DB-editable instead of hardcoded (edited directly in Supabase for
--- now; an in-app Settings UI is still deferred, but the door is open cheaply).
+-- Config, DB-editable. M3 adds `archived boolean not null default false` to all
+-- three tables plus the in-app Settings CRUD (add/rename/reorder/archive) —
+-- archive, never delete, so historical entry values keep their FK targets.
 create table metrics (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users,
@@ -98,15 +99,35 @@ create table entry_habits (
   primary key (entry_id, habit_id)
 );
 
-create table todos (
+-- One LIVING task list (M2 re-scope, 2026-07-17) — NOT per-entry snapshots.
+-- Replaces the original `todos` table that FK'd each item to a day's entry
+-- with roll-forward copying; an undone task now simply stays on the list.
+-- Migration: copy the most recent entry's undone todos into `tasks`
+-- (scope 'tomorrow' -> 'today'), then drop `todos`.
+create table tasks (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users,
-  entry_id uuid not null references entries on delete cascade,
-  scope text not null check (scope in ('tomorrow', 'week')),
+  scope text not null check (scope in ('today', 'week', 'someday')),
+  size text not null default 'small' check (size in ('big', 'medium', 'small')),
   text text not null,
-  done boolean not null default false,
-  sort_order int not null default 0
+  completed_at timestamptz,          -- null = open; timestamps double as history
+  archived boolean not null default false,
+  sort_order int not null default 0,
+  created_at timestamptz not null default now()
 );
+
+-- Projects with a WIP limit of ONE: exactly one in_progress, the rest parked.
+create table projects (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users,
+  name text not null,
+  emoji text,
+  status text not null default 'parking_lot' check (status in ('in_progress', 'parking_lot')),
+  sort_order int not null default 0,
+  created_at timestamptz not null default now()
+);
+-- WIP-1 enforced at the DB, not just the UI:
+create unique index one_project_in_progress on projects (user_id) where status = 'in_progress';
 
 -- The AI coach's output. One (or more, if regenerated) row per entry.
 create table ai_reports (
@@ -131,9 +152,20 @@ join metrics m on m.id = v.metric_id
 group by e.id;
 ```
 
-### Todo roll-forward
+### Tasks: one list, two surfaces
 
-Same behavior as v1, now expressed as inserts instead of a load-time copy: when a new day's entry is first created, the app queries the most recent prior `entries` row for that user, and inserts a fresh `todos` row (same `text`/`scope`, `done = false`) for every prior todo that's still `done = false`. The original rows aren't touched — they remain that day's historical record even if never completed.
+The dashboard (`/`) and the reflection screen (`/reflect`) both read/write the same `tasks` rows — there is exactly one todo state in the system. Completing a task sets `completed_at` (kept, giving completion history for the future SMART report); "rescheduling" is just changing `scope`. The old roll-forward mechanism is gone: nothing is copied between days because tasks don't belong to days.
+
+**The 1-3-5 rule** (`CAPS` in `src/lib/storage.ts`): the weekly board = tasks in scope `today`+`week`, hard-capped at 1 big / 3 medium / 5 small per size — completed items still count (done work occupied its slot). Adding or promoting past a cap opens a swap chooser (evict a board item to `someday`, or park the incoming one); there is no silent overflow.
+
+### App surfaces (M2–M3)
+
+| Route | Purpose |
+|---|---|
+| `/` | **Command center** — the 1-3-5 board (hard caps + swap), habit chips (writes today's entry), goal glance, projects card (WIP-1, tap-to-swap), nav to Reflect |
+| `/reflect` | The evening reflection (moved from `/`); embeds the same task list |
+| `/settings` | M3: CRUD + archive for metrics/habits/goals, goal progress editing |
+| `/login` | Magic link + paste-the-link sign-in |
 
 ## Save flow
 
@@ -142,7 +174,7 @@ The nightly ritual has two distinct actions now, not one — this matters for co
 1. **Continuous autosave (silent, no AI call).** As you edit sliders/habits/reflection/todos, changes write to a **local draft buffer in localStorage first** (instant, survives a dropped connection), then sync to the corresponding Postgres rows in the background (debounced). This is the same UX as today's autosave — just backed by Postgres instead of being the only copy.
 2. **Explicit "Finish reflection" (triggers the AI coach).** A single tap invokes the `synthesize-entry` Edge Function with the entry's id. The function reads the entry + its metrics/habits/todos, calls the Claude API, and writes one row to `ai_reports`.
 3. The client is subscribed to `ai_reports` inserts for that entry via **Supabase Realtime** — the coaching output appears automatically, no refresh, no polling.
-4. On load, the app reads `entries` + child rows for the selected date (or the most recent prior day for roll-forward) directly via the Supabase client, gated by RLS to the logged-in user.
+4. On load, the app reads `entries` + child rows for the selected date (and the open `tasks` list) directly via the Supabase client, gated by RLS to the logged-in user.
 
 ## Non-goals for v2 (architectural)
 

@@ -8,17 +8,40 @@
 import { supabase } from './supabaseClient'
 import { DEFAULT_CONFIG, type Config, type Metric, type Habit, type Goal } from './config'
 
-export type TodoItem = { text: string; done: boolean }
-
 export type DayEntry = {
   date: string // YYYY-MM-DD
   theme: string
   metrics: Record<string, number>
   habits: Record<string, boolean>
-  todos: { tomorrow: TodoItem[]; week: TodoItem[] }
   reflection: string
   updatedAt: string
 }
+
+// The living task list (M2): tasks belong to no day. scope today/week counts
+// toward the weekly 1-3-5 commitment; someday is the parking lot.
+export type TaskScope = 'today' | 'week' | 'someday'
+export type TaskSize = 'big' | 'medium' | 'small'
+export type Task = {
+  id: string
+  scope: TaskScope
+  size: TaskSize
+  text: string
+  completedAt: string | null
+  sortOrder: number
+}
+
+export type ProjectStatus = 'in_progress' | 'parking_lot'
+export type Project = {
+  id: string
+  name: string
+  emoji: string | null
+  status: ProjectStatus
+  sortOrder: number
+}
+
+// The 1-3-5 rule: weekly caps per size, counted over scope today+week,
+// including completed items (done work still occupied its slot this week).
+export const CAPS: Record<TaskSize, number> = { big: 1, medium: 3, small: 5 }
 
 // Config rows keyed by their stable slug (`key` in Postgres, `id` in the UI
 // shape) plus the slug -> row-uuid maps needed to write child tables.
@@ -158,28 +181,15 @@ async function fetchEntryRow(userId: string, date: string) {
   return data
 }
 
-async function fetchMostRecentPriorEntryRow(userId: string, beforeDate: string) {
-  const { data } = await supabase
-    .from('entries')
-    .select('*')
-    .eq('user_id', userId)
-    .lt('entry_date', beforeDate)
-    .order('entry_date', { ascending: false })
-    .limit(1)
-    .maybeSingle()
-  return data
-}
-
 // Hydrates an `entries` row into the same DayEntry shape the UI has always
 // used, keyed by metric/habit *slug* (not the Postgres row uuid).
 async function hydrateEntry(
   row: { id: string; entry_date: string; theme: string | null; reflection: string | null; updated_at: string },
   config: LoadedConfig,
 ): Promise<DayEntry> {
-  const [{ data: metricVals }, { data: habitVals }, { data: todoRows }] = await Promise.all([
+  const [{ data: metricVals }, { data: habitVals }] = await Promise.all([
     supabase.from('entry_metric_values').select('metric_id, value').eq('entry_id', row.id),
     supabase.from('entry_habits').select('habit_id, done').eq('entry_id', row.id),
-    supabase.from('todos').select('scope, text, done').eq('entry_id', row.id).order('sort_order'),
   ])
 
   const metricKeyById = Object.fromEntries(
@@ -200,19 +210,11 @@ async function hydrateEntry(
     if (key) habits[key] = h.done
   }
 
-  const todos: { tomorrow: TodoItem[]; week: TodoItem[] } = { tomorrow: [], week: [] }
-  for (const t of todoRows ?? []) {
-    const item: TodoItem = { text: t.text, done: t.done }
-    if (t.scope === 'tomorrow') todos.tomorrow.push(item)
-    else todos.week.push(item)
-  }
-
   return {
     date: row.entry_date,
     theme: row.theme ?? config.activeTheme,
     metrics,
     habits,
-    todos,
     reflection: row.reflection ?? '',
     updatedAt: row.updated_at,
   }
@@ -230,15 +232,9 @@ export async function loadAllDays(config: LoadedConfig): Promise<DayEntry[]> {
   return entries.filter((d): d is DayEntry => d !== null)
 }
 
-const carryForward = (items: TodoItem[] = []): TodoItem[] =>
-  items.filter((t) => !t.done).map((t) => ({ text: t.text, done: false }))
-
-// A fresh entry for `date`. Unfinished todos roll forward from the most recent
-// prior day (not strictly yesterday, so skipped days don't drop pending items).
+// A fresh entry for `date`. (Todos no longer roll forward — the living task
+// list simply persists; see the tasks section below.)
 export async function newEntry(date: string, config: LoadedConfig): Promise<DayEntry> {
-  const userId = await currentUserId()
-  const priorRow = await fetchMostRecentPriorEntryRow(userId, date)
-  const prev = priorRow ? await hydrateEntry(priorRow, config) : null
   return {
     date,
     theme: config.activeTheme,
@@ -246,10 +242,6 @@ export async function newEntry(date: string, config: LoadedConfig): Promise<DayE
     // baseline (they'd otherwise seed at the mid-point and look like real data)
     metrics: Object.fromEntries(config.metrics.map((m) => [m.id, 0])),
     habits: Object.fromEntries(config.habits.map((h) => [h.id, false])),
-    todos: {
-      tomorrow: prev ? carryForward(prev.todos.tomorrow) : [],
-      week: prev ? carryForward(prev.todos.week) : [],
-    },
     reflection: '',
     updatedAt: new Date().toISOString(),
   }
@@ -297,33 +289,6 @@ export async function saveDay(entry: DayEntry, config: LoadedConfig): Promise<vo
       .upsert(habitRows, { onConflict: 'entry_id,habit_id' })
     if (hErr) throw hErr
   }
-
-  // Todos: replace-all is simplest and correct here — the list is short and
-  // fully re-derived from client state on every save; no ids to reconcile.
-  const { error: delErr } = await supabase.from('todos').delete().eq('entry_id', entryId)
-  if (delErr) throw delErr
-  const todoRows = [
-    ...entry.todos.tomorrow.map((t, i) => ({
-      user_id: userId,
-      entry_id: entryId,
-      scope: 'tomorrow',
-      text: t.text,
-      done: t.done,
-      sort_order: i,
-    })),
-    ...entry.todos.week.map((t, i) => ({
-      user_id: userId,
-      entry_id: entryId,
-      scope: 'week',
-      text: t.text,
-      done: t.done,
-      sort_order: i,
-    })),
-  ]
-  if (todoRows.length) {
-    const { error: tErr } = await supabase.from('todos').insert(todoRows)
-    if (tErr) throw tErr
-  }
 }
 
 // --- Local draft buffer -----------------------------------------------------
@@ -352,4 +317,124 @@ export function loadDraft(date: string): DayEntry | null {
 
 export function clearDraft(date: string): void {
   if (hasWindow()) localStorage.removeItem(draftKey(date))
+}
+
+// --- Tasks (the living 1-3-5 list) ------------------------------------------
+// Direct row ops with optimistic UI at the callsite — no debounced blob sync;
+// each mutation is one small write.
+
+type TaskRow = {
+  id: string
+  scope: TaskScope
+  size: TaskSize
+  text: string
+  completed_at: string | null
+  sort_order: number
+}
+
+const taskFromRow = (r: TaskRow): Task => ({
+  id: r.id,
+  scope: r.scope,
+  size: r.size,
+  text: r.text,
+  completedAt: r.completed_at,
+  sortOrder: r.sort_order,
+})
+
+// Open tasks plus recently completed ones (completed stay visible on the board
+// for the week they occupied — done work still counts toward the caps).
+export async function listTasks(): Promise<Task[]> {
+  const weekAgo = new Date(Date.now() - 7 * 86400_000).toISOString()
+  const { data, error } = await supabase
+    .from('tasks')
+    .select('id, scope, size, text, completed_at, sort_order')
+    .eq('archived', false)
+    .or(`completed_at.is.null,completed_at.gte.${weekAgo}`)
+    .order('sort_order')
+    .order('created_at')
+  if (error) throw error
+  return (data ?? []).map(taskFromRow)
+}
+
+export async function addTask(text: string, scope: TaskScope, size: TaskSize): Promise<Task> {
+  const { data, error } = await supabase
+    .from('tasks')
+    .insert({ text, scope, size })
+    .select('id, scope, size, text, completed_at, sort_order')
+    .single()
+  if (error || !data) throw error ?? new Error('Failed to add task')
+  return taskFromRow(data as TaskRow)
+}
+
+export async function setTaskDone(id: string, done: boolean): Promise<void> {
+  const { error } = await supabase
+    .from('tasks')
+    .update({ completed_at: done ? new Date().toISOString() : null })
+    .eq('id', id)
+  if (error) throw error
+}
+
+export async function moveTask(id: string, scope: TaskScope): Promise<void> {
+  const { error } = await supabase.from('tasks').update({ scope }).eq('id', id)
+  if (error) throw error
+}
+
+export async function deleteTask(id: string): Promise<void> {
+  const { error } = await supabase.from('tasks').delete().eq('id', id)
+  if (error) throw error
+}
+
+// --- Projects (WIP limit: one) ----------------------------------------------
+
+type ProjectRow = {
+  id: string
+  name: string
+  emoji: string | null
+  status: ProjectStatus
+  sort_order: number
+}
+
+const projectFromRow = (r: ProjectRow): Project => ({
+  id: r.id,
+  name: r.name,
+  emoji: r.emoji,
+  status: r.status,
+  sortOrder: r.sort_order,
+})
+
+export async function listProjects(): Promise<Project[]> {
+  const { data, error } = await supabase
+    .from('projects')
+    .select('id, name, emoji, status, sort_order')
+    .order('sort_order')
+    .order('created_at')
+  if (error) throw error
+  return (data ?? []).map(projectFromRow)
+}
+
+export async function addProject(name: string, emoji?: string): Promise<Project> {
+  const { data, error } = await supabase
+    .from('projects')
+    .insert({ name, emoji: emoji ?? null })
+    .select('id, name, emoji, status, sort_order')
+    .single()
+  if (error || !data) throw error ?? new Error('Failed to add project')
+  return projectFromRow(data as ProjectRow)
+}
+
+// Swap which project is in progress. Demote first, then promote — the partial
+// unique index (one in_progress per user) rejects the other order.
+export async function setActiveProject(id: string): Promise<void> {
+  const { error: demoteErr } = await supabase
+    .from('projects')
+    .update({ status: 'parking_lot' })
+    .eq('status', 'in_progress')
+  if (demoteErr) throw demoteErr
+  const { error } = await supabase.from('projects').update({ status: 'in_progress' }).eq('id', id)
+  if (error) throw error
+}
+
+export async function deleteProject(id: string): Promise<void> {
+  const { error } = await supabase.from('projects').delete().eq('id', id)
+  if (error) throw error
 }
