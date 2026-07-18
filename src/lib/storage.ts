@@ -127,10 +127,12 @@ export async function loadConfig(): Promise<LoadedConfig> {
   const userId = await currentUserId()
   await seedMissingDefaults(userId)
 
+  // Archived rows are invisible to the app but keep their uuid, so historical
+  // entry values still join (and old wellness scores still include them).
   const [{ data: metricRows }, { data: habitRows }, { data: goalRows }] = await Promise.all([
-    supabase.from('metrics').select('*').order('sort_order'),
-    supabase.from('habits').select('*').order('sort_order'),
-    supabase.from('goals').select('*').order('sort_order'),
+    supabase.from('metrics').select('*').eq('archived', false).order('sort_order'),
+    supabase.from('habits').select('*').eq('archived', false).order('sort_order'),
+    supabase.from('goals').select('*').eq('archived', false).order('sort_order'),
   ])
 
   const metrics: Metric[] = (metricRows ?? []).map((r) => ({
@@ -436,5 +438,147 @@ export async function setActiveProject(id: string): Promise<void> {
 
 export async function deleteProject(id: string): Promise<void> {
   const { error } = await supabase.from('projects').delete().eq('id', id)
+  if (error) throw error
+}
+
+// --- Settings CRUD (M3) ------------------------------------------------------
+// Full rows (uuid, archived, sort_order) for the /settings screen. Mutations
+// are by row uuid. Archive, never delete — historical entry values keep their
+// FK targets. seedMissingDefaults checks keys UNFILTERED by archived, so an
+// archived default stays archived instead of resurrecting on next load.
+
+export type MetricRow = {
+  id: string
+  key: string
+  label: string
+  groupName: string
+  higherIsBetter: boolean
+  scale: number
+  sortOrder: number
+  archived: boolean
+}
+export type HabitRow = {
+  id: string
+  key: string
+  label: string
+  sortOrder: number
+  archived: boolean
+}
+export type GoalRow = {
+  id: string
+  key: string
+  label: string
+  progress: number
+  note: string | null
+  sortOrder: number
+  archived: boolean
+}
+
+// Stable slug for a new row's key, from its label ("Cold shower" -> cold_shower).
+export function slugify(label: string): string {
+  return label
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 60)
+}
+
+export async function listMetricRows(): Promise<MetricRow[]> {
+  const { data, error } = await supabase.from('metrics').select('*').order('sort_order')
+  if (error) throw error
+  return (data ?? []).map((r) => ({
+    id: r.id,
+    key: r.key,
+    label: r.label,
+    groupName: r.group_name,
+    higherIsBetter: r.higher_is_better,
+    scale: r.scale,
+    sortOrder: r.sort_order,
+    archived: r.archived,
+  }))
+}
+
+export async function listHabitRows(): Promise<HabitRow[]> {
+  const { data, error } = await supabase.from('habits').select('*').order('sort_order')
+  if (error) throw error
+  return (data ?? []).map((r) => ({
+    id: r.id,
+    key: r.key,
+    label: r.label,
+    sortOrder: r.sort_order,
+    archived: r.archived,
+  }))
+}
+
+export async function listGoalRows(): Promise<GoalRow[]> {
+  const { data, error } = await supabase.from('goals').select('*').order('sort_order')
+  if (error) throw error
+  return (data ?? []).map((r) => ({
+    id: r.id,
+    key: r.key,
+    label: r.label,
+    progress: Number(r.progress),
+    note: r.note,
+    sortOrder: r.sort_order,
+    archived: r.archived,
+  }))
+}
+
+type ConfigTable = 'metrics' | 'habits' | 'goals'
+
+// Shared patch shape; snake_case DB columns assembled here so callers stay camel.
+export async function updateConfigRow(
+  table: ConfigTable,
+  id: string,
+  patch: Partial<{
+    label: string
+    groupName: string
+    higherIsBetter: boolean
+    progress: number
+    note: string | null
+    sortOrder: number
+    archived: boolean
+  }>,
+): Promise<void> {
+  const row: Record<string, unknown> = {}
+  if (patch.label !== undefined) row.label = patch.label
+  if (patch.groupName !== undefined) row.group_name = patch.groupName
+  if (patch.higherIsBetter !== undefined) row.higher_is_better = patch.higherIsBetter
+  if (patch.progress !== undefined) row.progress = patch.progress
+  if (patch.note !== undefined) row.note = patch.note
+  if (patch.sortOrder !== undefined) row.sort_order = patch.sortOrder
+  if (patch.archived !== undefined) row.archived = patch.archived
+  const { error } = await supabase.from(table).update(row).eq('id', id)
+  if (error) throw error
+}
+
+export async function addMetricRow(input: {
+  label: string
+  groupName: string
+  higherIsBetter: boolean
+  sortOrder: number
+}): Promise<void> {
+  const { error } = await supabase.from('metrics').insert({
+    key: slugify(input.label),
+    label: input.label,
+    group_name: input.groupName,
+    higher_is_better: input.higherIsBetter,
+    scale: 5,
+    sort_order: input.sortOrder,
+  })
+  if (error) throw error
+}
+
+export async function addHabitRow(label: string, sortOrder: number): Promise<void> {
+  const { error } = await supabase
+    .from('habits')
+    .insert({ key: slugify(label), label, sort_order: sortOrder })
+  if (error) throw error
+}
+
+export async function addGoalRow(label: string, sortOrder: number): Promise<void> {
+  const { error } = await supabase
+    .from('goals')
+    .insert({ key: slugify(label), label, progress: 0, sort_order: sortOrder })
   if (error) throw error
 }

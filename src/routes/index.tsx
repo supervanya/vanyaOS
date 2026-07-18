@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router"
 import { useEffect, useRef, useState } from "react"
-import { Layers, Flag, Repeat, Moon, Monitor, Plus, X } from "lucide-react"
+import { Layers, Flag, Repeat, Moon, Monitor, Plus, X, Settings as SettingsIcon } from "lucide-react"
 import { toast } from "sonner"
 import {
   loadConfig,
@@ -58,13 +58,21 @@ function Dashboard() {
       <ProjectsCard />
 
       {/* Nav */}
-      <div className="mt-6">
+      <div className="mt-6 flex flex-col gap-2">
         <Link
           to="/reflect"
           className="border-border bg-input/20 flex items-center gap-2.5 rounded-lg border px-4 py-3 text-[14px] font-medium"
         >
           <Moon size={16} className="text-indigo-500 dark:text-indigo-300" />
           Evening reflection
+          <span className="text-muted-foreground ml-auto">→</span>
+        </Link>
+        <Link
+          to="/settings"
+          className="border-border bg-input/20 flex items-center gap-2.5 rounded-lg border px-4 py-3 text-[14px] font-medium"
+        >
+          <SettingsIcon size={16} className="text-muted-foreground" />
+          Settings
           <span className="text-muted-foreground ml-auto">→</span>
         </Link>
       </div>

@@ -39,15 +39,15 @@ The app opens onto a **command center at `/`** organized by the 1-3-5 framework;
 
 ---
 
-## M3 — Settings: full control over the setup
-An in-app `/settings` area that kills the last reason to touch the Supabase dashboard or redeploy for config.
+## M3 — Settings: full control over the setup  ✅ **DONE** (built 2026-07-18)
+An in-app `/settings` area — the last reason to touch the Supabase dashboard or redeploy for config is gone.
 
-- **Metrics / habits / goals**: add, rename, reorder, and **archive** (never delete — historical entries keep their data; archived items disappear from Reflect/Dashboard).
-- **Goals**: progress + note editable in-app (replaces hand-editing rows).
-- Schema: `archived` flag on `metrics` / `habits` / `goals`; config queries filter it.
-- config.ts seeding demotes to first-run bootstrap only — after that, Settings is the source of truth.
+- **Metrics / habits / goals**: add, rename (inline, saves on blur), reorder (up/down), and **archive** (never delete — historical entries keep their data; archived items vanish from Reflect/Dashboard but sit in a restorable Archived list).
+- **Goals**: progress slider + note editable in-app.
+- Schema: `archived` flag on all three config tables; `loadConfig` filters it. Seeding checks keys *unfiltered*, so an archived default stays archived instead of resurrecting.
+- New metrics get a slugified stable `key`; renames touch only the label.
 
-**DoD:** you add a new habit, hide a metric you stopped tracking, and bump a goal's progress — all from your phone, and the reflection screen reflects it immediately.
+**✅ Met:** added a habit, renamed a metric, archived another (confirmed gone from Reflect and not re-seeded), bumped a goal's progress — all verified against the DB.
 
 ---
 
