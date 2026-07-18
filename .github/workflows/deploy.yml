@@ -29,6 +29,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: supabase/setup-cli@v1
+        with:
+          # Must be >= the version that generated supabase/config.toml (see the
+          # `supabase` devDependency) — the action's default lags far behind and
+          # chokes on newer config keys.
+          version: 2.109.0
       - run: supabase link --project-ref "$SUPABASE_PROJECT_REF"
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
@@ -45,6 +50,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: supabase/setup-cli@v1
+        with:
+          # Must be >= the version that generated supabase/config.toml (see the
+          # `supabase` devDependency) — the action's default lags far behind and
+          # chokes on newer config keys.
+          version: 2.109.0
       - run: supabase link --project-ref "$SUPABASE_PROJECT_REF"
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
