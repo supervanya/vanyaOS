@@ -142,7 +142,9 @@ create table ai_reports (
 -- Wellness score computed once, in SQL, so both the frontend and the Edge
 -- Function get the same number without duplicating the formula in two languages.
 -- higher_is_better metrics contribute `value`; inverted ones contribute `scale - value`.
-create view entry_wellness_scores as
+-- security_invoker so the view runs as the querying user and RLS on the
+-- underlying tables applies (definer views bypass RLS).
+create view entry_wellness_scores with (security_invoker = on) as
 select
   e.id as entry_id,
   avg(case when m.higher_is_better then v.value else m.scale - v.value end) as wellness
