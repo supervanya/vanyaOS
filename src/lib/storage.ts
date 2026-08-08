@@ -524,7 +524,7 @@ export async function listGoalRows(): Promise<GoalRow[]> {
   }))
 }
 
-type ConfigTable = 'metrics' | 'habits' | 'goals'
+type ConfigTable = 'metrics' | 'habits' | 'goals' | 'retro_areas'
 
 // Shared patch shape; snake_case DB columns assembled here so callers stay camel.
 export async function updateConfigRow(
@@ -581,4 +581,211 @@ export async function addGoalRow(label: string, sortOrder: number): Promise<void
     .from('goals')
     .insert({ key: slugify(label), label, progress: 0, sort_order: sortOrder })
   if (error) throw error
+}
+
+export async function addRetroAreaRow(label: string, sortOrder: number): Promise<void> {
+  const { error } = await supabase
+    .from('retro_areas')
+    .insert({ key: slugify(label), label, sort_order: sortOrder })
+  if (error) throw error
+}
+
+// --- BYO AI settings (M4) ----------------------------------------------------
+// Each account brings its own provider + key; the app holds no AI secrets.
+// The key is write-mostly from the client: reads return whether one exists,
+// not the key itself (the Edge Function is the only reader of the value).
+
+export type AiProvider = 'anthropic' | 'openai' | 'google'
+export type AiSettings = { provider: AiProvider; model: string; hasKey: boolean }
+
+export const AI_PROVIDERS: Record<AiProvider, { label: string; models: string[] }> = {
+  anthropic: { label: 'Anthropic', models: ['claude-sonnet-5', 'claude-opus-5', 'claude-haiku-4-5'] },
+  openai: { label: 'OpenAI', models: ['gpt-5.2', 'gpt-5.2-mini'] },
+  google: { label: 'Google', models: ['gemini-3-pro', 'gemini-3-flash'] },
+}
+
+export async function getAiSettings(): Promise<AiSettings | null> {
+  const { data, error } = await supabase
+    .from('ai_settings')
+    .select('provider, model, api_key')
+    .maybeSingle()
+  if (error) throw error
+  if (!data) return null
+  return { provider: data.provider, model: data.model, hasKey: !!data.api_key }
+}
+
+export async function saveAiSettings(
+  provider: AiProvider,
+  model: string,
+  apiKey?: string, // omit to keep the stored key
+): Promise<void> {
+  const userId = await currentUserId()
+  if (apiKey) {
+    const { error } = await supabase
+      .from('ai_settings')
+      .upsert({ user_id: userId, provider, model, api_key: apiKey, updated_at: new Date().toISOString() })
+    if (error) throw error
+  } else {
+    const { error } = await supabase
+      .from('ai_settings')
+      .update({ provider, model, updated_at: new Date().toISOString() })
+      .eq('user_id', userId)
+    if (error) throw error
+  }
+}
+
+// Provider-agnostic coach call: the Edge Function reads the caller's own
+// ai_settings row and dispatches. Multi-turn: pass the running transcript.
+export type CoachMsg = { role: 'user' | 'assistant'; content: string }
+
+export async function askCoach(system: string, messages: CoachMsg[], maxTokens = 4096): Promise<string> {
+  const { data, error } = await supabase.functions.invoke('ai-coach', {
+    body: { system, messages, maxTokens },
+  })
+  if (error) {
+    // supabase-js wraps non-2xx responses; surface the function's own message.
+    let detail = error.message
+    try {
+      const ctx = (error as { context?: Response }).context
+      if (ctx) detail = (await ctx.json()).error ?? detail
+    } catch { /* keep default */ }
+    throw new Error(detail)
+  }
+  if (data?.error) throw new Error(data.error)
+  return data.text as string
+}
+
+// --- Retrospectives (M4) -----------------------------------------------------
+
+export type RetroArea = {
+  id: string
+  key: string
+  label: string
+  sortOrder: number
+  archived: boolean
+}
+
+export type RetroVersion = {
+  id: string
+  docMd: string
+  aiSummary: string | null
+  model: string | null
+  createdAt: string
+}
+
+const RETRO_AREA_DEFAULTS = [
+  { key: 'finances', label: 'Finances' },
+  { key: 'health', label: 'Health' },
+  { key: 'exercise', label: 'Exercise' },
+  { key: 'work', label: 'Work' },
+]
+
+// Same seeding contract as config defaults: insert missing keys only, checked
+// UNFILTERED by archived so an archived default stays archived.
+export async function listRetroAreas(): Promise<RetroArea[]> {
+  const userId = await currentUserId()
+  const { data: existing, error } = await supabase.from('retro_areas').select('*').order('sort_order')
+  if (error) throw error
+  const have = new Set((existing ?? []).map((r) => r.key))
+  const missing = RETRO_AREA_DEFAULTS.filter((d) => !have.has(d.key)).map((d, i) => ({
+    user_id: userId,
+    key: d.key,
+    label: d.label,
+    sort_order: (existing?.length ?? 0) + i,
+  }))
+  let rows = existing ?? []
+  if (missing.length) {
+    const { data: inserted, error: insErr } = await supabase
+      .from('retro_areas')
+      .insert(missing)
+      .select('*')
+    if (insErr) throw insErr
+    rows = [...rows, ...(inserted ?? [])]
+  }
+  return rows.map((r) => ({
+    id: r.id,
+    key: r.key,
+    label: r.label,
+    sortOrder: r.sort_order,
+    archived: r.archived,
+  }))
+}
+
+export async function latestRetro(areaId: string): Promise<RetroVersion | null> {
+  const { data, error } = await supabase
+    .from('retros')
+    .select('id, doc_md, ai_summary, model, created_at')
+    .eq('area_id', areaId)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  if (error) throw error
+  if (!data) return null
+  return {
+    id: data.id,
+    docMd: data.doc_md,
+    aiSummary: data.ai_summary,
+    model: data.model,
+    createdAt: data.created_at,
+  }
+}
+
+// Latest run per area in one query, for the list screen + due nudges.
+export async function latestRetroDates(): Promise<Record<string, string>> {
+  const { data, error } = await supabase
+    .from('retros')
+    .select('area_id, created_at')
+    .order('created_at', { ascending: false })
+  if (error) throw error
+  const out: Record<string, string> = {}
+  for (const r of data ?? []) {
+    if (!(r.area_id in out)) out[r.area_id] = r.created_at
+  }
+  return out
+}
+
+// Every save is a NEW version — the doc history is the point.
+export async function saveRetroVersion(
+  areaId: string,
+  docMd: string,
+  aiSummary: string | null,
+  model: string | null,
+): Promise<void> {
+  const { error } = await supabase
+    .from('retros')
+    .insert({ area_id: areaId, doc_md: docMd, ai_summary: aiSummary, model })
+  if (error) throw error
+}
+
+const DUE_AFTER_DAYS = 30
+export function isRetroDue(lastRunISO: string | undefined): boolean {
+  if (!lastRunISO) return false // never-seeded areas show "start", not "due"
+  return Date.now() - new Date(lastRunISO).getTime() > DUE_AFTER_DAYS * 86400_000
+}
+
+// Intake for a retro session: dated reflections + wellness since a given date
+// (the area's last run). Usually nothing relevant — the coach decides.
+export type IntakeEntry = { date: string; wellness: number | null; reflection: string }
+
+export async function entriesSince(sinceISO: string | null): Promise<IntakeEntry[]> {
+  let q = supabase
+    .from('entries')
+    .select('id, entry_date, reflection')
+    .order('entry_date')
+  if (sinceISO) q = q.gte('entry_date', sinceISO.slice(0, 10))
+  const { data, error } = await q
+  if (error) throw error
+  const rows = (data ?? []).filter((r) => (r.reflection ?? '').trim().length > 0)
+  if (!rows.length) return []
+  const ids = rows.map((r) => r.id)
+  const { data: scores } = await supabase
+    .from('entry_wellness_scores')
+    .select('entry_id, wellness')
+    .in('entry_id', ids)
+  const scoreById = Object.fromEntries((scores ?? []).map((s) => [s.entry_id, Number(s.wellness)]))
+  return rows.map((r) => ({
+    date: r.entry_date,
+    wellness: scoreById[r.id] ?? null,
+    reflection: r.reflection,
+  }))
 }
