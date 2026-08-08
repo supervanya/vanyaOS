@@ -5,7 +5,7 @@
 **The six pillars (roadmap value prop, 2026-07-17):**
 1. **TODO** — see and set current to-do lists, habits, and goals
 2. **REF** ✅ — reflect every evening on the day / habits / wellbeing
-3. **RE** — retrospectives on fitness areas: finances, health, exercise, work
+3. **RE** — retrospectives on fitness areas: finances, health, exercise, work *(M4)*
 4. **SMART** — holistic AI report across everything
 5. **SYNC** — bring in data from notes / calendar / email
 6. **OUT** — export into other platforms
@@ -41,10 +41,13 @@
 | Themes | **Life-themes / focus areas**; minimal `active_theme` stamped on each entry | Makes history filterable later; full theme management deferred |
 | Offline | Online-first, but a **local draft buffer** (localStorage) protects an in-progress entry from a dropped connection | Wifi is usually present, but a save should never be lost to a network hiccup |
 | Markdown export | **Dropped** — no Copy/Export button in v2 | DB rows are the only source of truth; export can return later as a generated view if ever wanted |
+| AI provider | **Bring your own** — provider (Anthropic/OpenAI/Google) + model + API key chosen in Settings, stored per-user in RLS-protected `ai_settings`; one provider-agnostic Edge Function proxies calls | No provider lock-in, no app-held AI secrets; every user sets up their own key |
+| Retrospectives | Per-area **living state-of-affairs markdown doc**, versioned per run. "Run retrospective" = an **interactive coaching session**: (1) intake — current doc + all new signal since last retro + anything the user adds; (2) a *prompted* structured retro; (3) a coach voice that's proficient and incredibly sharp at getting goals done and improving that area's posture; (4) the coach prompts the user with new info, proposed changes, and **new goals**. Session ends in an updated doc + change summary | The retro is a conversation with a sharp coach, not a background job; the doc is the session's product. On-demand cadence with a monthly due-nudge |
+| Retro areas | `retro_areas` DB rows seeded with Finances / Health / Exercise / Work; Settings-managed (CRUD + archive) | Same pattern as habits/metrics/goals — nothing hardcoded |
 
-**The AI loop is no longer manual-first.** M4 (see ROADMAP) automates exactly the loop already validated by hand: an explicit "Finish reflection" tap triggers a server-side call to the Claude API, which writes action items + goal-progress notes back to the entry. No copy, no paste. It deliberately ships *after* the M2 dashboard/todos and M3 settings build-out.
+**The AI loop is no longer manual-first.** M4 builds the provider-agnostic coach plumbing and its first consumer (retrospectives); M5 adds the nightly synthesis ("Finish reflection" → action items + goal-progress notes). No copy, no paste — and no provider lock-in at any point.
 
-**Explicitly deferred:** chat-style coach (ask-anything over your history — automated synthesis ships first), history & trends views, automated SYNC (import notes/calendar/email), EXPORT integrations to other platforms, fitness-area retrospectives (RE), theme management, multi-user sign-up.
+**Explicitly deferred:** chat-style coach (ask-anything over your history), history & trends views, automated SYNC (import notes/calendar/email), EXPORT integrations to other platforms, theme management, multi-user sign-up.
 
 ---
 

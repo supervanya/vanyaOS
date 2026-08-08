@@ -2,10 +2,10 @@
 
 **Main value prop: a one-stop shop for everything in my life.**
 
-1. **TODO** — a place to see and set current to-do lists, habits, and goals *(M2–M3)*
+1. **TODO** ✅ — a place to see and set current to-do lists, habits, and goals *(shipped, M2–M3)*
 2. **REF** ✅ — reflect every evening on the day / habits / wellbeing *(shipped)*
-3. **RE** — retrospectives on fitness areas of life: finances, health, exercise, work *(backlog)*
-4. **SMART** — holistic AI report on everything together *(M4)*
+3. **RE** — retrospectives on fitness areas of life: finances, health, exercise, work *(M4)*
+4. **SMART** — holistic AI report on everything together *(M5)*
 5. **SYNC** — bring in data from notes / calendar / email *(backlog)*
 6. **OUT** — export into other platforms *(backlog)*
 
@@ -51,18 +51,39 @@ An in-app `/settings` area — the last reason to touch the Supabase dashboard o
 
 ---
 
-## M4 — Automated AI coach  *(SMART v1 — moved from M2)*
-Automates exactly the loop validated by hand in M0. Unchanged in shape:
-- Explicit **"Finish reflection"** action (separate from silent autosave).
-- **`synthesize-entry` Edge Function** — the only server-side code: reads the entry + recent history, calls the Claude API, writes to `ai_reports`. Holds `ANTHROPIC_API_KEY`.
-- **Realtime** subscription on `ai_reports` → coaching output appears without a refresh.
+## M4 — BYO-AI foundation + Retrospectives  *(CURRENT — re-scoped 2026-08-07)*
+RE jumps out of the backlog, and it forces the AI plumbing to ship with it: a retro is *run by the coach*. Two halves, one milestone:
+
+**(a) Bring-your-own AI provider** — no provider lock-in, no app-held API keys:
+- Settings gains an **AI section**: pick a provider (Anthropic / OpenAI / Google), pick a model, paste *your own* API key → stored in an RLS-protected `ai_settings` row.
+- One **provider-agnostic Edge Function** (`ai-coach`): verifies the caller's JWT, reads *their* provider/model/key, dispatches to the right provider adapter. The app itself holds zero AI secrets — the old `ANTHROPIC_API_KEY`-as-server-secret design is dead.
+
+**(b) Retrospectives** — each area is a **living state-of-affairs markdown doc**, and running a retro is an **interactive coaching session**, not a silent doc rewrite:
+- `retro_areas` (seeded: Finances, Health, Exercise, Work) — DB rows, managed in Settings like everything else.
+- Seed an area by **pasting your existing markdown** (e.g. the financial-fitness doc with all the numbers and checklists) — that becomes version 1, no AI involved.
+- **Run retrospective** is a four-step session:
+  1. **Intake** — the coach takes *everything*: the area's current doc, all new signal since the area's last retro (reflections, entries — usually nothing relevant, sometimes a journal line matters), plus **anything the user adds up front** (new numbers, events, context).
+  2. **The prompted retrospective** — the session works through a structured retro, not a freeform chat.
+  3. **Coach voice** — the AI talks like a coach who is proficient and *incredibly sharp* at getting goals done and improving the posture of that area (financial fitness, physical fitness, …). Direct, goal-driven, no fluff.
+  4. **Output back at the user** — the coach *prompts the user* with the new information, the changes it proposes to the state-of-affairs doc, and **new goals** based on everything given.
+- The session's product is an **updated doc + change summary**, written as a new version — full history kept, never overwriting, and the doc stays hand-editable between runs.
+- **Cadence: on-demand + monthly due-nudge** — each area shows a gentle "due" state when a month has passed since its last retro; the dashboard gets a small indicator. No forced schedule.
+
+**DoD:** paste the real financial-fitness markdown into the Finances area, run a retrospective with your own API key against your chosen provider, and have an actual back-and-forth where the coach surfaces changes and proposes next goals — ending with an updated doc that reflects the session (or correctly concluded nothing changed) — plus the due-nudge appearing a month out.
+
+---
+
+## M5 — Nightly AI coach  *(SMART v1 — rides on M4's plumbing)*
+Automates the loop validated by hand in M0, now provider-agnostic for free:
+- Explicit **"Finish reflection"** action (separate from silent autosave) → the same `ai-coach` Edge Function, task `synthesize-entry` → action items + goal-progress notes into `ai_reports`.
+- **Realtime** subscription on `ai_reports` → output appears without a refresh.
 
 **DoD:** tap "Finish reflection" on a real entry and see AI-generated action items appear in the same session, without touching another app.
 
 ---
 
-## M5 — Polish & daily-use hardening
-Whatever two weeks of real use across dashboard + reflection + settings demands: draft-buffer edge cases, magic-link UX friction, anything clunky.
+## M6 — Polish & daily-use hardening
+Whatever two weeks of real use across dashboard + reflection + retros + settings demands.
 
 **DoD:** you've used it daily for two weeks and stopped noticing the tool.
 
@@ -70,11 +91,10 @@ Whatever two weeks of real use across dashboard + reflection + settings demands:
 
 ## Deferred backlog (value order)
 1. **History & trends** — past-day browser, habit streaks, wellness sparklines (plain SQL now). The dashboard is its natural home.
-2. **RE / fitness-area retros** — periodic deep-dives on Finances / Health / Exercise / Work (value-prop #3).
-3. **Chat coach** — ask-anything over your history, once M4's synthesis is proven.
-4. **SYNC** — notes / calendar / email in (value-prop #5). Hardest, most fragile — stays last-ish.
-5. **OUT** — export to other platforms (value-prop #6).
-6. **Multi-user** — explicitly out of scope; RLS already isolates by `user_id`, nothing else planned.
+2. **Chat coach** — ask-anything over your history, once M4/M5's coach plumbing is proven.
+3. **SYNC** — notes / calendar / email in (value-prop #5). Hardest, most fragile — stays last-ish.
+4. **OUT** — export to other platforms (value-prop #6).
+5. **Multi-user** — explicitly out of scope; RLS already isolates by `user_id`, nothing else planned. (BYO keys already assume per-user AI config, so this wouldn't touch the AI layer.)
 
 ---
 
@@ -83,4 +103,6 @@ Whatever two weeks of real use across dashboard + reflection + settings demands:
 - **Tedium kills the ritual.** The nightly entry must stay under ~90s. Embedding the living task list in Reflect must not add friction to the parts that already work.
 - **Todo migration data loss.** Per-entry todos → `tasks` is the first destructive-ish migration; migrate undone items forward, keep completed history queryable, verify on local stack before `db push`.
 - **Settings CRUD invites deletes.** Archive-only in the UI — a hard delete would orphan historical entry values.
-- **AI coach slippage.** SMART is the north star and it's now two milestones out. If M2+M3 drag, cut scope there rather than letting M4 slide further.
+- **API keys at rest.** BYO keys live in an RLS-protected Postgres row — fine for the current threat model, but consider Supabase Vault encryption before any multi-user future. Never log keys in the Edge Function.
+- **Retro doc drift.** The coach rewrites a document the owner also hand-edits — every run must version, never overwrite silently, and the summary must say what it changed.
+- **AI coach slippage.** SMART is the north star. M4 deliberately builds its plumbing (provider adapters, Edge Function) so M5 is a thin milestone — if M4 drags, cut retro polish, not the AI foundation.
