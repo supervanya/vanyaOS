@@ -10,7 +10,8 @@
     "generate-routes": "tsr generate",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "vitest run"
+    "test": "vitest run",
+    "db:mirror": "bash scripts/db-mirror-prod.sh"
   },
   "dependencies": {
     "@radix-ui/react-checkbox": "^1.3.5",
