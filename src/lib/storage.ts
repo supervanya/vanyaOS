@@ -806,30 +806,89 @@ export function isRetroDue(lastRunISO: string | undefined): boolean {
   return Date.now() - new Date(lastRunISO).getTime() > DUE_AFTER_DAYS * 86400_000
 }
 
-// Intake for a retro session: dated reflections + wellness since a given date
-// (the area's last run). Usually nothing relevant — the coach decides.
-export type IntakeEntry = { date: string; wellness: number | null; reflection: string }
+// Intake for a retro session: EVERYTHING the journal captured in the window —
+// per-metric slider values (averaged, with trend), habit completion, wellness,
+// and any written reflections. Slider-only days are first-class signal: most
+// entries have no text, and the coach must still see the numbers.
+const FIRST_RUN_WINDOW_DAYS = 60
 
-export async function entriesSince(sinceISO: string | null): Promise<IntakeEntry[]> {
-  let q = supabase
+export async function buildIntakeSignal(sinceISO: string | null): Promise<string> {
+  const since = sinceISO
+    ? sinceISO.slice(0, 10)
+    : shiftISO(todayISO(), -FIRST_RUN_WINDOW_DAYS)
+  const windowLabel = sinceISO
+    ? `since the last retro (${since})`
+    : `last ${FIRST_RUN_WINDOW_DAYS} days (first retro for this area)`
+
+  const { data: entries, error } = await supabase
     .from('entries')
     .select('id, entry_date, reflection')
+    .gte('entry_date', since)
     .order('entry_date')
-  if (sinceISO) q = q.gte('entry_date', sinceISO.slice(0, 10))
-  const { data, error } = await q
   if (error) throw error
-  const rows = (data ?? []).filter((r) => (r.reflection ?? '').trim().length > 0)
-  if (!rows.length) return []
-  const ids = rows.map((r) => r.id)
-  const { data: scores, error: scoresErr } = await supabase
-    .from('entry_wellness_scores')
-    .select('entry_id, wellness')
-    .in('entry_id', ids)
-  if (scoresErr) throw scoresErr
-  const scoreById = Object.fromEntries((scores ?? []).map((s) => [s.entry_id, Number(s.wellness)]))
-  return rows.map((r) => ({
-    date: r.entry_date,
-    wellness: scoreById[r.id] ?? null,
-    reflection: r.reflection,
-  }))
+  if (!entries?.length) return `(no journal data in the window: ${windowLabel})`
+
+  const ids = entries.map((r) => r.id)
+  const config = await loadConfig()
+  const [{ data: values, error: vErr }, { data: habitRows, error: hErr }, { data: scores, error: sErr }] =
+    await Promise.all([
+      supabase.from('entry_metric_values').select('entry_id, metric_id, value').in('entry_id', ids),
+      supabase.from('entry_habits').select('entry_id, habit_id, done').in('entry_id', ids),
+      supabase.from('entry_wellness_scores').select('entry_id, wellness').in('entry_id', ids),
+    ])
+  if (vErr) throw vErr
+  if (hErr) throw hErr
+  if (sErr) throw sErr
+
+  const lines: string[] = [`Journal signal, ${windowLabel} — ${entries.length} day(s) tracked.`]
+
+  // Per-metric: overall average + trend (first half of the window vs second).
+  const half = Math.floor(entries.length / 2)
+  const firstIds = new Set(entries.slice(0, half).map((r) => r.id))
+  const mean = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null)
+  lines.push('', '### Metrics (0-5 sliders, averaged over the window)')
+  for (const m of config.metrics) {
+    const rowId = config.metricRowId[m.id]
+    const vals = (values ?? []).filter((v) => v.metric_id === rowId)
+    if (!vals.length) continue
+    const all = mean(vals.map((v) => Number(v.value)))!
+    const early = mean(vals.filter((v) => firstIds.has(v.entry_id)).map((v) => Number(v.value)))
+    const late = mean(vals.filter((v) => !firstIds.has(v.entry_id)).map((v) => Number(v.value)))
+    let trend = ''
+    if (early != null && late != null && Math.abs(late - early) >= 0.4) {
+      trend = ` (trending ${late > early ? 'up' : 'down'}: ${early.toFixed(1)} -> ${late.toFixed(1)})`
+    }
+    const direction = m.higherIsBetter ? '' : ' [0 is best]'
+    lines.push(`- ${m.label}${direction}: avg ${all.toFixed(1)}/${m.scale}${trend}`)
+  }
+
+  const wellnessVals = (scores ?? []).map((x) => Number(x.wellness))
+  if (wellnessVals.length) {
+    lines.push(`- Composite wellness: avg ${mean(wellnessVals)!.toFixed(1)}/5`)
+  }
+
+  lines.push('', '### Habits (days completed / days tracked)')
+  for (const h of config.habits) {
+    const rowId = config.habitRowId[h.id]
+    const rows = (habitRows ?? []).filter((x) => x.habit_id === rowId)
+    if (!rows.length) continue
+    lines.push(`- ${h.label}: ${rows.filter((x) => x.done).length}/${rows.length}`)
+  }
+
+  const scoreById = Object.fromEntries((scores ?? []).map((x) => [x.entry_id, Number(x.wellness)]))
+  const written = entries.filter((r) => (r.reflection ?? '').trim().length > 0)
+  lines.push('', '### Written reflections')
+  if (written.length) {
+    for (const r of written) {
+      const w = scoreById[r.id]
+      lines.push(`- ${r.entry_date}${w != null ? ` (wellness ${w.toFixed(1)}/5)` : ''}: ${r.reflection}`)
+    }
+    const sliderOnly = entries.length - written.length
+    if (sliderOnly > 0) lines.push(`
+(${sliderOnly} more day(s) had slider data only, included in the averages above)`)
+  } else {
+    lines.push('(none in this window - all signal is in the numbers above)')
+  }
+
+  return lines.join('\n')
 }

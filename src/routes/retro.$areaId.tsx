@@ -8,7 +8,7 @@ import {
   latestRetro,
   latestCoachRunAt,
   saveRetroVersion,
-  entriesSince,
+  buildIntakeSignal,
   askCoach,
   getAiSettings,
 } from "@/lib/storage"
@@ -46,7 +46,11 @@ function coachSystemPrompt(areaLabel: string): string {
     `When asked to finalize, follow the <summary>/<doc> format exactly. ` +
     `Keep the doc's original structure and formatting; update values, check off or add checklist items, ` +
     `fold in new goals, and prune only what the user agreed is obsolete. ` +
-    `If the intake contained nothing relevant, say so plainly — do not invent changes.`
+    `If the intake contained nothing relevant, say so plainly — do not invent changes.\n\n` +
+    `If there is NO state-of-affairs document yet (first session), your job is to DRAFT it: ` +
+    `mine the journal signal (metric trends, habits, reflections) for a starting picture, ` +
+    `interview the user for the facts the journal can't know (numbers, commitments, context), ` +
+    `and build the initial document with them — sections, current numbers, checklists, goals.`
   )
 }
 
@@ -95,7 +99,6 @@ function RetroAreaScreen() {
   }
 
   const startSession = async () => {
-    if (!version) return
     setBusy(true)
     try {
       const settings = await getAiSettings()
@@ -104,22 +107,17 @@ function RetroAreaScreen() {
         return
       }
       // Cutoff = the last COACH run, not the last doc version — a manual edit
-      // in between must not swallow the reflections that preceded it.
+      // in between must not swallow the reflections that preceded it. First
+      // session (no run yet): the builder windows to the recent past.
       const cutoff = await latestCoachRunAt(areaId)
-      const signal = await entriesSince(cutoff)
-      const signalBlock = signal.length
-        ? signal
-            .map(
-              (e) =>
-                `- ${e.date}${e.wellness != null ? ` (wellness ${e.wellness.toFixed(1)}/5)` : ""}: ${e.reflection}`,
-            )
-            .join("\n")
-        : "(no journal entries with reflections since the last retro)"
+      const signalBlock = await buildIntakeSignal(cutoff)
+      const docBlock = version
+        ? `## Current state-of-affairs doc (last updated ${new Date(version.createdAt).toLocaleDateString()})\n\n${version.docMd}`
+        : `## Current state-of-affairs doc\n\n(none yet — this is the FIRST session for this area: draft the initial document together)`
       const intake =
         `INTAKE for this ${area.label} retrospective.\n\n` +
-        `## Current state-of-affairs doc (last updated ${new Date(version.createdAt).toLocaleDateString()})\n\n` +
-        `${version.docMd}\n\n` +
-        `## New signal since the last retro (daily reflections)\n\n${signalBlock}\n\n` +
+        `${docBlock}\n\n` +
+        `## Signal from the journal\n\n${signalBlock}\n\n` +
         `## Context I'm adding right now\n\n${preSessionContext.trim() || "(nothing extra)"}\n\n` +
         `Start the retrospective.`
       const first: CoachMsg[] = [{ role: "user", content: intake }]
@@ -129,7 +127,7 @@ function RetroAreaScreen() {
       setTranscript([...first, { role: "assistant", content: reply }])
     } catch (err) {
       toast.error((err as Error).message)
-      setMode("view")
+      setMode(version ? "view" : "edit")
     } finally {
       setBusy(false)
     }
@@ -270,9 +268,13 @@ function RetroAreaScreen() {
             <Button type="button" size="sm" onClick={saveManual} disabled={!editText.trim()}>
               Save {version ? "as new version" : "doc"}
             </Button>
-            {version && (
+            {version ? (
               <Button type="button" variant="ghost" size="sm" onClick={() => setMode("view")}>
                 Cancel
+              </Button>
+            ) : (
+              <Button type="button" variant="outline" size="sm" onClick={startSession} disabled={busy}>
+                <Play /> {busy ? "Starting…" : "Or draft it with your coach"}
               </Button>
             )}
           </div>
