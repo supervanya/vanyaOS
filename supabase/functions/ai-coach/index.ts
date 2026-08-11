@@ -122,11 +122,14 @@ Deno.serve(async (req) => {
     return json({ error: "Bad request: JSON body expected" }, 400);
   }
 
+  // A DB/RLS failure here is an OPERATIONAL error (5xx), not "user has no
+  // settings" — conflating them hides outages as configuration problems.
   const stored = async () => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("ai_settings")
       .select("provider, model, api_key")
       .maybeSingle();
+    if (error) throw new Error("Settings lookup failed");
     return data;
   };
 
@@ -135,16 +138,17 @@ Deno.serve(async (req) => {
     // BEFORE anything is saved; the key is used for this one call only.
     let provider = body.provider;
     let apiKey = body.apiKey;
-    if (!provider || !apiKey) {
-      const s = await stored();
-      if (!s) return json({ error: "No AI provider configured" }, 400);
-      provider = provider ?? s.provider;
-      apiKey = apiKey ?? s.api_key;
-    }
     try {
+      if (!provider || !apiKey) {
+        const s = await stored();
+        if (!s) return json({ error: "No AI provider configured" }, 400);
+        provider = provider ?? s.provider;
+        apiKey = apiKey ?? s.api_key;
+      }
       return json({ models: await listModels(provider!, apiKey!) });
     } catch (err) {
-      return json({ error: err instanceof Error ? err.message : "Model listing failed" }, 502);
+      const msg = err instanceof Error ? err.message : "Model listing failed";
+      return json({ error: msg }, msg === "Settings lookup failed" ? 500 : 502);
     }
   }
 
@@ -152,7 +156,12 @@ Deno.serve(async (req) => {
   if (!Array.isArray(body.messages) || body.messages.length === 0) {
     return json({ error: "Bad request: expected { messages: [...] }" }, 400);
   }
-  const s = await stored();
+  let s;
+  try {
+    s = await stored();
+  } catch {
+    return json({ error: "Settings lookup failed" }, 500);
+  }
   if (!s) return json({ error: "No AI provider configured — set one up in Settings → AI." }, 400);
 
   try {

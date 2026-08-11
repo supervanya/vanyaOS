@@ -626,13 +626,16 @@ export async function listProviderModels(provider?: AiProvider, apiKey?: string)
 }
 
 export async function getAiSettings(): Promise<AiSettings | null> {
+  // Deliberately NOT selecting api_key — the key value must never reach the
+  // browser (it would sit in the network response and client memory). The
+  // column is NOT NULL, so a row existing already means a key is stored.
   const { data, error } = await supabase
     .from('ai_settings')
-    .select('provider, model, api_key')
+    .select('provider, model')
     .maybeSingle()
   if (error) throw error
   if (!data) return null
-  return { provider: data.provider, model: data.model, hasKey: !!data.api_key }
+  return { provider: data.provider, model: data.model, hasKey: true }
 }
 
 export async function saveAiSettings(
@@ -751,11 +754,14 @@ export async function latestRetro(areaId: string): Promise<RetroVersion | null> 
   }
 }
 
-// Latest run per area in one query, for the list screen + due nudges.
+// Latest COACH RUN per area (model is null for manual seeds/edits — those
+// must not reset the due clock or the intake cutoff; a retrospective is a
+// session, not a save).
 export async function latestRetroDates(): Promise<Record<string, string>> {
   const { data, error } = await supabase
     .from('retros')
     .select('area_id, created_at')
+    .not('model', 'is', null)
     .order('created_at', { ascending: false })
   if (error) throw error
   const out: Record<string, string> = {}
@@ -763,6 +769,22 @@ export async function latestRetroDates(): Promise<Record<string, string>> {
     if (!(r.area_id in out)) out[r.area_id] = r.created_at
   }
   return out
+}
+
+// The intake cutoff for a session: when the coach last actually ran for this
+// area. Manual doc edits in between must not swallow the reflections that
+// happened before them. Null = no coach run yet (intake scans everything).
+export async function latestCoachRunAt(areaId: string): Promise<string | null> {
+  const { data, error } = await supabase
+    .from('retros')
+    .select('created_at')
+    .eq('area_id', areaId)
+    .not('model', 'is', null)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  if (error) throw error
+  return data?.created_at ?? null
 }
 
 // Every save is a NEW version — the doc history is the point.
@@ -799,10 +821,11 @@ export async function entriesSince(sinceISO: string | null): Promise<IntakeEntry
   const rows = (data ?? []).filter((r) => (r.reflection ?? '').trim().length > 0)
   if (!rows.length) return []
   const ids = rows.map((r) => r.id)
-  const { data: scores } = await supabase
+  const { data: scores, error: scoresErr } = await supabase
     .from('entry_wellness_scores')
     .select('entry_id, wellness')
     .in('entry_id', ids)
+  if (scoresErr) throw scoresErr
   const scoreById = Object.fromEntries((scores ?? []).map((s) => [s.entry_id, Number(s.wellness)]))
   return rows.map((r) => ({
     date: r.entry_date,

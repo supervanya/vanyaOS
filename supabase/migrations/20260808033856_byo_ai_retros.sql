@@ -52,5 +52,12 @@ create policy "ai_settings_owner" on ai_settings
 create policy "retro_areas_owner" on retro_areas
   for all using (user_id = auth.uid()) with check (user_id = auth.uid());
 
+-- Ownership via user_id AND via the parent area: without the exists check, a
+-- user could insert retro rows pointing at another user's area_id. Invisible
+-- to the victim (reads are user_id-scoped) but junk data shouldn't be possible.
 create policy "retros_owner" on retros
-  for all using (user_id = auth.uid()) with check (user_id = auth.uid());
+  for all using (user_id = auth.uid())
+  with check (
+    user_id = auth.uid()
+    and exists (select 1 from retro_areas a where a.id = area_id and a.user_id = auth.uid())
+  );

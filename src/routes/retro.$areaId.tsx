@@ -6,6 +6,7 @@ import { toast } from "sonner"
 import {
   listRetroAreas,
   latestRetro,
+  latestCoachRunAt,
   saveRetroVersion,
   entriesSince,
   askCoach,
@@ -101,7 +102,10 @@ function RetroAreaScreen() {
         toast.error("Set up your AI provider in Settings first")
         return
       }
-      const signal = await entriesSince(version.createdAt)
+      // Cutoff = the last COACH run, not the last doc version — a manual edit
+      // in between must not swallow the reflections that preceded it.
+      const cutoff = await latestCoachRunAt(areaId)
+      const signal = await entriesSince(cutoff)
       const signalBlock = signal.length
         ? signal
             .map(
@@ -315,7 +319,13 @@ function RetroAreaScreen() {
                 placeholder="Reply to your coach…"
                 className="border-input bg-input/30 focus-visible:border-ring w-full resize-none rounded-lg border p-2.5 text-[13px] outline-none"
               />
-              <Button type="button" size="icon" onClick={sendChat} disabled={busy || !chatDraft.trim()}>
+              <Button
+                type="button"
+                size="icon"
+                aria-label="Send message"
+                onClick={sendChat}
+                disabled={busy || !chatDraft.trim()}
+              >
                 <Send />
               </Button>
             </div>

@@ -140,7 +140,7 @@ function RetroAreasSection() {
           placeholder="New retro area…"
           className="h-8 text-[13px]"
         />
-        <Button type="button" variant="outline" size="icon-sm" onClick={add}>
+        <Button type="button" variant="outline" size="icon-sm" aria-label="Add retro area" onClick={add}>
           <Plus />
         </Button>
       </div>
@@ -155,6 +155,9 @@ function AiSection() {
   const [model, setModel] = useState(AI_PROVIDERS.anthropic.models[0])
   const [key, setKey] = useState("")
   const [hasKey, setHasKey] = useState(false)
+  // Which provider the STORED key belongs to — a stored Anthropic key must
+  // never be silently re-labeled as an OpenAI credential by a provider switch.
+  const [storedProvider, setStoredProvider] = useState<AiProvider | null>(null)
   const [loaded, setLoaded] = useState(false)
   const [saving, setSaving] = useState(false)
   // Live catalog from the provider's own API — null until fetched; the static
@@ -167,7 +170,7 @@ function AiSection() {
     listProviderModels(freshKey ? p : undefined, freshKey || undefined)
       .then((m) => {
         setModels(m)
-        if (m.length && !m.includes(model)) setModel(m[0])
+        if (m.length) setModel((cur) => (m.includes(cur) ? cur : m[0]))
       })
       .catch((err) => {
         setModels(null)
@@ -183,6 +186,7 @@ function AiSection() {
           setProvider(s.provider)
           setModel(s.model)
           setHasKey(s.hasKey)
+          setStoredProvider(s.provider)
           // Stored key -> refresh the catalog silently in the background.
           if (s.hasKey) fetchModels(s.provider, undefined, true)
         }
@@ -194,15 +198,18 @@ function AiSection() {
 
   if (!loaded) return null
 
+  const storedKeyUsable = hasKey && provider === storedProvider
+
   const save = async () => {
-    if (!hasKey && !key.trim()) {
-      toast.error("Paste your API key first")
+    if (!storedKeyUsable && !key.trim()) {
+      toast.error(`Paste your ${AI_PROVIDERS[provider].label} API key first`)
       return
     }
     setSaving(true)
     try {
       await saveAiSettings(provider, model, key.trim() || undefined)
       setHasKey(true)
+      setStoredProvider(provider)
       setKey("")
       toast.success("AI settings saved")
     } catch (err) {
@@ -269,7 +276,7 @@ function AiSection() {
             variant="outline"
             size="icon-sm"
             aria-label="Fetch models from provider"
-            disabled={fetchingModels || (!key.trim() && !hasKey)}
+            disabled={fetchingModels || (!key.trim() && !storedKeyUsable)}
             onClick={() => fetchModels(provider, key.trim() || undefined)}
             className="shrink-0"
           >
@@ -280,7 +287,11 @@ function AiSection() {
           type="password"
           value={key}
           onChange={(e) => setKey(e.target.value)}
-          placeholder={hasKey ? "API key saved — paste to replace" : "Paste your API key"}
+          placeholder={
+            storedKeyUsable
+              ? "API key saved — paste to replace"
+              : `Paste your ${AI_PROVIDERS[provider].label} API key`
+          }
           autoComplete="off"
           className="h-8 text-[13px]"
         />
@@ -529,7 +540,7 @@ function MetricsSection() {
               <option key={g} value={g} />
             ))}
           </datalist>
-          <Button type="button" variant="outline" size="icon-sm" onClick={add}>
+          <Button type="button" variant="outline" size="icon-sm" aria-label="Add metric" onClick={add}>
             <Plus />
           </Button>
         </div>
@@ -613,7 +624,7 @@ function HabitsSection() {
           placeholder="New habit…"
           className="h-8 text-[13px]"
         />
-        <Button type="button" variant="outline" size="icon-sm" onClick={add}>
+        <Button type="button" variant="outline" size="icon-sm" aria-label="Add habit" onClick={add}>
           <Plus />
         </Button>
       </div>
@@ -712,7 +723,7 @@ function GoalsSection() {
           placeholder="New goal…"
           className="h-8 text-[13px]"
         />
-        <Button type="button" variant="outline" size="icon-sm" onClick={add}>
+        <Button type="button" variant="outline" size="icon-sm" aria-label="Add goal" onClick={add}>
           <Plus />
         </Button>
       </div>
