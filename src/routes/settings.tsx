@@ -10,6 +10,7 @@ import {
   Flag,
   Bot,
   BookOpen,
+  RefreshCw,
   LayoutDashboard,
   Plus,
   Repeat,
@@ -28,6 +29,7 @@ import {
   listRetroAreas,
   getAiSettings,
   saveAiSettings,
+  listProviderModels,
   AI_PROVIDERS,
 } from "@/lib/storage"
 import type { MetricRow, HabitRow, GoalRow, RetroArea, AiProvider } from "@/lib/storage"
@@ -155,6 +157,24 @@ function AiSection() {
   const [hasKey, setHasKey] = useState(false)
   const [loaded, setLoaded] = useState(false)
   const [saving, setSaving] = useState(false)
+  // Live catalog from the provider's own API — null until fetched; the static
+  // AI_PROVIDERS list only serves as the datalist fallback.
+  const [models, setModels] = useState<string[] | null>(null)
+  const [fetchingModels, setFetchingModels] = useState(false)
+
+  const fetchModels = (p: AiProvider, freshKey?: string, quiet = false) => {
+    setFetchingModels(true)
+    listProviderModels(freshKey ? p : undefined, freshKey || undefined)
+      .then((m) => {
+        setModels(m)
+        if (m.length && !m.includes(model)) setModel(m[0])
+      })
+      .catch((err) => {
+        setModels(null)
+        if (!quiet) toast.error(`Couldn't fetch models: ${(err as Error).message}`)
+      })
+      .finally(() => setFetchingModels(false))
+  }
 
   useEffect(() => {
     getAiSettings()
@@ -163,10 +183,13 @@ function AiSection() {
           setProvider(s.provider)
           setModel(s.model)
           setHasKey(s.hasKey)
+          // Stored key -> refresh the catalog silently in the background.
+          if (s.hasKey) fetchModels(s.provider, undefined, true)
         }
         setLoaded(true)
       })
       .catch(onErr)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   if (!loaded) return null
@@ -202,6 +225,10 @@ function AiSection() {
               const p = e.target.value as AiProvider
               setProvider(p)
               setModel(AI_PROVIDERS[p].models[0])
+              setModels(null)
+              // A fresh key in the box can list models pre-save; a stored key
+              // can't (it may belong to the previous provider).
+              if (key.trim()) fetchModels(p, key.trim())
             }}
             className="border-input bg-transparent dark:bg-input/30 h-8 rounded-md border px-2 text-[13px]"
           >
@@ -211,18 +238,43 @@ function AiSection() {
               </option>
             ))}
           </select>
-          <Input
-            value={model}
-            onChange={(e) => setModel(e.target.value)}
-            list="ai-models"
-            placeholder="model"
-            className="h-8 flex-1 text-[13px]"
-          />
+          {models ? (
+            <select
+              value={model}
+              onChange={(e) => setModel(e.target.value)}
+              className="border-input bg-transparent dark:bg-input/30 h-8 min-w-0 flex-1 rounded-md border px-2 text-[13px]"
+            >
+              {models.map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <Input
+              value={model}
+              onChange={(e) => setModel(e.target.value)}
+              list="ai-models"
+              placeholder="model"
+              className="h-8 flex-1 text-[13px]"
+            />
+          )}
           <datalist id="ai-models">
             {AI_PROVIDERS[provider].models.map((m) => (
               <option key={m} value={m} />
             ))}
           </datalist>
+          <Button
+            type="button"
+            variant="outline"
+            size="icon-sm"
+            aria-label="Fetch models from provider"
+            disabled={fetchingModels || (!key.trim() && !hasKey)}
+            onClick={() => fetchModels(provider, key.trim() || undefined)}
+            className="shrink-0"
+          >
+            <RefreshCw className={fetchingModels ? "animate-spin" : undefined} />
+          </Button>
         </div>
         <Input
           type="password"

@@ -12,7 +12,7 @@
 | Data + Auth | **Supabase** — managed Postgres, built-in Auth, Row-Level Security | One platform for schema + real login; RLS replaces hand-rolled authorization |
 | Client access | **Supabase JS client**, called directly from the browser | RLS is the security boundary; no server needed for ordinary reads/writes |
 | Login | **Magic link** (passwordless email) via Supabase Auth | No password to type nightly on a phone; still a real account, not a shared passcode |
-| AI coach | **One provider-agnostic Edge Function** (`ai-coach`) calling the *user's own* provider (Anthropic / OpenAI / Google) with the *user's own* key from `ai_settings` | The only server-side code; the app holds **zero AI secrets** — no provider lock-in, each account brings its own key |
+| AI coach | **One provider-agnostic Edge Function** (`ai-coach`) using the **AI SDK** (`ai` + provider packages) to call the *user's own* provider with the *user's own* key from `ai_settings`; also serves a **live model catalog** (`list-models`) fetched from the provider's API so the app never ships stale model lists | The only server-side code; the app holds **zero AI secrets** — no provider lock-in, each account brings its own key |
 | Realtime | **Supabase Realtime** subscription on `ai_reports` | Coaching output appears in the UI without polling |
 | PWA | **`vite-plugin-pwa`** (manifest + service worker) | Installable on the phone home screen — unchanged from M0 |
 | Hosting | **GitHub Pages** (unchanged), via the existing Actions workflow | The static frontend didn't need to move; only the data layer changed |

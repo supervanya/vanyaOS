@@ -598,10 +598,31 @@ export async function addRetroAreaRow(label: string, sortOrder: number): Promise
 export type AiProvider = 'anthropic' | 'openai' | 'google'
 export type AiSettings = { provider: AiProvider; model: string; hasKey: boolean }
 
+// Static lists are a FALLBACK only — the real catalog is fetched live from the
+// provider via the Edge Function (list-models action), so it never goes stale.
 export const AI_PROVIDERS: Record<AiProvider, { label: string; models: string[] }> = {
   anthropic: { label: 'Anthropic', models: ['claude-sonnet-5', 'claude-opus-5', 'claude-haiku-4-5'] },
   openai: { label: 'OpenAI', models: ['gpt-5.2', 'gpt-5.2-mini'] },
   google: { label: 'Google', models: ['gemini-3-pro', 'gemini-3-flash'] },
+}
+
+// Live model catalog from the provider's own API, via the Edge Function
+// (server-side: OpenAI blocks browser CORS). Pass provider+apiKey to list from
+// a freshly pasted key BEFORE saving; omit both to use the stored settings.
+export async function listProviderModels(provider?: AiProvider, apiKey?: string): Promise<string[]> {
+  const { data, error } = await supabase.functions.invoke('ai-coach', {
+    body: { action: 'list-models', provider, apiKey },
+  })
+  if (error) {
+    let detail = error.message
+    try {
+      const ctx = (error as { context?: Response }).context
+      if (ctx) detail = (await ctx.json()).error ?? detail
+    } catch { /* keep default */ }
+    throw new Error(detail)
+  }
+  if (data?.error) throw new Error(data.error)
+  return data.models as string[]
 }
 
 export async function getAiSettings(): Promise<AiSettings | null> {

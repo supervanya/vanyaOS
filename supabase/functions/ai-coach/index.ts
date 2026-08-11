@@ -1,18 +1,36 @@
-// Provider-agnostic AI chat proxy — the only server-side code in VanyaOS.
+// Provider-agnostic AI proxy — the only server-side code in VanyaOS.
 // The app holds ZERO AI secrets: each caller's provider/model/API key lives in
 // their own RLS-protected `ai_settings` row, read here with the caller's own
 // JWT (so RLS applies; there is no service-role access in this function).
 //
-// Input:  { system?: string, messages: [{ role: 'user'|'assistant', content: string }], maxTokens?: number }
-// Output: { text: string }  |  { error: string }
+// Actions:
+//   { action?: "chat", system?, messages: [{role, content}], maxTokens? } -> { text }
+//   { action: "list-models", provider?, apiKey? }                         -> { models: string[] }
+//     (provider/apiKey override supports listing BEFORE settings are saved;
+//      otherwise the stored settings are used)
+//
+// Chat goes through the AI SDK (one generateText call instead of hand-rolled
+// per-provider adapters). Model listing is hand-rolled because the SDK doesn't
+// expose it — three small GETs.
 //
 // SECURITY: never log request bodies, settings rows, or provider payloads —
 // they contain the user's API key and intimate journal content.
 
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { generateText } from "npm:ai@5";
+import { createAnthropic } from "npm:@ai-sdk/anthropic@2";
+import { createOpenAI } from "npm:@ai-sdk/openai@2";
+import { createGoogleGenerativeAI } from "npm:@ai-sdk/google@2";
 
 type Msg = { role: "user" | "assistant"; content: string };
-type Payload = { system?: string; messages: Msg[]; maxTokens?: number };
+type Body = {
+  action?: "chat" | "list-models";
+  system?: string;
+  messages?: Msg[];
+  maxTokens?: number;
+  provider?: string;
+  apiKey?: string;
+};
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -25,73 +43,59 @@ const json = (body: unknown, status = 200) =>
     headers: { ...CORS, "Content-Type": "application/json" },
   });
 
-async function callAnthropic(model: string, key: string, p: Payload): Promise<string> {
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "x-api-key": key,
-      "anthropic-version": "2023-06-01",
-      "content-type": "application/json",
-    },
-    body: JSON.stringify({
-      model,
-      max_tokens: p.maxTokens ?? 4096,
-      system: p.system,
-      messages: p.messages,
-    }),
-  });
-  if (!res.ok) throw new Error(`Anthropic ${res.status}: ${(await res.text()).slice(0, 300)}`);
-  const data = await res.json();
-  return (data.content ?? [])
-    .filter((b: { type: string }) => b.type === "text")
-    .map((b: { text: string }) => b.text)
-    .join("");
-}
-
-async function callOpenAI(model: string, key: string, p: Payload): Promise<string> {
-  const messages = [
-    ...(p.system ? [{ role: "system", content: p.system }] : []),
-    ...p.messages,
-  ];
-  const res = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${key}`, "content-type": "application/json" },
-    body: JSON.stringify({ model, max_completion_tokens: p.maxTokens ?? 4096, messages }),
-  });
-  if (!res.ok) throw new Error(`OpenAI ${res.status}: ${(await res.text()).slice(0, 300)}`);
-  const data = await res.json();
-  return data.choices?.[0]?.message?.content ?? "";
-}
-
-async function callGoogle(model: string, key: string, p: Payload): Promise<string> {
-  const contents = p.messages.map((m) => ({
-    role: m.role === "assistant" ? "model" : "user",
-    parts: [{ text: m.content }],
-  }));
-  const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
-    {
-      method: "POST",
-      headers: { "x-goog-api-key": key, "content-type": "application/json" },
-      body: JSON.stringify({
-        contents,
-        systemInstruction: p.system ? { parts: [{ text: p.system }] } : undefined,
-        generationConfig: { maxOutputTokens: p.maxTokens ?? 4096 },
-      }),
-    },
-  );
-  if (!res.ok) throw new Error(`Google ${res.status}: ${(await res.text()).slice(0, 300)}`);
-  const data = await res.json();
-  return (data.candidates?.[0]?.content?.parts ?? [])
-    .map((part: { text?: string }) => part.text ?? "")
-    .join("");
-}
-
-const ADAPTERS: Record<string, (model: string, key: string, p: Payload) => Promise<string>> = {
-  anthropic: callAnthropic,
-  openai: callOpenAI,
-  google: callGoogle,
+// One factory per provider; the AI SDK normalizes everything after this line.
+const sdkModel = (provider: string, model: string, apiKey: string) => {
+  switch (provider) {
+    case "anthropic":
+      return createAnthropic({ apiKey })(model);
+    case "openai":
+      return createOpenAI({ apiKey })(model);
+    case "google":
+      return createGoogleGenerativeAI({ apiKey })(model);
+    default:
+      throw new Error(`Unknown provider: ${provider}`);
+  }
 };
+
+// Model catalogs, fetched live from each provider so the app never ships a
+// stale hardcoded list. Filtered to chat-capable text models, newest-ish first.
+async function listModels(provider: string, apiKey: string): Promise<string[]> {
+  if (provider === "anthropic") {
+    const res = await fetch("https://api.anthropic.com/v1/models?limit=100", {
+      headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01" },
+    });
+    if (!res.ok) throw new Error(`Anthropic ${res.status}: ${(await res.text()).slice(0, 200)}`);
+    const data = await res.json();
+    return (data.data ?? []).map((m: { id: string }) => m.id);
+  }
+  if (provider === "openai") {
+    const res = await fetch("https://api.openai.com/v1/models", {
+      headers: { Authorization: `Bearer ${apiKey}` },
+    });
+    if (!res.ok) throw new Error(`OpenAI ${res.status}: ${(await res.text()).slice(0, 200)}`);
+    const data = await res.json();
+    return (data.data ?? [])
+      .map((m: { id: string }) => m.id)
+      .filter((id: string) => /^(gpt|o\d)/.test(id))
+      .filter((id: string) => !/(audio|realtime|image|tts|transcribe|embed|moderation|search)/.test(id))
+      .sort()
+      .reverse();
+  }
+  if (provider === "google") {
+    const res = await fetch("https://generativelanguage.googleapis.com/v1beta/models?pageSize=200", {
+      headers: { "x-goog-api-key": apiKey },
+    });
+    if (!res.ok) throw new Error(`Google ${res.status}: ${(await res.text()).slice(0, 200)}`);
+    const data = await res.json();
+    return (data.models ?? [])
+      .filter((m: { supportedGenerationMethods?: string[] }) =>
+        m.supportedGenerationMethods?.includes("generateContent"),
+      )
+      .map((m: { name: string }) => m.name.replace(/^models\//, ""))
+      .filter((id: string) => /gemini/.test(id));
+  }
+  throw new Error(`Unknown provider: ${provider}`);
+}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
@@ -111,31 +115,57 @@ Deno.serve(async (req) => {
   const { data: userData, error: userErr } = await supabase.auth.getUser();
   if (userErr || !userData.user) return json({ error: "Not authenticated" }, 401);
 
-  const { data: settings } = await supabase
-    .from("ai_settings")
-    .select("provider, model, api_key")
-    .maybeSingle();
-  if (!settings) {
-    return json({ error: "No AI provider configured — set one up in Settings → AI." }, 400);
+  let body: Body;
+  try {
+    body = await req.json();
+  } catch {
+    return json({ error: "Bad request: JSON body expected" }, 400);
   }
 
-  let payload: Payload;
-  try {
-    payload = await req.json();
-    if (!Array.isArray(payload.messages) || payload.messages.length === 0) throw new Error();
-  } catch {
+  const stored = async () => {
+    const { data } = await supabase
+      .from("ai_settings")
+      .select("provider, model, api_key")
+      .maybeSingle();
+    return data;
+  };
+
+  if (body.action === "list-models") {
+    // Ephemeral override lets the UI list models from a freshly pasted key
+    // BEFORE anything is saved; the key is used for this one call only.
+    let provider = body.provider;
+    let apiKey = body.apiKey;
+    if (!provider || !apiKey) {
+      const s = await stored();
+      if (!s) return json({ error: "No AI provider configured" }, 400);
+      provider = provider ?? s.provider;
+      apiKey = apiKey ?? s.api_key;
+    }
+    try {
+      return json({ models: await listModels(provider!, apiKey!) });
+    } catch (err) {
+      return json({ error: err instanceof Error ? err.message : "Model listing failed" }, 502);
+    }
+  }
+
+  // Default action: chat.
+  if (!Array.isArray(body.messages) || body.messages.length === 0) {
     return json({ error: "Bad request: expected { messages: [...] }" }, 400);
   }
-
-  const adapter = ADAPTERS[settings.provider];
-  if (!adapter) return json({ error: `Unknown provider: ${settings.provider}` }, 400);
+  const s = await stored();
+  if (!s) return json({ error: "No AI provider configured — set one up in Settings → AI." }, 400);
 
   try {
-    const text = await adapter(settings.model, settings.api_key, payload);
+    const { text } = await generateText({
+      model: sdkModel(s.provider, s.model, s.api_key),
+      system: body.system,
+      messages: body.messages,
+      maxOutputTokens: body.maxTokens ?? 4096,
+    });
     return json({ text });
   } catch (err) {
-    // Provider errors (bad key, bad model, rate limit) surface to the client
-    // verbatim-ish; they never contain the key itself.
+    // Provider errors (bad key, bad model, rate limit) surface to the client;
+    // they never contain the key itself.
     return json({ error: err instanceof Error ? err.message : "Provider call failed" }, 502);
   }
 });
