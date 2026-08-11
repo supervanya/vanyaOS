@@ -14,6 +14,7 @@ import {
 } from "@/lib/storage"
 import type { RetroArea, RetroVersion, CoachMsg } from "@/lib/storage"
 import { Button } from "@/components/ui/button"
+import { Markdown } from "@/components/Markdown"
 import { cn } from "@/lib/utils"
 
 export const Route = createFileRoute("/retro/$areaId")({ component: RetroAreaScreen })
@@ -212,7 +213,7 @@ function RetroAreaScreen() {
           {version.aiSummary && (
             <div className="border-info/40 bg-info/10 mt-2 rounded-md border px-3 py-2 text-[12px]">
               <p className="text-info mb-0.5 font-medium">Last retro summary</p>
-              <p className="whitespace-pre-wrap">{version.aiSummary}</p>
+              <Markdown>{version.aiSummary}</Markdown>
             </div>
           )}
 
@@ -241,9 +242,9 @@ function RetroAreaScreen() {
             className="border-input bg-input/30 focus-visible:border-ring mt-3 w-full resize-none rounded-lg border p-2.5 text-[13px] outline-none"
           />
 
-          <pre className="border-border bg-input/20 mt-3 overflow-x-auto rounded-lg border p-3 text-[12px] leading-relaxed whitespace-pre-wrap">
-            {version.docMd}
-          </pre>
+          <div className="border-border bg-input/20 mt-3 overflow-x-auto rounded-lg border p-3">
+            <Markdown>{version.docMd}</Markdown>
+          </div>
         </>
       )}
 
@@ -287,13 +288,13 @@ function RetroAreaScreen() {
               <div
                 key={i}
                 className={cn(
-                  "max-w-[92%] rounded-lg px-3 py-2 text-[13px] leading-relaxed whitespace-pre-wrap",
+                  "max-w-[92%] rounded-lg px-3 py-2 text-[13px] leading-relaxed",
                   m.role === "assistant"
                     ? "border-border bg-input/20 self-start border"
-                    : "bg-primary text-primary-foreground self-end",
+                    : "bg-primary text-primary-foreground self-end whitespace-pre-wrap",
                 )}
               >
-                {m.content}
+                {m.role === "assistant" ? <Markdown>{m.content}</Markdown> : m.content}
               </div>
             ))}
             {busy && (
