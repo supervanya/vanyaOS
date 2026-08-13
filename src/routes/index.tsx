@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router"
 import { useEffect, useRef, useState } from "react"
-import { Layers, Flag, Repeat, Moon, Monitor, Plus, X, Settings as SettingsIcon } from "lucide-react"
+import { Layers, Flag, Repeat, Moon, Monitor, Plus, X, Settings as SettingsIcon, BookOpen } from "lucide-react"
 import { toast } from "sonner"
 import {
   loadConfig,
@@ -13,6 +13,9 @@ import {
   addProject,
   setActiveProject,
   deleteProject,
+  listRetroAreas,
+  latestRetroDates,
+  isRetroDue,
 } from "../lib/storage"
 import type { DayEntry, LoadedConfig, Project } from "../lib/storage"
 import { TaskBoard } from "@/components/TaskBoard"
@@ -67,6 +70,7 @@ function Dashboard() {
           Evening reflection
           <span className="text-muted-foreground ml-auto">→</span>
         </Link>
+        <RetroNavCard />
         <Link
           to="/settings"
           className="border-border bg-input/20 flex items-center gap-2.5 rounded-lg border px-4 py-3 text-[14px] font-medium"
@@ -188,6 +192,36 @@ function GoalsGlance() {
         </div>
       ))}
     </section>
+  )
+}
+
+// Retro nav card: shows how many areas are due (30+ days since last run).
+function RetroNavCard() {
+  const [dueCount, setDueCount] = useState<number | null>(null)
+
+  useEffect(() => {
+    Promise.all([listRetroAreas(), latestRetroDates()])
+      .then(([areas, dates]) => {
+        const due = areas.filter((a) => !a.archived && isRetroDue(dates[a.id])).length
+        setDueCount(due)
+      })
+      .catch(() => setDueCount(0))
+  }, [])
+
+  return (
+    <Link
+      to="/retro"
+      className="border-border bg-input/20 flex items-center gap-2.5 rounded-lg border px-4 py-3 text-[14px] font-medium"
+    >
+      <BookOpen size={16} className="text-indigo-500 dark:text-indigo-300" />
+      Retrospectives
+      {dueCount != null && dueCount > 0 && (
+        <span className="bg-warning/15 text-warning rounded-full px-2 py-0.5 text-[11px]">
+          {dueCount} due
+        </span>
+      )}
+      <span className="text-muted-foreground ml-auto">→</span>
+    </Link>
   )
 }
 

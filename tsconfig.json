@@ -1,5 +1,8 @@
 {
   "include": ["**/*.ts", "**/*.tsx"],
+  // Edge Functions are Deno (Deno globals, npm: specifiers) — not part of the
+  // Vite/browser project. The Supabase CLI typechecks them on deploy.
+  "exclude": ["supabase/functions"],
   "compilerOptions": {
     "target": "ES2022",
     "jsx": "react-jsx",

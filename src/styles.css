@@ -1,5 +1,7 @@
 @import "tailwindcss";
 @import "tw-animate-css";
+/* prose classes for rendered markdown (coach messages, retro docs) */
+@plugin "@tailwindcss/typography";
 
 /* Dark mode follows the device system preference (no manual toggle). */
 @custom-variant dark (@media (prefers-color-scheme: dark));

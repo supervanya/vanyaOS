@@ -8,6 +8,9 @@ import {
   ChevronDown,
   ChevronUp,
   Flag,
+  Bot,
+  BookOpen,
+  RefreshCw,
   LayoutDashboard,
   Plus,
   Repeat,
@@ -22,8 +25,14 @@ import {
   addMetricRow,
   addHabitRow,
   addGoalRow,
+  addRetroAreaRow,
+  listRetroAreas,
+  getAiSettings,
+  saveAiSettings,
+  listProviderModels,
+  AI_PROVIDERS,
 } from "@/lib/storage"
-import type { MetricRow, HabitRow, GoalRow } from "@/lib/storage"
+import type { MetricRow, HabitRow, GoalRow, RetroArea, AiProvider } from "@/lib/storage"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
@@ -58,7 +67,250 @@ function Settings() {
       <MetricsSection />
       <HabitsSection />
       <GoalsSection />
+      <RetroAreasSection />
+      <AiSection />
     </>
+  )
+}
+
+// --- retro areas -------------------------------------------------------------
+
+function RetroAreasSection() {
+  const [rows, setRows] = useState<RetroArea[] | null>(null)
+  const [label, setLabel] = useState("")
+
+  const reload = () => listRetroAreas().then(setRows).catch(onErr)
+  useEffect(() => {
+    reload()
+  }, [])
+
+  if (!rows) return null
+  const active = rows.filter((r) => !r.archived)
+  const archived = rows.filter((r) => r.archived)
+
+  const patch = (id: string, p: Parameters<typeof updateConfigRow>[2]) =>
+    updateConfigRow("retro_areas", id, p).then(reload).catch(onErr)
+
+  const move = (i: number, delta: -1 | 1) => {
+    const pair = swapWith(active, i, delta)
+    if (!pair) return
+    const [a, b] = pair
+    Promise.all([
+      updateConfigRow("retro_areas", a.id, { sortOrder: b.sortOrder }),
+      updateConfigRow("retro_areas", b.id, { sortOrder: a.sortOrder }),
+    ])
+      .then(reload)
+      .catch(onErr)
+  }
+
+  const add = () => {
+    const l = label.trim()
+    if (!l) return
+    addRetroAreaRow(l, Math.max(0, ...rows.map((r) => r.sortOrder)) + 1)
+      .then(() => {
+        setLabel("")
+        reload()
+      })
+      .catch(onErr)
+  }
+
+  return (
+    <section className="mt-6">
+      <p className="text-muted-foreground mb-2 flex items-center gap-1.5 text-xs">
+        <BookOpen size={14} /> Retro areas
+      </p>
+      <div className="flex flex-col gap-2">
+        {active.map((a, i) => (
+          <RowShell
+            key={a.id}
+            onUp={i > 0 ? () => move(i, -1) : undefined}
+            onDown={i < active.length - 1 ? () => move(i, 1) : undefined}
+            onArchive={() => patch(a.id, { archived: true })}
+          >
+            <LabelInput value={a.label} onSave={(v) => patch(a.id, { label: v })} />
+          </RowShell>
+        ))}
+      </div>
+      <ArchivedList rows={archived} onRestore={(r) => patch(r.id, { archived: false })} />
+      <div className="mt-3 flex items-center gap-2">
+        <Input
+          value={label}
+          onChange={(e) => setLabel(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && add()}
+          placeholder="New retro area…"
+          className="h-8 text-[13px]"
+        />
+        <Button type="button" variant="outline" size="icon-sm" aria-label="Add retro area" onClick={add}>
+          <Plus />
+        </Button>
+      </div>
+    </section>
+  )
+}
+
+// --- AI provider (BYO key) ---------------------------------------------------
+
+function AiSection() {
+  const [provider, setProvider] = useState<AiProvider>("anthropic")
+  const [model, setModel] = useState(AI_PROVIDERS.anthropic.models[0])
+  const [key, setKey] = useState("")
+  const [hasKey, setHasKey] = useState(false)
+  // Which provider the STORED key belongs to — a stored Anthropic key must
+  // never be silently re-labeled as an OpenAI credential by a provider switch.
+  const [storedProvider, setStoredProvider] = useState<AiProvider | null>(null)
+  const [loaded, setLoaded] = useState(false)
+  const [saving, setSaving] = useState(false)
+  // Live catalog from the provider's own API — null until fetched; the static
+  // AI_PROVIDERS list only serves as the datalist fallback.
+  const [models, setModels] = useState<string[] | null>(null)
+  const [fetchingModels, setFetchingModels] = useState(false)
+
+  const fetchModels = (p: AiProvider, freshKey?: string, quiet = false) => {
+    setFetchingModels(true)
+    listProviderModels(freshKey ? p : undefined, freshKey || undefined)
+      .then((m) => {
+        setModels(m)
+        if (m.length) setModel((cur) => (m.includes(cur) ? cur : m[0]))
+      })
+      .catch((err) => {
+        setModels(null)
+        if (!quiet) toast.error(`Couldn't fetch models: ${(err as Error).message}`)
+      })
+      .finally(() => setFetchingModels(false))
+  }
+
+  useEffect(() => {
+    getAiSettings()
+      .then((s) => {
+        if (s) {
+          setProvider(s.provider)
+          setModel(s.model)
+          setHasKey(s.hasKey)
+          setStoredProvider(s.provider)
+          // Stored key -> refresh the catalog silently in the background.
+          if (s.hasKey) fetchModels(s.provider, undefined, true)
+        }
+        setLoaded(true)
+      })
+      .catch(onErr)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  if (!loaded) return null
+
+  const storedKeyUsable = hasKey && provider === storedProvider
+
+  const save = async () => {
+    if (!storedKeyUsable && !key.trim()) {
+      toast.error(`Paste your ${AI_PROVIDERS[provider].label} API key first`)
+      return
+    }
+    setSaving(true)
+    try {
+      await saveAiSettings(provider, model, key.trim() || undefined)
+      setHasKey(true)
+      setStoredProvider(provider)
+      setKey("")
+      toast.success("AI settings saved")
+    } catch (err) {
+      onErr(err as { message: string })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <section className="mt-6">
+      <p className="text-muted-foreground mb-2 flex items-center gap-1.5 text-xs">
+        <Bot size={14} /> AI coach · bring your own provider
+      </p>
+      <div className="flex flex-col gap-2">
+        <div className="flex gap-2">
+          <select
+            value={provider}
+            onChange={(e) => {
+              const p = e.target.value as AiProvider
+              setProvider(p)
+              setModel(AI_PROVIDERS[p].models[0])
+              setModels(null)
+              // A fresh key in the box can list models pre-save; a stored key
+              // can't (it may belong to the previous provider).
+              if (key.trim()) fetchModels(p, key.trim())
+            }}
+            className="border-input bg-transparent dark:bg-input/30 h-8 rounded-md border px-2 text-[13px]"
+          >
+            {(Object.keys(AI_PROVIDERS) as AiProvider[]).map((p) => (
+              <option key={p} value={p}>
+                {AI_PROVIDERS[p].label}
+              </option>
+            ))}
+          </select>
+          {models ? (
+            <select
+              value={model}
+              onChange={(e) => setModel(e.target.value)}
+              className="border-input bg-transparent dark:bg-input/30 h-8 min-w-0 flex-1 rounded-md border px-2 text-[13px]"
+            >
+              {models.map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <Input
+              value={model}
+              onChange={(e) => setModel(e.target.value)}
+              list="ai-models"
+              placeholder="model"
+              className="h-8 flex-1 text-[13px]"
+            />
+          )}
+          <datalist id="ai-models">
+            {AI_PROVIDERS[provider].models.map((m) => (
+              <option key={m} value={m} />
+            ))}
+          </datalist>
+          <Button
+            type="button"
+            variant="outline"
+            size="icon-sm"
+            aria-label="Fetch models from provider"
+            disabled={fetchingModels || (!key.trim() && !storedKeyUsable)}
+            onClick={() => fetchModels(provider, key.trim() || undefined)}
+            className="shrink-0"
+          >
+            <RefreshCw className={fetchingModels ? "animate-spin" : undefined} />
+          </Button>
+        </div>
+        <Input
+          type="password"
+          value={key}
+          onChange={(e) => setKey(e.target.value)}
+          placeholder={
+            storedKeyUsable
+              ? "API key saved — paste to replace"
+              : `Paste your ${AI_PROVIDERS[provider].label} API key`
+          }
+          autoComplete="off"
+          className="h-8 text-[13px]"
+        />
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={save}
+          disabled={saving}
+          className="self-start"
+        >
+          {saving ? "Saving…" : "Save AI settings"}
+        </Button>
+        <p className="text-muted-foreground text-[11px]">
+          Your key is stored in your own account row and only ever read by the
+          coach function — the app has no AI keys of its own.
+        </p>
+      </div>
+    </section>
   )
 }
 
@@ -288,7 +540,7 @@ function MetricsSection() {
               <option key={g} value={g} />
             ))}
           </datalist>
-          <Button type="button" variant="outline" size="icon-sm" onClick={add}>
+          <Button type="button" variant="outline" size="icon-sm" aria-label="Add metric" onClick={add}>
             <Plus />
           </Button>
         </div>
@@ -372,7 +624,7 @@ function HabitsSection() {
           placeholder="New habit…"
           className="h-8 text-[13px]"
         />
-        <Button type="button" variant="outline" size="icon-sm" onClick={add}>
+        <Button type="button" variant="outline" size="icon-sm" aria-label="Add habit" onClick={add}>
           <Plus />
         </Button>
       </div>
@@ -471,7 +723,7 @@ function GoalsSection() {
           placeholder="New goal…"
           className="h-8 text-[13px]"
         />
-        <Button type="button" variant="outline" size="icon-sm" onClick={add}>
+        <Button type="button" variant="outline" size="icon-sm" aria-label="Add goal" onClick={add}>
           <Plus />
         </Button>
       </div>

@@ -51,7 +51,7 @@ An in-app `/settings` area — the last reason to touch the Supabase dashboard o
 
 ---
 
-## M4 — BYO-AI foundation + Retrospectives  *(CURRENT — re-scoped 2026-08-07)*
+## M4 — BYO-AI foundation + Retrospectives  🔨 **BUILT** (2026-08-08; DoD pending a real-key session)
 RE jumps out of the backlog, and it forces the AI plumbing to ship with it: a retro is *run by the coach*. Two halves, one milestone:
 
 **(a) Bring-your-own AI provider** — no provider lock-in, no app-held API keys:
@@ -70,6 +70,8 @@ RE jumps out of the backlog, and it forces the AI plumbing to ship with it: a re
 - **Cadence: on-demand + monthly due-nudge** — each area shows a gentle "due" state when a month has passed since its last retro; the dashboard gets a small indicator. No forced schedule.
 
 **DoD:** paste the real financial-fitness markdown into the Finances area, run a retrospective with your own API key against your chosen provider, and have an actual back-and-forth where the coach surfaces changes and proposes next goals — ending with an updated doc that reflects the session (or correctly concluded nothing changed) — plus the due-nudge appearing a month out.
+
+> **Build status:** everything is implemented and verified locally up to the provider boundary (session start with a fake key produced a clean provider 401 through the full chain: client → JWT-verified Edge Function → RLS-read ai_settings → Anthropic adapter). The DoD's real coaching session needs Vanya's actual API key — first real retro closes this milestone.
 
 ---
 
