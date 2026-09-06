@@ -117,3 +117,13 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
 }
+
+/* iOS Safari auto-zooms the page when focusing a text field whose
+   font-size is under 16px. Force 16px on mobile so focus never zooms. */
+@media (max-width: 768px) {
+  input,
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+}
