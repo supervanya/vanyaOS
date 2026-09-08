@@ -11,6 +11,8 @@
 
 Each milestone has a concrete Definition of Done (DoD) — don't move on until it's met.
 
+> **Granular work lives in [GitHub Issues](https://github.com/supervanya/vanyaOS/issues), not here.** This file holds milestone *scope*, DoDs, and risks. Individual features, polish items, and bugs are issues, labeled by `type/` and `size/` and assigned to the matching milestone — see [CLAUDE.md](../CLAUDE.md) for the conventions.
+
 > **2026-07-17 re-scope:** before any AI reports, build out the app surface — a real dashboard, a living todo list, and in-app settings. The AI coach (previously M2) moves to M4. Decisions from this grill: todos become **one living list** (not per-day snapshots), the dashboard is **glanceable + actionable** (not just a nav hub), and settings are **full CRUD + archive** (not visibility toggles).
 
 ---
