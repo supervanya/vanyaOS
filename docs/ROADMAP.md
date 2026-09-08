@@ -29,9 +29,9 @@ Real magic-link login (plus paste-the-link sign-in so the installed PWA can auth
 ---
 
 ## M2 — Command-center dashboard  ✅ **DONE** (built 2026-07-18)
-The app opens onto a **command center at `/`** organized by the 1-3-5 framework; the reflection moved to `/reflect`. (Amended from the original "dashboard + todos" scope after the framework grill: sizes/caps and projects added, areas hierarchy cut.)
+The app opens onto a **command center at `/`** organized by the 1-3-5 framework (surfaced in the UI as Large/Medium/Small — the digits are caps, not sizes); the reflection moved to `/reflect`. (Amended from the original "dashboard + todos" scope after the framework grill: sizes/caps and projects added, areas hierarchy cut.)
 
-- **Living task list** (`tasks` table, no entry FK) with a **size** per task; the weekly board is **hard-capped at 1 big / 3 medium / 5 small** — adding or promoting past a cap forces a swap to Someday (the chooser lists the current slot-holders; no silent overflow). `today` is a pull from the week; `someday` is the parking lot; roll-forward machinery deleted.
+- **Living task list** (`tasks` table, no entry FK) with a **size** per task; the weekly board is **hard-capped at 1 Large / 3 Medium / 5 Small** — adding or promoting past a cap forces a swap to Someday (the chooser lists the current slot-holders; no silent overflow). `today` is a pull from the week; `someday` is the parking lot; roll-forward machinery deleted.
 - **Projects · WIP limit 1** — one `in_progress` (enforced by a DB partial unique index), the rest parked; tap to swap.
 - **Habit chips + goal glance** inline on the dashboard (habits write today's entry, same autosave path as the reflection).
 - **`/reflect` embeds the same board** (compact) — one todo state in the system.
@@ -98,7 +98,8 @@ Whatever two weeks of real use across dashboard + reflection + retros + settings
 2. **Chat coach** — ask-anything over your history, once M4/M5's coach plumbing is proven.
 3. **SYNC** — notes / calendar / email in (value-prop #5). Hardest, most fragile — stays last-ish.
 4. **OUT** — export to other platforms (value-prop #6).
-5. **Multi-user** — explicitly out of scope; RLS already isolates by `user_id`, nothing else planned. (BYO keys already assume per-user AI config, so this wouldn't touch the AI layer.)
+5. **Offline support** — the app works disconnected, with strict validation on anything captured offline and the last few months readable without a connection. A real architectural commitment (local store, sync reconciliation, conflict rules), not a polish item — needs a design pass before any code. Distinct from M1's local draft buffer, which only protects a single in-flight entry.
+6. **Multi-user** — explicitly out of scope; RLS already isolates by `user_id`, nothing else planned. (BYO keys already assume per-user AI config, so this wouldn't touch the AI layer.)
 
 ---
 
