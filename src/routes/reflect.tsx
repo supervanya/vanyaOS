@@ -31,6 +31,7 @@ import type { Metric } from "../lib/config"
 import { MetricSlider } from "@/components/MetricSlider"
 import { HabitChip } from "@/components/HabitChip"
 import { TaskBoard } from "@/components/TaskBoard"
+import { useAutoGrow } from "@/hooks/useAutoGrow"
 
 export const Route = createFileRoute("/reflect")({ component: Reflection })
 
@@ -46,7 +47,6 @@ function Reflection() {
     defaultEntryDate(),
   )
   const [showDateInfo, setShowDateInfo] = useState(false)
-  const taRef = useRef<HTMLTextAreaElement>(null)
   const syncTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Load config once the account is known (the root layout only renders this
@@ -89,12 +89,7 @@ function Reflection() {
   }, [entry, config])
 
   // Auto-grow the reflection textarea to fit its content (no drag handle).
-  useEffect(() => {
-    const el = taRef.current
-    if (!el) return
-    el.style.height = "auto"
-    el.style.height = `${el.scrollHeight}px`
-  }, [entry?.reflection])
+  const reflectionRef = useAutoGrow(entry?.reflection ?? "")
 
   const score = useMemo(
     () => (entry && config ? wellness(entry, config) : 0),
@@ -374,7 +369,7 @@ function Reflection() {
       {/* Reflection */}
       <section className="mt-5">
         <textarea
-          ref={taRef}
+          ref={reflectionRef}
           rows={3}
           value={entry.reflection}
           onChange={(ev) => setReflection(ev.target.value)}
