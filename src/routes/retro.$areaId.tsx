@@ -16,6 +16,7 @@ import type { RetroArea, RetroVersion, CoachMsg } from "@/lib/storage"
 import { Button } from "@/components/ui/button"
 import { Markdown } from "@/components/Markdown"
 import { cn } from "@/lib/utils"
+import { useAutoGrow } from "@/hooks/useAutoGrow"
 
 export const Route = createFileRoute("/retro/$areaId")({ component: RetroAreaScreen })
 
@@ -67,6 +68,9 @@ function RetroAreaScreen() {
   const [preSessionContext, setPreSessionContext] = useState("")
   const [busy, setBusy] = useState(false)
   const chatEndRef = useRef<HTMLDivElement>(null)
+  const contextRef = useAutoGrow(preSessionContext)
+  const editRef = useAutoGrow(editText)
+  const chatRef = useAutoGrow(chatDraft)
 
   useEffect(() => {
     Promise.all([listRetroAreas(), latestRetro(areaId)])
@@ -233,11 +237,12 @@ function RetroAreaScreen() {
           </div>
 
           <textarea
+            ref={contextRef}
             placeholder="Anything to add before the session? New numbers, events, context… (optional)"
             value={preSessionContext}
             onChange={(e) => setPreSessionContext(e.target.value)}
             rows={2}
-            className="border-input bg-input/30 focus-visible:border-ring mt-3 w-full resize-none rounded-lg border p-2.5 text-[13px] outline-none"
+            className="border-input bg-input/30 focus-visible:border-ring mt-3 w-full resize-none overflow-hidden rounded-lg border p-2.5 text-[13px] outline-none"
           />
 
           <div className="border-border bg-input/20 mt-3 overflow-x-auto rounded-lg border p-3">
@@ -258,11 +263,12 @@ function RetroAreaScreen() {
             </p>
           )}
           <textarea
+            ref={editRef}
             value={editText}
             onChange={(e) => setEditText(e.target.value)}
             rows={18}
             placeholder={`# ${area.label} — state of affairs\n\n…`}
-            className="border-input bg-input/30 focus-visible:border-ring mt-3 w-full resize-y rounded-lg border p-3 font-mono text-[12px] leading-relaxed outline-none"
+            className="border-input bg-input/30 focus-visible:border-ring mt-3 w-full resize-none overflow-hidden rounded-lg border p-3 font-mono text-[12px] leading-relaxed outline-none"
           />
           <div className="mt-2 flex gap-2">
             <Button type="button" size="sm" onClick={saveManual} disabled={!editText.trim()}>
@@ -310,6 +316,7 @@ function RetroAreaScreen() {
           <div className="bg-background sticky bottom-0 mt-3 flex flex-col gap-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
             <div className="flex items-end gap-2">
               <textarea
+                ref={chatRef}
                 value={chatDraft}
                 onChange={(e) => setChatDraft(e.target.value)}
                 onKeyDown={(e) => {
@@ -320,7 +327,9 @@ function RetroAreaScreen() {
                 }}
                 rows={2}
                 placeholder="Reply to your coach…"
-                className="border-input bg-input/30 focus-visible:border-ring w-full resize-none rounded-lg border p-2.5 text-[13px] outline-none"
+                // Capped: this bar is sticky, so an uncapped reply would push
+                // the transcript off screen. Past the cap it scrolls.
+                className="border-input bg-input/30 focus-visible:border-ring max-h-[40dvh] w-full resize-none overflow-y-auto rounded-lg border p-2.5 text-[13px] outline-none"
               />
               <Button
                 type="button"
