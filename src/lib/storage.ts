@@ -524,7 +524,7 @@ export async function listGoalRows(): Promise<GoalRow[]> {
   }))
 }
 
-type ConfigTable = 'metrics' | 'habits' | 'goals' | 'retro_areas'
+export type ConfigTable = 'metrics' | 'habits' | 'goals' | 'retro_areas'
 
 // Shared patch shape; snake_case DB columns assembled here so callers stay camel.
 export async function updateConfigRow(
@@ -550,6 +550,13 @@ export async function updateConfigRow(
   if (patch.archived !== undefined) row.archived = patch.archived
   const { error } = await supabase.from(table).update(row).eq('id', id)
   if (error) throw error
+}
+
+export async function updateSortOrders(
+  table: ConfigTable,
+  rows: { id: string; sortOrder: number }[],
+): Promise<void> {
+  await Promise.all(rows.map((r) => updateConfigRow(table, r.id, { sortOrder: r.sortOrder })))
 }
 
 export async function addMetricRow(input: {

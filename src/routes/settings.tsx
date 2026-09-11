@@ -1,12 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router"
 import { useEffect, useState } from "react"
-import type { ReactNode } from "react"
+import type { Dispatch, ReactNode, SetStateAction } from "react"
 import {
   Activity,
   Archive,
   ArchiveRestore,
-  ChevronDown,
-  ChevronUp,
   Flag,
   Bot,
   BookOpen,
@@ -22,6 +20,7 @@ import {
   listHabitRows,
   listGoalRows,
   updateConfigRow,
+  updateSortOrders,
   addMetricRow,
   addHabitRow,
   addGoalRow,
@@ -32,7 +31,16 @@ import {
   listProviderModels,
   AI_PROVIDERS,
 } from "@/lib/storage"
-import type { MetricRow, HabitRow, GoalRow, RetroArea, AiProvider } from "@/lib/storage"
+import type {
+  MetricRow,
+  HabitRow,
+  GoalRow,
+  RetroArea,
+  AiProvider,
+  ConfigTable,
+} from "@/lib/storage"
+import { bySortOrder, withSortOrderSlots } from "@/lib/sortOrder"
+import { DragHandle, SortableList } from "@/components/SortableList"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
@@ -91,17 +99,8 @@ function RetroAreasSection() {
   const patch = (id: string, p: Parameters<typeof updateConfigRow>[2]) =>
     updateConfigRow("retro_areas", id, p).then(reload).catch(onErr)
 
-  const move = (i: number, delta: -1 | 1) => {
-    const pair = swapWith(active, i, delta)
-    if (!pair) return
-    const [a, b] = pair
-    Promise.all([
-      updateConfigRow("retro_areas", a.id, { sortOrder: b.sortOrder }),
-      updateConfigRow("retro_areas", b.id, { sortOrder: a.sortOrder }),
-    ])
-      .then(reload)
-      .catch(onErr)
-  }
+  const reorder = (reordered: RetroArea[]) =>
+    persistReorder("retro_areas", reordered, setRows, reload)
 
   const add = () => {
     const l = label.trim()
@@ -119,18 +118,13 @@ function RetroAreasSection() {
       <p className="text-muted-foreground mb-2 flex items-center gap-1.5 text-xs">
         <BookOpen size={14} /> Retro areas
       </p>
-      <div className="flex flex-col gap-2">
-        {active.map((a, i) => (
-          <RowShell
-            key={a.id}
-            onUp={i > 0 ? () => move(i, -1) : undefined}
-            onDown={i < active.length - 1 ? () => move(i, 1) : undefined}
-            onArchive={() => patch(a.id, { archived: true })}
-          >
+      <SortableList items={active} onReorder={reorder} className="flex flex-col gap-2">
+        {(a) => (
+          <RowShell onArchive={() => patch(a.id, { archived: true })}>
             <LabelInput value={a.label} onSave={(v) => patch(a.id, { label: v })} />
           </RowShell>
-        ))}
-      </div>
+        )}
+      </SortableList>
       <ArchivedList rows={archived} onRestore={(r) => patch(r.id, { archived: false })} />
       <div className="mt-3 flex items-center gap-2">
         <Input
@@ -316,39 +310,11 @@ function AiSection() {
 
 // --- shared row chrome -------------------------------------------------------
 
-function RowShell({
-  onUp,
-  onDown,
-  onArchive,
-  children,
-}: {
-  onUp?: () => void
-  onDown?: () => void
-  onArchive: () => void
-  children: ReactNode
-}) {
+// A row of a SortableList: drag handle, the row's fields, archive button.
+function RowShell({ onArchive, children }: { onArchive: () => void; children: ReactNode }) {
   return (
     <div className="flex items-center gap-1.5">
-      <div className="flex flex-col">
-        <button
-          type="button"
-          aria-label="Move up"
-          disabled={!onUp}
-          onClick={onUp}
-          className="text-muted-foreground hover:text-foreground disabled:opacity-20"
-        >
-          <ChevronUp size={14} />
-        </button>
-        <button
-          type="button"
-          aria-label="Move down"
-          disabled={!onDown}
-          onClick={onDown}
-          className="text-muted-foreground hover:text-foreground disabled:opacity-20"
-        >
-          <ChevronDown size={14} />
-        </button>
-      </div>
+      <DragHandle />
       {children}
       <Button
         type="button"
@@ -428,16 +394,24 @@ function ArchivedList<T extends { id: string; label: string }>({
   )
 }
 
-// Reorder helper: swap sort_order with the neighbor among ACTIVE rows.
-// Returns the two [id, newSortOrder] writes, or null at a boundary.
-function swapWith<T extends { id: string; sortOrder: number }>(
-  active: T[],
-  index: number,
-  delta: -1 | 1,
-): [T, T] | null {
-  const other = index + delta
-  if (other < 0 || other >= active.length) return null
-  return [active[index], active[other]]
+// Persist a drag-reorder of a section's active rows. The new order shows
+// immediately; only rows whose sort_order changed are written, and a failed
+// write reloads the saved order.
+function persistReorder<T extends { id: string; sortOrder: number }>(
+  table: ConfigTable,
+  reordered: T[],
+  setRows: Dispatch<SetStateAction<T[] | null>>,
+  reload: () => void,
+) {
+  const next = withSortOrderSlots(reordered)
+  const byId = new Map(next.map((r) => [r.id, r]))
+  setRows((cur) => cur && cur.map((r) => byId.get(r.id) ?? r).sort(bySortOrder))
+
+  const moved = next.filter((r, i) => r.sortOrder !== reordered[i].sortOrder)
+  updateSortOrders(table, moved).catch((err) => {
+    onErr(err)
+    reload()
+  })
 }
 
 // --- metrics -----------------------------------------------------------------
@@ -462,17 +436,8 @@ function MetricsSection() {
     updateConfigRow("metrics", id, p).then(reload).catch(onErr)
   }
 
-  const move = (i: number, delta: -1 | 1) => {
-    const pair = swapWith(active, i, delta)
-    if (!pair) return
-    const [a, b] = pair
-    Promise.all([
-      updateConfigRow("metrics", a.id, { sortOrder: b.sortOrder }),
-      updateConfigRow("metrics", b.id, { sortOrder: a.sortOrder }),
-    ])
-      .then(reload)
-      .catch(onErr)
-  }
+  const reorder = (reordered: MetricRow[]) =>
+    persistReorder("metrics", reordered, setRows, reload)
 
   const add = () => {
     const l = label.trim()
@@ -498,14 +463,9 @@ function MetricsSection() {
       <p className="text-muted-foreground mb-2 flex items-center gap-1.5 text-xs">
         <Activity size={14} /> Metrics
       </p>
-      <div className="flex flex-col gap-2">
-        {active.map((m, i) => (
-          <RowShell
-            key={m.id}
-            onUp={i > 0 ? () => move(i, -1) : undefined}
-            onDown={i < active.length - 1 ? () => move(i, 1) : undefined}
-            onArchive={() => patch(m.id, { archived: true })}
-          >
+      <SortableList items={active} onReorder={reorder} className="flex flex-col gap-2">
+        {(m) => (
+          <RowShell onArchive={() => patch(m.id, { archived: true })}>
             <LabelInput value={m.label} onSave={(v) => patch(m.id, { label: v })} />
             <LabelInput
               value={m.groupName}
@@ -516,8 +476,8 @@ function MetricsSection() {
               <span className="text-destructive shrink-0 text-[10px]">0 best</span>
             )}
           </RowShell>
-        ))}
-      </div>
+        )}
+      </SortableList>
       <ArchivedList rows={archived} onRestore={(r) => patch(r.id, { archived: false })} />
 
       <div className="mt-3 flex flex-col gap-2">
@@ -575,17 +535,8 @@ function HabitsSection() {
   const patch = (id: string, p: Parameters<typeof updateConfigRow>[2]) =>
     updateConfigRow("habits", id, p).then(reload).catch(onErr)
 
-  const move = (i: number, delta: -1 | 1) => {
-    const pair = swapWith(active, i, delta)
-    if (!pair) return
-    const [a, b] = pair
-    Promise.all([
-      updateConfigRow("habits", a.id, { sortOrder: b.sortOrder }),
-      updateConfigRow("habits", b.id, { sortOrder: a.sortOrder }),
-    ])
-      .then(reload)
-      .catch(onErr)
-  }
+  const reorder = (reordered: HabitRow[]) =>
+    persistReorder("habits", reordered, setRows, reload)
 
   const add = () => {
     const l = label.trim()
@@ -603,18 +554,13 @@ function HabitsSection() {
       <p className="text-muted-foreground mb-2 flex items-center gap-1.5 text-xs">
         <Repeat size={14} /> Habits
       </p>
-      <div className="flex flex-col gap-2">
-        {active.map((h, i) => (
-          <RowShell
-            key={h.id}
-            onUp={i > 0 ? () => move(i, -1) : undefined}
-            onDown={i < active.length - 1 ? () => move(i, 1) : undefined}
-            onArchive={() => patch(h.id, { archived: true })}
-          >
+      <SortableList items={active} onReorder={reorder} className="flex flex-col gap-2">
+        {(h) => (
+          <RowShell onArchive={() => patch(h.id, { archived: true })}>
             <LabelInput value={h.label} onSave={(v) => patch(h.id, { label: v })} />
           </RowShell>
-        ))}
-      </div>
+        )}
+      </SortableList>
       <ArchivedList rows={archived} onRestore={(r) => patch(r.id, { archived: false })} />
       <div className="mt-3 flex items-center gap-2">
         <Input
@@ -654,17 +600,8 @@ function GoalsSection() {
   const setProgressLocal = (id: string, v: number) =>
     setRows((cur) => (cur ? cur.map((r) => (r.id === id ? { ...r, progress: v } : r)) : cur))
 
-  const move = (i: number, delta: -1 | 1) => {
-    const pair = swapWith(active, i, delta)
-    if (!pair) return
-    const [a, b] = pair
-    Promise.all([
-      updateConfigRow("goals", a.id, { sortOrder: b.sortOrder }),
-      updateConfigRow("goals", b.id, { sortOrder: a.sortOrder }),
-    ])
-      .then(reload)
-      .catch(onErr)
-  }
+  const reorder = (reordered: GoalRow[]) =>
+    persistReorder("goals", reordered, setRows, reload)
 
   const add = () => {
     const l = label.trim()
@@ -682,14 +619,10 @@ function GoalsSection() {
       <p className="text-muted-foreground mb-2 flex items-center gap-1.5 text-xs">
         <Flag size={14} /> Goals
       </p>
-      <div className="flex flex-col gap-3">
-        {active.map((g, i) => (
-          <div key={g.id}>
-            <RowShell
-              onUp={i > 0 ? () => move(i, -1) : undefined}
-              onDown={i < active.length - 1 ? () => move(i, 1) : undefined}
-              onArchive={() => patch(g.id, { archived: true })}
-            >
+      <SortableList items={active} onReorder={reorder} className="flex flex-col gap-3">
+        {(g) => (
+          <>
+            <RowShell onArchive={() => patch(g.id, { archived: true })}>
               <LabelInput value={g.label} onSave={(v) => patch(g.id, { label: v })} />
             </RowShell>
             <div className="mt-1.5 ml-6 flex items-center gap-3">
@@ -711,9 +644,9 @@ function GoalsSection() {
                 className="w-20 shrink-0"
               />
             </div>
-          </div>
-        ))}
-      </div>
+          </>
+        )}
+      </SortableList>
       <ArchivedList rows={archived} onRestore={(r) => patch(r.id, { archived: false })} />
       <div className="mt-3 flex items-center gap-2">
         <Input
