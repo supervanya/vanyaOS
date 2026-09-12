@@ -37,6 +37,8 @@ Every issue gets exactly one `type/` label and one `size/` label, plus a milesto
 
 A `size/l` is a smell: try to split it into sub-issues before starting.
 
+**`priority/high`** — optional, and only for issues that should jump the queue within their milestone (e.g. a bug that corrupts data). No label means normal priority; there's no low or medium.
+
 **Milestone** — `M4`, `M5`, `M6`, or `Backlog`, matching ROADMAP.md. If it doesn't belong to the current milestone and isn't urgent, it goes to `Backlog`.
 
 **Dependencies** — write `Blocked by #12` in the issue body; GitHub renders it as a live link with open/closed state. Add the `blocked` label only while it is *actually* blocked, and remove it when the blocker closes. For a parent/child breakdown, use GitHub sub-issues so the parent gets a progress bar.
