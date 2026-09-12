@@ -102,6 +102,41 @@ export function currentStreak(points: Point[]): Streak {
 export const pointsSince = (points: Point[], from: string | null) =>
   from === null ? points : points.filter((p) => p.date >= from)
 
+/**
+ * How good you are at an item lately, from 0 (worst) to 1 (best): its recent
+ * average — the right-hand number of its readout — over its scale, flipped when
+ * lower is better. For a habit that's the recent completion rate. Null when
+ * there's too little data for a trend.
+ */
+export function standing(trend: Trend | null, higherIsBetter: boolean, scale: number): number | null {
+  if (!trend) return null
+  const share = trend.recent / scale
+  return higherIsBetter ? share : 1 - share
+}
+
+export const SORT_ORDERS = ['yours', 'best', 'worst'] as const
+export type SortOrder = (typeof SORT_ORDERS)[number]
+
+export const isSortOrder = (value: unknown): value is SortOrder =>
+  SORT_ORDERS.includes(value as SortOrder)
+
+/**
+ * Items in your order, or by standing with the best or worst first. Items with
+ * no standing (too few entries) always go last, and ties keep your order.
+ */
+export function sortByStanding<T>(
+  items: T[],
+  standingOf: (item: T) => number | null,
+  order: SortOrder,
+): T[] {
+  if (order === 'yours') return items
+  const ranked = items.map((item) => ({ item, standing: standingOf(item) }))
+  const known = ranked.filter((r): r is { item: T; standing: number } => r.standing !== null)
+  const unknown = ranked.filter((r) => r.standing === null)
+  known.sort((a, b) => (order === 'best' ? b.standing - a.standing : a.standing - b.standing))
+  return [...known, ...unknown].map((r) => r.item)
+}
+
 /** First day a window covers (today inclusive), or null for all time. */
 export function windowStart(window: TrendWindow, today: string): string | null {
   const { days } = TREND_WINDOWS[window]

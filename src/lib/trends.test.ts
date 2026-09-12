@@ -7,10 +7,14 @@ import {
   habitTrend,
   metricTrend,
   pointsSince,
+  sortByStanding,
+  standing,
   wellnessSeries,
   wellnessTrend,
   windowStart,
   type Point,
+  type SortOrder,
+  type Trend,
 } from "./trends"
 
 // Day n counted from Sep 1, 2026.
@@ -108,6 +112,46 @@ describe("pointsSince", () => {
   it("keeps everything for all time", () => {
     const all = at([0, 1], [1, 2])
     expect(pointsSince(all, null)).toBe(all)
+  })
+})
+
+describe("standing", () => {
+  const recently = (recent: number): Trend => ({ early: 0, recent, verdict: "better" })
+
+  it("is a habit's recent completion rate", () => {
+    expect(standing(recently(0.6), true, 1)).toBeCloseTo(0.6)
+  })
+
+  it("puts a slider on a 0-1 scale where 1 is best, flipping symptoms", () => {
+    expect(standing(recently(4), true, 5)).toBeCloseTo(0.8)
+    expect(standing(recently(1), false, 5)).toBeCloseTo(0.8) // 1/5 brain fog is as good as 4/5 mood
+  })
+
+  it("is null without a trend", () => {
+    expect(standing(null, true, 5)).toBeNull()
+  })
+})
+
+describe("sortByStanding", () => {
+  const items = [
+    { id: "a", standing: 0.2 },
+    { id: "b", standing: null },
+    { id: "c", standing: 0.9 },
+    { id: "d", standing: 0.2 },
+  ]
+  const ids = (order: SortOrder) =>
+    sortByStanding(items, (item) => item.standing, order).map((item) => item.id)
+
+  it("keeps your order", () => {
+    expect(ids("yours")).toEqual(["a", "b", "c", "d"])
+  })
+
+  it("puts the best first, ties in your order, and unknowns last", () => {
+    expect(ids("best")).toEqual(["c", "a", "d", "b"])
+  })
+
+  it("puts the worst first, with unknowns still last", () => {
+    expect(ids("worst")).toEqual(["a", "d", "c", "b"])
   })
 })
 
