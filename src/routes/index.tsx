@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router"
 import { useEffect, useRef, useState } from "react"
-import { Layers, Flag, Repeat, Moon, Monitor, Plus, X, Settings as SettingsIcon, BookOpen } from "lucide-react"
+import { Layers, Flag, Repeat, Moon, Monitor, Plus, X, Settings as SettingsIcon, BookOpen, TrendingUp } from "lucide-react"
 import { toast } from "sonner"
 import {
   loadConfig,
@@ -68,6 +68,14 @@ function Dashboard() {
         >
           <Moon size={16} className="text-indigo-500 dark:text-indigo-300" />
           Evening reflection
+          <span className="text-muted-foreground ml-auto">→</span>
+        </Link>
+        <Link
+          to="/trends"
+          className="border-border bg-input/20 flex items-center gap-2.5 rounded-lg border px-4 py-3 text-[14px] font-medium"
+        >
+          <TrendingUp size={16} className="text-indigo-500 dark:text-indigo-300" />
+          Trends
           <span className="text-muted-foreground ml-auto">→</span>
         </Link>
         <RetroNavCard />
