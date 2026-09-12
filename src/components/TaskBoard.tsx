@@ -18,7 +18,8 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 
 const SIZES: TaskSize[] = ["big", "medium", "small"]
-const SIZE_LABEL: Record<TaskSize, string> = { big: "1", medium: "3", small: "5" }
+// Named by size, not by cap: a "1" was the biggest task, which read backwards.
+const SIZE_LABEL: Record<TaskSize, string> = { big: "Large", medium: "Medium", small: "Small" }
 
 // Occupies a weekly 1-3-5 slot: on the board (today or week) and not deleted.
 // Completed items still count — done work used up its slot this week.
@@ -132,7 +133,7 @@ export function TaskBoard({ compact = false }: { compact?: boolean }) {
         return (
           <section key={size} className="mt-3 first:mt-0">
             <div className="mb-1.5 flex items-baseline gap-2">
-              <span className="text-lg font-semibold tabular-nums">{SIZE_LABEL[size]}</span>
+              <span className="text-sm font-semibold">{SIZE_LABEL[size]}</span>
               <span
                 className={cn(
                   "text-[11px] tabular-nums",
@@ -202,7 +203,8 @@ export function TaskBoard({ compact = false }: { compact?: boolean }) {
       {overflow && overflowSize && (
         <div className="border-warning/40 bg-warning/10 mt-3 rounded-lg border p-3">
           <p className="text-[12px] font-medium">
-            The {SIZE_LABEL[overflowSize]}-slot is full. Swap one out for “{overflowText}”?
+            {SIZE_LABEL[overflowSize]} is full ({CAPS[overflowSize]}/{CAPS[overflowSize]}). Swap
+            one out for “{overflowText}”?
           </p>
           <div className="mt-2 flex flex-col gap-1.5">
             {bySize(overflowSize)
@@ -238,12 +240,15 @@ export function TaskBoard({ compact = false }: { compact?: boolean }) {
                 key={s}
                 type="button"
                 onClick={() => setDraftSize(s)}
+                aria-label={SIZE_LABEL[s]}
+                title={SIZE_LABEL[s]}
                 className={cn(
-                  "px-2.5 py-1.5 text-[12px] tabular-nums",
+                  "px-2.5 py-1.5 text-[12px]",
                   draftSize === s ? "bg-primary text-primary-foreground" : "text-muted-foreground",
                 )}
               >
-                {SIZE_LABEL[s]}
+                {/* Initials keep the add row roomy on a phone; the headings spell it out. */}
+                {SIZE_LABEL[s][0]}
               </button>
             ))}
           </div>
@@ -269,7 +274,7 @@ export function TaskBoard({ compact = false }: { compact?: boolean }) {
             {someday.map((t) => (
               <div key={t.id} className="flex items-center gap-2.5">
                 <span className="text-muted-foreground flex-1 text-[13px]">{t.text}</span>
-                <span className="text-muted-foreground/70 text-[10px] tabular-nums">
+                <span className="text-muted-foreground/70 text-[10px]">
                   {SIZE_LABEL[t.size]}
                 </span>
                 <Button
