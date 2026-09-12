@@ -21,15 +21,13 @@ import { HabitChip } from "@/components/HabitChip"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
+import { dayOfYear, isoWeek } from "@/lib/dates"
 
 export const Route = createFileRoute("/")({ component: Dashboard })
 
-// Monday of the current week, for the "week of" header.
-function weekOfLabel(): string {
-  const d = new Date()
-  const day = d.getDay() // 0 = Sun
-  d.setDate(d.getDate() - ((day + 6) % 7))
-  return d.toLocaleDateString(undefined, { month: "short", day: "numeric" })
+// Where today sits in the year, e.g. "2026 · week 37 · day 255" (ISO week).
+function dateStamp(d = new Date()): string {
+  return `${d.getFullYear()} · week ${isoWeek(d)} · day ${dayOfYear(d)}`
 }
 
 function Dashboard() {
@@ -41,9 +39,7 @@ function Dashboard() {
           <Layers size={17} className="text-indigo-500 dark:text-indigo-300" />
           Command center
         </span>
-        <span className="text-muted-foreground text-xs">
-          week of {weekOfLabel()}
-        </span>
+        <span className="text-muted-foreground text-xs tabular-nums">{dateStamp()}</span>
       </div>
 
       {/* This week's 1-3-5 (the living task list) */}
