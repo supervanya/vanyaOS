@@ -1,24 +1,28 @@
 import { createFileRoute, Link } from "@tanstack/react-router"
 import { useEffect, useState, type ReactNode } from "react"
-import { LayoutDashboard, TrendingUp } from "lucide-react"
+import { ArrowUpDown, LayoutDashboard, TrendingUp } from "lucide-react"
 import { toast } from "sonner"
 import { loadConfig, loadTrendSeries, todayISO } from "../lib/storage"
 import type { LoadedConfig, TrendSeries } from "../lib/storage"
 import {
+  SORT_ORDERS,
   TREND_WINDOWS,
   bucketSize,
   bucketize,
   currentStreak,
   habitTrend,
+  isSortOrder,
   isTrendWindow,
   metricTrend,
   pointsSince,
+  sortByStanding,
+  standing,
   wellnessSeries,
   wellnessTrend,
   windowStart,
 } from "../lib/trends"
-import type { Point, Streak, Trend, TrendWindow } from "../lib/trends"
-import { groupMetrics } from "../lib/config"
+import type { Point, SortOrder, Streak, Trend, TrendWindow } from "../lib/trends"
+import { groupMetrics, type Metric } from "../lib/config"
 import { HabitCells } from "@/components/HabitCells"
 import { Sparkline } from "@/components/Sparkline"
 import { TrendReadout, trendTone } from "@/components/TrendReadout"
@@ -31,7 +35,8 @@ const formatScore = (value: number) => value.toFixed(1)
 const formatRate = (value: number) => `${Math.round(value * 100)}%`
 
 function Trends() {
-  const [trendWindow, setTrendWindow] = useStoredWindow()
+  const [trendWindow, setTrendWindow] = useStoredChoice(WINDOW_KEY, isTrendWindow, "1M")
+  const [sortOrder, setSortOrder] = useStoredChoice(SORT_KEY, isSortOrder, "yours")
   const config = useConfig()
   const history = useTrendHistory(config)
 
@@ -48,13 +53,21 @@ function Trends() {
         <WindowPicker value={trendWindow} onChange={setTrendWindow} />
       </div>
 
-      <h1 className="mt-3 flex items-center gap-2 text-[15px] font-medium">
-        <TrendingUp size={17} className="text-indigo-500 dark:text-indigo-300" />
-        Trends
-      </h1>
+      <div className="mt-3 flex items-center justify-between">
+        <h1 className="flex items-center gap-2 text-[15px] font-medium">
+          <TrendingUp size={17} className="text-indigo-500 dark:text-indigo-300" />
+          Trends
+        </h1>
+        <SortButton value={sortOrder} onChange={setSortOrder} />
+      </div>
 
       {config && history && (
-        <TrendSections config={config} trendWindow={trendWindow} history={history} />
+        <TrendSections
+          config={config}
+          trendWindow={trendWindow}
+          sortOrder={sortOrder}
+          history={history}
+        />
       )}
     </>
   )
@@ -63,10 +76,12 @@ function Trends() {
 function TrendSections({
   config,
   trendWindow,
+  sortOrder,
   history,
 }: {
   config: LoadedConfig
   trendWindow: TrendWindow
+  sortOrder: SortOrder
   history: TrendSeries
 }) {
   // Every chart shares one x-axis: the window, ending today.
@@ -75,6 +90,20 @@ function TrendSections({
   const from = start ?? history.firstDate ?? today
   const axis: Axis = { from, to: today, size: bucketSize(trendWindow, from, today) }
   const wellness = pointsSince(wellnessSeries(history.metrics, config.metrics), start)
+
+  const metricRows: MetricRow[] = config.metrics.map((metric) => {
+    const points = pointsSince(history.metrics[metric.id] ?? [], start)
+    const trend = metricTrend(points, metric)
+    return { metric, points, trend, standing: standing(trend, metric.higherIsBetter, metric.scale) }
+  })
+  const habitRows = config.habits.map((habit) => {
+    // The streak counts the whole history; the cells and trend, the window.
+    const all = history.habits[habit.id] ?? []
+    const points = pointsSince(all, start)
+    const trend = habitTrend(points)
+    return { habit, all, points, trend, standing: standing(trend, true, 1) }
+  })
+  const sorted = sortOrder !== "yours"
 
   return (
     <>
@@ -87,36 +116,34 @@ function TrendSections({
           axis={axis}
         />
       </Section>
-      {groupMetrics(config.metrics).map(({ group, metrics }) => (
-        <Section
-          key={group}
-          title={metrics.every((m) => !m.higherIsBetter) ? `${group} · 0 is best` : group}
-        >
-          {metrics.map((m) => {
-            const points = pointsSince(history.metrics[m.id] ?? [], start)
-            return (
-              <ChartedRow
-                key={m.id}
-                label={m.label}
-                points={points}
-                trend={metricTrend(points, m)}
-                max={m.scale}
-                axis={axis}
-              />
-            )
-          })}
+      {metricSections(metricRows, sortOrder).map(({ title, note, rows }) => (
+        <Section key={title} title={title} note={note}>
+          {rows.map(({ metric, points, trend }) => (
+            <ChartedRow
+              key={metric.id}
+              label={metric.label}
+              points={points}
+              trend={trend}
+              max={metric.scale}
+              axis={axis}
+            />
+          ))}
         </Section>
       ))}
-      <Section title="Habits" note={<HabitLegend cellDays={axis.size} />}>
-        {config.habits.map((h) => {
-          // The streak counts the whole history; the cells and trend, the window.
-          const all = history.habits[h.id] ?? []
-          const points = pointsSince(all, start)
-          const trend = habitTrend(points)
-          return (
+      <Section
+        title={sorted ? `Habits · ${SORT_LABEL[sortOrder].toLowerCase()}` : "Habits"}
+        note={
+          <>
+            {sorted && <SortNote>Ranked by recent completion rate.</SortNote>}
+            <HabitLegend cellDays={axis.size} />
+          </>
+        }
+      >
+        {sortByStanding(habitRows, (r) => r.standing, sortOrder).map(
+          ({ habit, all, points, trend }) => (
             <TrendRow
-              key={h.id}
-              label={h.label}
+              key={habit.id}
+              label={habit.label}
               trend={trend}
               format={formatRate}
               aside={<StreakCount streak={currentStreak(all)} />}
@@ -128,8 +155,8 @@ function TrendSections({
                 />
               }
             />
-          )
-        })}
+          ),
+        )}
       </Section>
     </>
   )
@@ -165,6 +192,67 @@ function WindowPicker({
         ))}
     </div>
   )
+}
+
+const SORT_LABEL: Record<SortOrder, string> = {
+  yours: "Your order",
+  best: "Best first",
+  worst: "Worst first",
+}
+
+// Shows the current order; each tap moves to the next one.
+function SortButton({
+  value,
+  onChange,
+}: {
+  value: SortOrder
+  onChange: (next: SortOrder) => void
+}) {
+  const next = SORT_ORDERS[(SORT_ORDERS.indexOf(value) + 1) % SORT_ORDERS.length]
+  return (
+    <button
+      type="button"
+      onClick={() => onChange(next)}
+      title={`Switch to ${SORT_LABEL[next].toLowerCase()}`}
+      className={cn(
+        "flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium",
+        value === "yours" ? "text-muted-foreground hover:text-foreground" : "bg-muted text-foreground",
+      )}
+    >
+      <ArrowUpDown size={13} />
+      <span className="sr-only">Sort: </span>
+      {SORT_LABEL[value]}
+    </button>
+  )
+}
+
+type MetricRow = { metric: Metric; points: Point[]; trend: Trend | null; standing: number | null }
+
+// Reflect's groups in your order. Sorted, it's one ranked list instead: a
+// group of one or two metrics can't show a ranking.
+function metricSections(
+  rows: MetricRow[],
+  order: SortOrder,
+): { title: string; note: ReactNode; rows: MetricRow[] }[] {
+  if (order !== "yours") {
+    return [
+      {
+        title: `Metrics · ${SORT_LABEL[order].toLowerCase()}`,
+        note: <SortNote>Ranked by your recent average; for symptoms, lower is better.</SortNote>,
+        rows: sortByStanding(rows, (r) => r.standing, order),
+      },
+    ]
+  }
+  const byId = new Map(rows.map((r) => [r.metric.id, r]))
+  return groupMetrics(rows.map((r) => r.metric)).map(({ group, metrics }) => ({
+    title: metrics.every((m) => !m.higherIsBetter) ? `${group} · 0 is best` : group,
+    note: null,
+    rows: metrics.flatMap((m) => byId.get(m.id) ?? []),
+  }))
+}
+
+function SortNote({ children }: { children: ReactNode }) {
+  return <p className="text-muted-foreground mb-1.5 text-[11px]">{children}</p>
 }
 
 function Section({
@@ -295,24 +383,29 @@ function LegendItem({ swatch, label }: { swatch: ReactNode; label: string }) {
 // --- Data hooks ---------------------------------------------------------------
 
 const WINDOW_KEY = "vanyaos:trends:window"
-const DEFAULT_WINDOW: TrendWindow = "1M"
+const SORT_KEY = "vanyaos:trends:sort"
 
-// The chosen window survives reloads. localStorage can throw (private mode,
-// blocked storage), in which case the choice just isn't remembered.
-function useStoredWindow() {
-  const [value, setValue] = useState<TrendWindow>(() => {
+// A choice that survives reloads. localStorage can throw (private mode, blocked
+// storage), in which case it just isn't remembered; an unknown stored value
+// falls back too.
+function useStoredChoice<T extends string>(
+  key: string,
+  isValid: (value: unknown) => value is T,
+  fallback: T,
+) {
+  const [value, setValue] = useState<T>(() => {
     try {
-      const stored = localStorage.getItem(WINDOW_KEY)
-      return isTrendWindow(stored) ? stored : DEFAULT_WINDOW
+      const stored = localStorage.getItem(key)
+      return isValid(stored) ? stored : fallback
     } catch {
-      return DEFAULT_WINDOW
+      return fallback
     }
   })
 
-  const choose = (next: TrendWindow) => {
+  const choose = (next: T) => {
     setValue(next)
     try {
-      localStorage.setItem(WINDOW_KEY, next)
+      localStorage.setItem(key, next)
     } catch {
       // Not remembered, but still applied for this visit.
     }
