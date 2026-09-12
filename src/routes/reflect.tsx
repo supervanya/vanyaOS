@@ -67,7 +67,7 @@ function Reflection() {
   const reflectionRef = useAutoGrow(entry?.reflection ?? "")
 
   const score = useMemo(
-    () => (entry && config ? wellness(entry, config) : 0),
+    () => (entry && config ? wellness(entry, config) : null),
     [entry, config],
   )
 
@@ -142,14 +142,16 @@ function Reflection() {
     { weekday: "short", month: "short", day: "numeric" },
   )
 
-  // Color-code wellness on the 0-5 scale.
+  // Color-code wellness on the 0-5 scale; there's no score until a slider is set.
   const scoreColor =
-    score >= 3.75
-      ? "text-success"
-      : score >= 2.5
-        ? "text-warning"
-        : "text-destructive"
-  const delta = prevScore == null ? null : score - prevScore
+    score === null
+      ? "text-muted-foreground"
+      : score >= 3.75
+        ? "text-success"
+        : score >= 2.5
+          ? "text-warning"
+          : "text-destructive"
+  const delta = score === null || prevScore === null ? null : score - prevScore
 
   return (
     <>
@@ -223,7 +225,7 @@ function Reflection() {
       {/* Wellness score + delta vs last entry */}
       <div className="mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-1">
         <span className={`text-4xl font-semibold tabular-nums ${scoreColor}`}>
-          {score.toFixed(1)}
+          {score === null ? "–" : score.toFixed(1)}
         </span>
         <span className="text-muted-foreground text-xs">wellness</span>
         {delta != null && (
@@ -265,7 +267,7 @@ function Reflection() {
             {inverted ? " · 0 is best" : ""}
           </p>
           {metrics.map((m) => {
-            const val = entry.metrics[m.id] ?? 0
+            const val = entry.metrics[m.id] // undefined until you set it
             return (
               <div key={m.id} className="mb-4 flex items-center gap-3">
                 <span className="w-24 shrink-0 text-[13px] text-foreground/85">
@@ -285,8 +287,10 @@ function Reflection() {
                     ))}
                   </div>
                 </div>
-                <span className="w-6 text-right text-[15px] font-semibold tabular-nums">
-                  {val}
+                <span
+                  className={`w-6 text-right text-[15px] font-semibold tabular-nums ${val === undefined ? "text-muted-foreground" : ""}`}
+                >
+                  {val ?? "–"}
                 </span>
               </div>
             )
