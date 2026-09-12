@@ -10,6 +10,19 @@ export type Metric = {
   scale: number // max value; sliders run 0..scale (we use 0-5)
 }
 
+export type MetricGroup = { group: string; metrics: Metric[] }
+
+/** Metrics bucketed by `group`, with groups in order of first appearance. */
+export function groupMetrics(metrics: Metric[]): MetricGroup[] {
+  const groups = new Map<string, Metric[]>()
+  for (const m of metrics) {
+    const members = groups.get(m.group)
+    if (members) members.push(m)
+    else groups.set(m.group, [m])
+  }
+  return [...groups].map(([group, members]) => ({ group, metrics: members }))
+}
+
 export type Habit = { id: string; label: string }
 
 export type Goal = { id: string; label: string; progress: number; note?: string }

@@ -57,6 +57,30 @@ export const metricTrend = (points: Point[], metric: Metric) =>
 /** Habit points are 1 (done) or 0 (missed), so the averages are completion rates. */
 export const habitTrend = (points: Point[]) => measureTrend(points, true, HABIT_FLAT_BAND)
 
+/** Composite wellness is on the slider scale, and higher is always better. */
+export const wellnessTrend = (points: Point[]) => measureTrend(points, true, METRIC_FLAT_BAND)
+
+/**
+ * Daily composite wellness from per-metric series: the mean of each day's
+ * logged values with symptoms inverted (scale - value), the same formula as
+ * Reflect's live score. Only the metrics passed in count, so archived ones
+ * drop out. Sorted by date.
+ */
+export function wellnessSeries(byMetric: Record<string, Point[]>, metrics: Metric[]): Point[] {
+  const scoresByDate = new Map<string, number[]>()
+  for (const m of metrics) {
+    for (const p of byMetric[m.id] ?? []) {
+      const score = m.higherIsBetter ? p.value : m.scale - p.value
+      const scores = scoresByDate.get(p.date)
+      if (scores) scores.push(score)
+      else scoresByDate.set(p.date, [score])
+    }
+  }
+  return [...scoresByDate]
+    .map(([date, scores]) => ({ date, value: scores.reduce((a, b) => a + b, 0) / scores.length }))
+    .sort((a, b) => a.date.localeCompare(b.date))
+}
+
 /** First day a window covers (today inclusive), or null for all time. */
 export function windowStart(window: TrendWindow, today: string): string | null {
   const { days } = TREND_WINDOWS[window]

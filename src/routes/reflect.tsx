@@ -25,7 +25,7 @@ import {
 import type { LoadedConfig } from "../lib/storage"
 import { useEntryAutosave } from "@/hooks/useEntryAutosave"
 import { wellness } from "../lib/wellness"
-import type { Metric } from "../lib/config"
+import { groupMetrics } from "../lib/config"
 import { MetricSlider } from "@/components/MetricSlider"
 import { HabitChip } from "@/components/HabitChip"
 import { TaskBoard } from "@/components/TaskBoard"
@@ -97,23 +97,14 @@ function Reflection() {
     }
   }, [config, entry?.date])
 
-  const groups = useMemo(() => {
-    if (!config) return []
-    const order: string[] = []
-    const byGroup: Record<string, Metric[]> = {}
-    for (const m of config.metrics) {
-      if (!byGroup[m.group]) {
-        byGroup[m.group] = []
-        order.push(m.group)
-      }
-      byGroup[m.group].push(m)
-    }
-    return order.map((g) => ({
-      group: g,
-      metrics: byGroup[g],
-      inverted: byGroup[g].every((m) => !m.higherIsBetter),
-    }))
-  }, [config])
+  const groups = useMemo(
+    () =>
+      groupMetrics(config?.metrics ?? []).map((g) => ({
+        ...g,
+        inverted: g.metrics.every((m) => !m.higherIsBetter),
+      })),
+    [config],
+  )
 
   if (!config || !entry) return null
 

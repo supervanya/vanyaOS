@@ -5,6 +5,8 @@ import {
   bucketize,
   habitTrend,
   metricTrend,
+  wellnessSeries,
+  wellnessTrend,
   windowStart,
   type Point,
 } from "./trends"
@@ -60,6 +62,25 @@ describe("habitTrend", () => {
 
   it("reads an evenly spread record as flat", () => {
     expect(habitTrend(series([1, 0, 1, 0, 1, 1, 0, 1, 0, 1]))?.verdict).toBe("flat")
+  })
+})
+
+describe("wellnessSeries", () => {
+  it("averages each day's logged values, with symptoms inverted", () => {
+    const byMetric = { mood: at([0, 4], [1, 2]), brain_fog: at([0, 1]) }
+    expect(wellnessSeries(byMetric, [mood, brainFog])).toEqual([
+      { date: day(0), value: 4 }, // (4 + (5 - 1)) / 2
+      { date: day(1), value: 2 }, // only mood was logged
+    ])
+  })
+
+  it("counts only the metrics it's given, so archived ones drop out", () => {
+    const byMetric = { mood: at([0, 3]), archived: at([0, 0]) }
+    expect(wellnessSeries(byMetric, [mood])).toEqual([{ date: day(0), value: 3 }])
+  })
+
+  it("feeds a higher-is-better trend", () => {
+    expect(wellnessTrend(series([2, 2, 2, 4, 4, 4]))?.verdict).toBe("better")
   })
 })
 
