@@ -297,12 +297,16 @@ export async function newEntry(date: string, config: LoadedConfig): Promise<DayE
   }
 }
 
+// A day as the page should show it. `unsynced` means it came from a local
+// draft that never reached Postgres, so it still needs saving.
+export type LoadedDay = { entry: DayEntry; unsynced: boolean }
+
 // Reconciles the remote entry with any local draft, preferring whichever is
 // freshest by `updatedAt` — protects an in-progress edit from a dropped sync.
-export async function loadOrInitDay(date: string, config: LoadedConfig): Promise<DayEntry> {
+export async function loadOrInitDay(date: string, config: LoadedConfig): Promise<LoadedDay> {
   const [remote, draft] = await Promise.all([loadDay(date, config), Promise.resolve(loadDraft(date))])
-  if (draft && (!remote || draft.updatedAt > remote.updatedAt)) return draft
-  return remote ?? newEntry(date, config)
+  if (draft && (!remote || draft.updatedAt > remote.updatedAt)) return { entry: draft, unsynced: true }
+  return { entry: remote ?? (await newEntry(date, config)), unsynced: false }
 }
 
 export async function saveDay(entry: DayEntry, config: LoadedConfig): Promise<void> {
