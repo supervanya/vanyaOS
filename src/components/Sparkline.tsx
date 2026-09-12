@@ -1,6 +1,6 @@
-import { useState, type PointerEvent } from "react"
 import type { Bucket } from "@/lib/trends"
 import { cn } from "@/lib/utils"
+import { HoverLabel, bucketDates, useHoverIndex } from "@/components/chartHover"
 
 // Drawn in a fixed viewBox and stretched to the container's width; strokes use
 // non-scaling-stroke so the line stays 1.5px however wide the row is. Anything
@@ -29,27 +29,16 @@ export function Sparkline({
   format: (value: number) => string
   className?: string
 }) {
-  const [active, setActive] = useState<number | null>(null)
+  const { index, handlers } = useHoverIndex(buckets.length, (ratio) =>
+    Math.round(ratio * (buckets.length - 1)),
+  )
 
   const x = (i: number) => (buckets.length > 1 ? (i / (buckets.length - 1)) * W : W / 2)
   const y = (value: number) => PAD + (1 - value / max) * (BASELINE - PAD)
-
-  const track = (e: PointerEvent<HTMLDivElement>) => {
-    const rect = e.currentTarget.getBoundingClientRect()
-    const ratio = (e.clientX - rect.left) / rect.width
-    setActive(Math.min(buckets.length - 1, Math.max(0, Math.round(ratio * (buckets.length - 1)))))
-  }
-
-  // Guards a stale index after the window (and so the bucket count) changes.
-  const hovered = active === null ? undefined : buckets[active]
+  const hovered = index === null ? null : buckets[index]
 
   return (
-    <div
-      className={cn("relative touch-pan-y", className)}
-      onPointerDown={track}
-      onPointerMove={track}
-      onPointerLeave={() => setActive(null)}
-    >
+    <div className={cn("relative touch-pan-y", className)} {...handlers}>
       <svg
         viewBox={`0 0 ${W} ${H}`}
         preserveAspectRatio="none"
@@ -92,9 +81,9 @@ export function Sparkline({
         })}
       </svg>
 
-      {hovered && (
+      {index !== null && hovered && (
         <HoverMarker
-          left={`${(x(active!) / W) * 100}%`}
+          left={`${(x(index) / W) * 100}%`}
           top={hovered.mean === null ? null : `${(y(hovered.mean) / H) * 100}%`}
           label={describe(hovered, format)}
         />
@@ -113,34 +102,20 @@ function HoverMarker({ left, top, label }: { left: string; top: string | null; l
           style={{ left, top }}
         />
       )}
-      <span
-        role="tooltip"
-        className="bg-foreground text-background pointer-events-none absolute bottom-full z-10 mb-1.5 -translate-x-1/2 rounded px-1.5 py-0.5 text-[11px] font-medium whitespace-nowrap tabular-nums"
-        style={{ left }}
-      >
-        {label}
-      </span>
+      <HoverLabel left={left}>{label}</HoverLabel>
     </>
   )
 }
 
 // "Tue, Aug 12 · 3.0" for a day; "Aug 4 – Aug 10 · avg 2.4 over 5 days" for a longer bucket.
 function describe(bucket: Bucket, format: (value: number) => string): string {
-  if (bucket.start === bucket.end) {
-    const day = formatDate(bucket.start, { weekday: "short", month: "short", day: "numeric" })
-    return bucket.mean === null ? `${day} · no entry` : `${day} · ${format(bucket.mean)}`
-  }
-  const range = `${formatDate(bucket.start)} – ${formatDate(bucket.end)}`
-  if (bucket.mean === null) return `${range} · no entries`
+  const dates = bucketDates(bucket)
+  const oneDay = bucket.start === bucket.end
+  if (bucket.mean === null) return `${dates} · ${oneDay ? "no entry" : "no entries"}`
+  if (oneDay) return `${dates} · ${format(bucket.mean)}`
   const days = `${bucket.count} day${bucket.count === 1 ? "" : "s"}`
-  return `${range} · avg ${format(bucket.mean)} over ${days}`
+  return `${dates} · avg ${format(bucket.mean)} over ${days}`
 }
-
-// Noon anchor so the local date never slips across a timezone boundary.
-const formatDate = (
-  iso: string,
-  options: Intl.DateTimeFormatOptions = { month: "short", day: "numeric" },
-) => new Date(`${iso}T12:00:00`).toLocaleDateString(undefined, options)
 
 // Consecutive buckets with data, split wherever nothing was logged.
 function segments(buckets: Bucket[]): Segment[] {

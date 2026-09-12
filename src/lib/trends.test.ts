@@ -3,8 +3,10 @@ import type { Metric } from "./config"
 import {
   bucketSize,
   bucketize,
+  currentStreak,
   habitTrend,
   metricTrend,
+  pointsSince,
   wellnessSeries,
   wellnessTrend,
   windowStart,
@@ -81,6 +83,31 @@ describe("wellnessSeries", () => {
 
   it("feeds a higher-is-better trend", () => {
     expect(wellnessTrend(series([2, 2, 2, 4, 4, 4]))?.verdict).toBe("better")
+  })
+})
+
+describe("currentStreak", () => {
+  it("counts done days back from the latest entry", () => {
+    expect(currentStreak(at([0, 1], [1, 0], [2, 1], [3, 1]))).toEqual({ days: 2, since: day(2) })
+  })
+
+  it("isn't broken by days with no entry", () => {
+    expect(currentStreak(at([0, 1], [5, 1]))).toEqual({ days: 2, since: day(0) })
+  })
+
+  it("is zero when the latest entry was a miss", () => {
+    expect(currentStreak(at([0, 1], [1, 0]))).toEqual({ days: 0, since: null })
+  })
+})
+
+describe("pointsSince", () => {
+  it("keeps points on or after the start", () => {
+    expect(pointsSince(at([0, 1], [1, 2], [2, 3]), day(1))).toEqual(at([1, 2], [2, 3]))
+  })
+
+  it("keeps everything for all time", () => {
+    const all = at([0, 1], [1, 2])
+    expect(pointsSince(all, null)).toBe(all)
   })
 })
 
