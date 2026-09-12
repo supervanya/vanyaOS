@@ -12,6 +12,10 @@ const Toaster = ({ ...props }: ToasterProps) => {
     <Sonner
       theme="system"
       className="toaster group"
+      mobileOffset={{
+        // the notch on the iPhone will cover the toast, safe-area-inset-top is perfect for this
+        top: "max(16px,env(safe-area-inset-top))",
+      }}
       icons={{
         success: <CircleCheckIcon className="size-4" />,
         info: <InfoIcon className="size-4" />,
