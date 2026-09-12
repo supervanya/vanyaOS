@@ -472,9 +472,22 @@ function MetricsSection() {
               onSave={(v) => patch(m.id, { groupName: v })}
               className="w-24 shrink-0"
             />
-            {!m.higherIsBetter && (
-              <span className="text-destructive shrink-0 text-[10px]">0 best</span>
-            )}
+            <Label
+              className="text-muted-foreground shrink-0 gap-1 text-[10px]"
+              title="Symptom-style: 0 is best (inverted in wellness)"
+            >
+              <Checkbox
+                checked={!m.higherIsBetter}
+                onCheckedChange={(v) => {
+                  const symptom = v === true
+                  patch(m.id, {
+                    higherIsBetter: !symptom,
+                  })
+                }}
+                className="size-3.5"
+              />
+              Symptom
+            </Label>
           </RowShell>
         )}
       </SortableList>
