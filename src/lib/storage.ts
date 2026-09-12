@@ -12,7 +12,7 @@ import type { Point } from './trends'
 export type DayEntry = {
   date: string // YYYY-MM-DD
   theme: string
-  metrics: Record<string, number>
+  metrics: Record<string, number> // only sliders you've set; untouched ones are absent
   habits: Record<string, boolean>
   reflection: string
   updatedAt: string
@@ -288,9 +288,9 @@ export async function newEntry(date: string, config: LoadedConfig): Promise<DayE
   return {
     date,
     theme: config.activeTheme,
-    // start every slider at 0 so untouched days don't masquerade as a flat
-    // baseline (they'd otherwise seed at the mid-point and look like real data)
-    metrics: Object.fromEntries(config.metrics.map((m) => [m.id, 0])),
+    // No slider starts with a value: only the ones you set are saved, so a
+    // habits-only day doesn't record a fake 0 on every metric.
+    metrics: {},
     habits: Object.fromEntries(config.habits.map((h) => [h.id, false])),
     reflection: '',
     updatedAt: new Date().toISOString(),
