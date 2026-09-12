@@ -8,17 +8,21 @@ import {
   TREND_WINDOWS,
   bucketSize,
   bucketize,
+  currentStreak,
   habitTrend,
   isTrendWindow,
   metricTrend,
+  pointsSince,
   wellnessSeries,
   wellnessTrend,
   windowStart,
 } from "../lib/trends"
-import type { Point, Trend, TrendWindow } from "../lib/trends"
+import type { Point, Streak, Trend, TrendWindow } from "../lib/trends"
 import { groupMetrics } from "../lib/config"
+import { HabitCells } from "@/components/HabitCells"
 import { Sparkline } from "@/components/Sparkline"
 import { TrendReadout, trendTone } from "@/components/TrendReadout"
+import { WithDetail, shortDate } from "@/components/chartHover"
 import { cn } from "@/lib/utils"
 
 export const Route = createFileRoute("/trends")({ component: Trends })
@@ -29,7 +33,7 @@ const formatRate = (value: number) => `${Math.round(value * 100)}%`
 function Trends() {
   const [trendWindow, setTrendWindow] = useStoredWindow()
   const config = useConfig()
-  const { loaded, loading } = useTrendSeries(config, trendWindow)
+  const history = useTrendHistory(config)
 
   return (
     <>
@@ -49,11 +53,8 @@ function Trends() {
         Trends
       </h1>
 
-      {config && loaded && (
-        // The previous window stays on screen, dimmed, until the new one lands.
-        <div className={cn("transition-opacity", loading && "opacity-60")}>
-          <TrendSections config={config} {...loaded} />
-        </div>
+      {config && history && (
+        <TrendSections config={config} trendWindow={trendWindow} history={history} />
       )}
     </>
   )
@@ -62,17 +63,18 @@ function Trends() {
 function TrendSections({
   config,
   trendWindow,
-  series,
+  history,
 }: {
   config: LoadedConfig
   trendWindow: TrendWindow
-  series: TrendSeries
+  history: TrendSeries
 }) {
   // Every chart shares one x-axis: the window, ending today.
   const today = todayISO()
-  const from = windowStart(trendWindow, today) ?? series.firstDate ?? today
+  const start = windowStart(trendWindow, today) // null for all time
+  const from = start ?? history.firstDate ?? today
   const axis: Axis = { from, to: today, size: bucketSize(trendWindow, from, today) }
-  const wellness = wellnessSeries(series.metrics, config.metrics)
+  const wellness = pointsSince(wellnessSeries(history.metrics, config.metrics), start)
 
   return (
     <>
@@ -91,7 +93,7 @@ function TrendSections({
           title={metrics.every((m) => !m.higherIsBetter) ? `${group} · 0 is best` : group}
         >
           {metrics.map((m) => {
-            const points = series.metrics[m.id] ?? []
+            const points = pointsSince(history.metrics[m.id] ?? [], start)
             return (
               <ChartedRow
                 key={m.id}
@@ -105,15 +107,29 @@ function TrendSections({
           })}
         </Section>
       ))}
-      <Section title="Habits">
-        {config.habits.map((h) => (
-          <TrendRow
-            key={h.id}
-            label={h.label}
-            trend={habitTrend(series.habits[h.id] ?? [])}
-            format={formatRate}
-          />
-        ))}
+      <Section title="Habits" note={<HabitLegend cellDays={axis.size} />}>
+        {config.habits.map((h) => {
+          // The streak counts the whole history; the cells and trend, the window.
+          const all = history.habits[h.id] ?? []
+          const points = pointsSince(all, start)
+          const trend = habitTrend(points)
+          return (
+            <TrendRow
+              key={h.id}
+              label={h.label}
+              trend={trend}
+              format={formatRate}
+              aside={<StreakCount streak={currentStreak(all)} />}
+              chart={
+                <HabitCells
+                  buckets={bucketize(points, axis.from, axis.to, axis.size)}
+                  firstDate={all[0]?.date ?? null}
+                  className={trendTone(trend?.verdict)}
+                />
+              }
+            />
+          )
+        })}
       </Section>
     </>
   )
@@ -151,26 +167,38 @@ function WindowPicker({
   )
 }
 
-function Section({ title, children }: { title: string; children: ReactNode }) {
+function Section({
+  title,
+  note,
+  children,
+}: {
+  title: string
+  note?: ReactNode
+  children: ReactNode
+}) {
   return (
     <section className="mt-6">
       <p className="text-muted-foreground mb-1 text-xs">{title}</p>
+      {note}
       <div className="divide-border divide-y">{children}</div>
     </section>
   )
 }
 
-// Label, optional chart, readout. The chart column takes whatever width is left.
+// Label, optional chart, readout (with an optional aside before it). The chart
+// column takes whatever width is left.
 function TrendRow({
   label,
   trend,
   format,
   chart,
+  aside,
 }: {
   label: string
   trend: Trend | null
   format: (value: number) => string
   chart?: ReactNode
+  aside?: ReactNode
 }) {
   return (
     <div
@@ -181,7 +209,10 @@ function TrendRow({
     >
       <span className="truncate">{label}</span>
       {chart}
-      <TrendReadout trend={trend} format={format} />
+      <span className="flex items-center justify-end gap-2">
+        {aside}
+        <TrendReadout trend={trend} format={format} />
+      </span>
     </div>
   )
 }
@@ -217,6 +248,47 @@ function ChartedRow({
         />
       }
     />
+  )
+}
+
+// Done days in a row up to the latest entry, e.g. "12d".
+function StreakCount({ streak }: { streak: Streak }) {
+  const detail = streak.since
+    ? `${streak.days}-day streak, since ${shortDate(streak.since)}`
+    : "No current streak"
+  return (
+    <WithDetail
+      detail={detail}
+      className={cn("text-muted-foreground text-xs tabular-nums", !streak.days && "opacity-50")}
+    >
+      <span className="sr-only">Current streak: </span>
+      {streak.days}d
+    </WithDetail>
+  )
+}
+
+// Key for the habit cells and the streak count.
+function HabitLegend({ cellDays }: { cellDays: number }) {
+  return (
+    <p className="text-muted-foreground mb-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
+      <LegendItem swatch={<span className="bg-muted-foreground size-2.5 rounded-[2px]" />} label="done" />
+      <LegendItem swatch={<span className="bg-muted size-2.5 rounded-[2px]" />} label="missed" />
+      <LegendItem
+        swatch={<span className="bg-muted-foreground/50 mx-[3.5px] size-[3px] rounded-full" />}
+        label="no entry"
+      />
+      <span>12d = streak</span>
+      {cellDays > 1 && <span>1 cell = {cellDays === 7 ? "1 week" : `${cellDays} days`}</span>}
+    </p>
+  )
+}
+
+function LegendItem({ swatch, label }: { swatch: ReactNode; label: string }) {
+  return (
+    <span className="inline-flex items-center gap-1">
+      {swatch}
+      {label}
+    </span>
   )
 }
 
@@ -259,30 +331,23 @@ function useConfig() {
   return config
 }
 
-// The series is kept together with the window it was fetched for, so what's on
-// screen stays self-consistent while the next window loads.
-function useTrendSeries(config: LoadedConfig | null, trendWindow: TrendWindow) {
-  const [loaded, setLoaded] = useState<{ trendWindow: TrendWindow; series: TrendSeries } | null>(
-    null,
-  )
-  const [loading, setLoading] = useState(false)
+// All history is loaded once and every window is a slice of it, so switching
+// windows is instant and a streak can count back past the window's start.
+function useTrendHistory(config: LoadedConfig | null) {
+  const [history, setHistory] = useState<TrendSeries | null>(null)
 
   useEffect(() => {
     if (!config) return
     let cancelled = false
-    setLoading(true)
-    loadTrendSeries(windowStart(trendWindow, todayISO()), config)
-      .then((series) => {
-        if (!cancelled) setLoaded({ trendWindow, series })
+    loadTrendSeries(config)
+      .then((h) => {
+        if (!cancelled) setHistory(h)
       })
       .catch((err) => toast.error(`Couldn't load trends: ${err.message}`))
-      .finally(() => {
-        if (!cancelled) setLoading(false)
-      })
     return () => {
       cancelled = true
     }
-  }, [config, trendWindow])
+  }, [config])
 
-  return { loaded, loading }
+  return history
 }

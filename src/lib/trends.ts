@@ -81,6 +81,27 @@ export function wellnessSeries(byMetric: Record<string, Point[]>, metrics: Metri
     .sort((a, b) => a.date.localeCompare(b.date))
 }
 
+export type Streak = { days: number; since: string | null }
+
+/**
+ * Done days in a row up to the latest entry. Points exist only for days with
+ * an entry, so a day with no entry never breaks a streak; a missed day does.
+ * Pass the full history, not a window, or a long streak gets cut short.
+ */
+export function currentStreak(points: Point[]): Streak {
+  let days = 0
+  let since: string | null = null
+  for (let i = points.length - 1; i >= 0 && points[i].value === 1; i--) {
+    days += 1
+    since = points[i].date
+  }
+  return { days, since }
+}
+
+/** Points on or after `from`; all of them when `from` is null (all time). */
+export const pointsSince = (points: Point[], from: string | null) =>
+  from === null ? points : points.filter((p) => p.date >= from)
+
 /** First day a window covers (today inclusive), or null for all time. */
 export function windowStart(window: TrendWindow, today: string): string | null {
   const { days } = TREND_WINDOWS[window]

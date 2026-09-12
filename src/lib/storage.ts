@@ -243,20 +243,14 @@ export type TrendSeries = {
   habits: Record<string, Point[]>
 }
 
-// Every logged value since `sinceISO` (null = all time), oldest first. Child
-// rows are embedded under their entry, so it's one request whatever the window
-// — and PostgREST's row cap counts entries (one per day), not the far more
-// numerous per-metric child rows.
-export async function loadTrendSeries(
-  sinceISO: string | null,
-  config: LoadedConfig,
-): Promise<TrendSeries> {
-  let query = supabase
+// Every logged value, oldest first. Child rows are embedded under their entry,
+// so it's one request however long the history — and PostgREST's row cap
+// counts entries (one per day), not the far more numerous per-metric child rows.
+export async function loadTrendSeries(config: LoadedConfig): Promise<TrendSeries> {
+  const { data, error } = await supabase
     .from('entries')
     .select('entry_date, entry_metric_values(metric_id, value), entry_habits(habit_id, done)')
     .order('entry_date')
-  if (sinceISO) query = query.gte('entry_date', sinceISO)
-  const { data, error } = await query
   if (error) throw error
 
   const metricKeyById = invert(config.metricRowId)
