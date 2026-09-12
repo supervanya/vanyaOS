@@ -1,6 +1,17 @@
 import { createFileRoute, Link } from "@tanstack/react-router"
 import { useEffect, useState } from "react"
-import { Layers, Flag, Repeat, Moon, Monitor, Plus, X, Settings as SettingsIcon, BookOpen, TrendingUp } from "lucide-react"
+import {
+  Layers,
+  Flag,
+  Repeat,
+  Moon,
+  Monitor,
+  Plus,
+  X,
+  Settings as SettingsIcon,
+  BookOpen,
+  TrendingUp,
+} from "lucide-react"
 import { toast } from "sonner"
 import {
   loadConfig,
@@ -33,63 +44,82 @@ function dateStamp(d = new Date()): string {
 function Dashboard() {
   return (
     <>
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <span className="flex items-center gap-2 text-[15px] font-semibold tracking-tight">
-          <Layers size={17} className="text-indigo-500 dark:text-indigo-300" />
-          Command center
-        </span>
-        <span className="text-muted-foreground text-xs tabular-nums">{dateStamp()}</span>
+      <div className="gap-6 flex flex-col">
+        <Header />
+        <Navigation />
+        <Tasks />
+        <HabitsToday />
+        <GoalsGlance />
+        <ProjectsCard />
+        <p className="text-center text-[11px]">
+          <Link
+            to="/playground"
+            className="text-muted-foreground hover:text-foreground underline"
+          >
+            Animation playground
+          </Link>
+        </p>
       </div>
-
-      {/* This week's 1-3-5 (the living task list) */}
-      <section className="mt-4">
-        <p className="text-muted-foreground mb-2 text-xs">This week's 1-3-5</p>
-        <TaskBoard />
-      </section>
-
-      <HabitsToday />
-      <GoalsGlance />
-      <ProjectsCard />
-
-      {/* Nav */}
-      <div className="mt-6 flex flex-col gap-2">
-        <Link
-          to="/reflect"
-          className="border-border bg-input/20 flex items-center gap-2.5 rounded-lg border px-4 py-3 text-[14px] font-medium"
-        >
-          <Moon size={16} className="text-indigo-500 dark:text-indigo-300" />
-          Evening reflection
-          <span className="text-muted-foreground ml-auto">→</span>
-        </Link>
-        <Link
-          to="/trends"
-          className="border-border bg-input/20 flex items-center gap-2.5 rounded-lg border px-4 py-3 text-[14px] font-medium"
-        >
-          <TrendingUp size={16} className="text-indigo-500 dark:text-indigo-300" />
-          Trends
-          <span className="text-muted-foreground ml-auto">→</span>
-        </Link>
-        <RetroNavCard />
-        <Link
-          to="/settings"
-          className="border-border bg-input/20 flex items-center gap-2.5 rounded-lg border px-4 py-3 text-[14px] font-medium"
-        >
-          <SettingsIcon size={16} className="text-muted-foreground" />
-          Settings
-          <span className="text-muted-foreground ml-auto">→</span>
-        </Link>
-      </div>
-
-      <p className="mt-4 text-center text-[11px]">
-        <Link
-          to="/playground"
-          className="text-muted-foreground hover:text-foreground underline"
-        >
-          Animation playground
-        </Link>
-      </p>
     </>
+  )
+}
+
+function Tasks() {
+  /* This week's 1-3-5 (the living task list) */
+  return (
+    <section className="mt-4">
+      <p className="text-muted-foreground mb-2 text-xs">This week's 1-3-5</p>
+      <TaskBoard />
+    </section>
+  )
+}
+
+function Header() {
+  return (
+    <div className="flex items-center justify-between">
+      <span className="flex items-center gap-2 text-[15px] font-semibold tracking-tight">
+        <Layers size={17} className="text-indigo-500 dark:text-indigo-300" />
+        Command center
+      </span>
+      <span className="text-muted-foreground text-xs tabular-nums">
+        {dateStamp()}
+      </span>
+    </div>
+  )
+}
+
+function Navigation() {
+  return (
+    <div className="flex flex-col gap-2">
+      <Link
+        to="/reflect"
+        className="border-border bg-input/20 flex items-center gap-2.5 rounded-lg border px-4 py-3 text-[14px] font-medium"
+      >
+        <Moon size={16} className="text-indigo-500 dark:text-indigo-300" />
+        Evening reflection
+        <span className="text-muted-foreground ml-auto">→</span>
+      </Link>
+      <Link
+        to="/trends"
+        className="border-border bg-input/20 flex items-center gap-2.5 rounded-lg border px-4 py-3 text-[14px] font-medium"
+      >
+        <TrendingUp
+          size={16}
+          className="text-indigo-500 dark:text-indigo-300"
+        />
+        Trends
+        <span className="text-muted-foreground ml-auto">→</span>
+      </Link>
+      <RetroNavCard />
+      <Link
+        to="/settings"
+        className="border-border bg-input/20 flex items-center gap-2.5 rounded-lg border px-4 py-3 text-[14px] font-medium"
+      >
+        <SettingsIcon size={16} className="text-muted-foreground" />
+        Settings
+        <span className="text-muted-foreground ml-auto">→</span>
+      </Link>
+    </div>
   )
 }
 
@@ -124,7 +154,7 @@ function HabitsToday() {
     )
 
   return (
-    <section className="mt-6">
+    <section>
       <p className="text-muted-foreground mb-2 flex items-center gap-1.5 text-xs">
         <Repeat size={14} /> Habits today
       </p>
@@ -156,7 +186,7 @@ function GoalsGlance() {
   if (!config) return null
 
   return (
-    <section className="mt-6">
+    <section>
       <p className="text-muted-foreground mb-2 flex items-center gap-1.5 text-xs">
         <Flag size={14} /> Goals
       </p>
@@ -187,7 +217,9 @@ function RetroNavCard() {
   useEffect(() => {
     Promise.all([listRetroAreas(), latestRetroDates()])
       .then(([areas, dates]) => {
-        const due = areas.filter((a) => !a.archived && isRetroDue(dates[a.id])).length
+        const due = areas.filter(
+          (a) => !a.archived && isRetroDue(dates[a.id]),
+        ).length
         setDueCount(due)
       })
       .catch(() => setDueCount(0))
@@ -258,7 +290,7 @@ function ProjectsCard() {
   }
 
   return (
-    <section className="mt-6">
+    <section>
       <p className="text-muted-foreground mb-2 flex items-center gap-1.5 text-xs">
         <Monitor size={14} /> Projects · WIP limit 1 · tap to swap
       </p>
