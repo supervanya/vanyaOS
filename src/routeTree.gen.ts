@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as TrendsRouteImport } from './routes/trends'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as ReflectRouteImport } from './routes/reflect'
 import { Route as PlaygroundRouteImport } from './routes/playground'
@@ -17,6 +18,11 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as RetroIndexRouteImport } from './routes/retro.index'
 import { Route as RetroAreaIdRouteImport } from './routes/retro.$areaId'
 
+const TrendsRoute = TrendsRouteImport.update({
+  id: '/trends',
+  path: '/trends',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
@@ -59,6 +65,7 @@ export interface FileRoutesByFullPath {
   '/playground': typeof PlaygroundRoute
   '/reflect': typeof ReflectRoute
   '/settings': typeof SettingsRoute
+  '/trends': typeof TrendsRoute
   '/retro/$areaId': typeof RetroAreaIdRoute
   '/retro/': typeof RetroIndexRoute
 }
@@ -68,6 +75,7 @@ export interface FileRoutesByTo {
   '/playground': typeof PlaygroundRoute
   '/reflect': typeof ReflectRoute
   '/settings': typeof SettingsRoute
+  '/trends': typeof TrendsRoute
   '/retro/$areaId': typeof RetroAreaIdRoute
   '/retro': typeof RetroIndexRoute
 }
@@ -78,6 +86,7 @@ export interface FileRoutesById {
   '/playground': typeof PlaygroundRoute
   '/reflect': typeof ReflectRoute
   '/settings': typeof SettingsRoute
+  '/trends': typeof TrendsRoute
   '/retro/$areaId': typeof RetroAreaIdRoute
   '/retro/': typeof RetroIndexRoute
 }
@@ -89,6 +98,7 @@ export interface FileRouteTypes {
     | '/playground'
     | '/reflect'
     | '/settings'
+    | '/trends'
     | '/retro/$areaId'
     | '/retro/'
   fileRoutesByTo: FileRoutesByTo
@@ -98,6 +108,7 @@ export interface FileRouteTypes {
     | '/playground'
     | '/reflect'
     | '/settings'
+    | '/trends'
     | '/retro/$areaId'
     | '/retro'
   id:
@@ -107,6 +118,7 @@ export interface FileRouteTypes {
     | '/playground'
     | '/reflect'
     | '/settings'
+    | '/trends'
     | '/retro/$areaId'
     | '/retro/'
   fileRoutesById: FileRoutesById
@@ -117,12 +129,20 @@ export interface RootRouteChildren {
   PlaygroundRoute: typeof PlaygroundRoute
   ReflectRoute: typeof ReflectRoute
   SettingsRoute: typeof SettingsRoute
+  TrendsRoute: typeof TrendsRoute
   RetroAreaIdRoute: typeof RetroAreaIdRoute
   RetroIndexRoute: typeof RetroIndexRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/trends': {
+      id: '/trends'
+      path: '/trends'
+      fullPath: '/trends'
+      preLoaderRoute: typeof TrendsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/settings': {
       id: '/settings'
       path: '/settings'
@@ -181,6 +201,7 @@ const rootRouteChildren: RootRouteChildren = {
   PlaygroundRoute: PlaygroundRoute,
   ReflectRoute: ReflectRoute,
   SettingsRoute: SettingsRoute,
+  TrendsRoute: TrendsRoute,
   RetroAreaIdRoute: RetroAreaIdRoute,
   RetroIndexRoute: RetroIndexRoute,
 }

@@ -7,6 +7,7 @@
 
 import { supabase } from './supabaseClient'
 import { DEFAULT_CONFIG, type Config, type Metric, type Habit, type Goal } from './config'
+import type { Point } from './trends'
 
 export type DayEntry = {
   date: string // YYYY-MM-DD
@@ -232,6 +233,53 @@ export async function loadAllDays(config: LoadedConfig): Promise<DayEntry[]> {
   const dates = await listDayDates()
   const entries = await Promise.all(dates.map((d) => loadDay(d, config)))
   return entries.filter((d): d is DayEntry => d !== null)
+}
+
+// Per-item daily series for the Trends screen, keyed by metric/habit slug.
+// Habit points are 1 (done) or 0 (missed).
+export type TrendSeries = {
+  firstDate: string | null // earliest entry returned; where "All" starts
+  metrics: Record<string, Point[]>
+  habits: Record<string, Point[]>
+}
+
+// Every logged value since `sinceISO` (null = all time), oldest first. Child
+// rows are embedded under their entry, so it's one request whatever the window
+// — and PostgREST's row cap counts entries (one per day), not the far more
+// numerous per-metric child rows.
+export async function loadTrendSeries(
+  sinceISO: string | null,
+  config: LoadedConfig,
+): Promise<TrendSeries> {
+  let query = supabase
+    .from('entries')
+    .select('entry_date, entry_metric_values(metric_id, value), entry_habits(habit_id, done)')
+    .order('entry_date')
+  if (sinceISO) query = query.gte('entry_date', sinceISO)
+  const { data, error } = await query
+  if (error) throw error
+
+  const metricKeyById = invert(config.metricRowId)
+  const habitKeyById = invert(config.habitRowId)
+  const series: TrendSeries = { firstDate: data?.[0]?.entry_date ?? null, metrics: {}, habits: {} }
+  for (const entry of data ?? []) {
+    const date = entry.entry_date as string
+    for (const v of entry.entry_metric_values) {
+      append(series.metrics, metricKeyById[v.metric_id], { date, value: Number(v.value) })
+    }
+    for (const h of entry.entry_habits) {
+      append(series.habits, habitKeyById[h.habit_id], { date, value: h.done ? 1 : 0 })
+    }
+  }
+  return series
+}
+
+const invert = (map: Record<string, string>) =>
+  Object.fromEntries(Object.entries(map).map(([key, value]) => [value, key]))
+
+// Archived items have no slug in `config`, so their rows are skipped.
+function append(bySlug: Record<string, Point[]>, slug: string | undefined, point: Point) {
+  if (slug) (bySlug[slug] ??= []).push(point)
 }
 
 // A fresh entry for `date`. (Todos no longer roll forward — the living task
