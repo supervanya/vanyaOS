@@ -11,9 +11,12 @@ import {
   habitTrend,
   isTrendWindow,
   metricTrend,
+  wellnessSeries,
+  wellnessTrend,
   windowStart,
 } from "../lib/trends"
-import type { Trend, TrendWindow } from "../lib/trends"
+import type { Point, Trend, TrendWindow } from "../lib/trends"
+import { groupMetrics } from "../lib/config"
 import { Sparkline } from "@/components/Sparkline"
 import { TrendReadout, trendTone } from "@/components/TrendReadout"
 import { cn } from "@/lib/utils"
@@ -68,32 +71,40 @@ function TrendSections({
   // Every chart shares one x-axis: the window, ending today.
   const today = todayISO()
   const from = windowStart(trendWindow, today) ?? series.firstDate ?? today
-  const size = bucketSize(trendWindow, from, today)
+  const axis: Axis = { from, to: today, size: bucketSize(trendWindow, from, today) }
+  const wellness = wellnessSeries(series.metrics, config.metrics)
 
   return (
     <>
-      <Section title="Metrics">
-        {config.metrics.map((m) => {
-          const points = series.metrics[m.id] ?? []
-          const trend = metricTrend(points, m)
-          return (
-            <TrendRow
-              key={m.id}
-              label={m.label}
-              trend={trend}
-              format={formatScore}
-              chart={
-                <Sparkline
-                  buckets={bucketize(points, from, today, size)}
-                  max={m.scale}
-                  format={formatScore}
-                  className={trendTone(trend?.verdict)}
-                />
-              }
-            />
-          )
-        })}
+      <Section title="Overall">
+        <ChartedRow
+          label="Wellness"
+          points={wellness}
+          trend={wellnessTrend(wellness)}
+          max={Math.max(1, ...config.metrics.map((m) => m.scale))}
+          axis={axis}
+        />
       </Section>
+      {groupMetrics(config.metrics).map(({ group, metrics }) => (
+        <Section
+          key={group}
+          title={metrics.every((m) => !m.higherIsBetter) ? `${group} · 0 is best` : group}
+        >
+          {metrics.map((m) => {
+            const points = series.metrics[m.id] ?? []
+            return (
+              <ChartedRow
+                key={m.id}
+                label={m.label}
+                points={points}
+                trend={metricTrend(points, m)}
+                max={m.scale}
+                axis={axis}
+              />
+            )
+          })}
+        </Section>
+      ))}
       <Section title="Habits">
         {config.habits.map((h) => (
           <TrendRow
@@ -172,6 +183,40 @@ function TrendRow({
       {chart}
       <TrendReadout trend={trend} format={format} />
     </div>
+  )
+}
+
+// The shared x-axis: every chart spans the same days in the same buckets.
+type Axis = { from: string; to: string; size: number }
+
+// A row with a sparkline, coloured by the row's trend.
+function ChartedRow({
+  label,
+  points,
+  trend,
+  max,
+  axis,
+}: {
+  label: string
+  points: Point[]
+  trend: Trend | null
+  max: number
+  axis: Axis
+}) {
+  return (
+    <TrendRow
+      label={label}
+      trend={trend}
+      format={formatScore}
+      chart={
+        <Sparkline
+          buckets={bucketize(points, axis.from, axis.to, axis.size)}
+          max={max}
+          format={formatScore}
+          className={trendTone(trend?.verdict)}
+        />
+      }
+    />
   )
 }
 
