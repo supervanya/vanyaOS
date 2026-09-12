@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router"
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import {
   Moon,
   Activity,
@@ -18,14 +18,12 @@ import {
   loadOrInitDay,
   listDayDates,
   loadDay,
-  saveDay,
-  saveDraft,
-  clearDraft,
   todayISO,
   shiftISO,
   defaultEntryDate,
 } from "../lib/storage"
-import type { DayEntry, LoadedConfig } from "../lib/storage"
+import type { LoadedConfig } from "../lib/storage"
+import { useEntryAutosave } from "@/hooks/useEntryAutosave"
 import { wellness } from "../lib/wellness"
 import type { Metric } from "../lib/config"
 import { MetricSlider } from "@/components/MetricSlider"
@@ -35,19 +33,13 @@ import { useAutoGrow } from "@/hooks/useAutoGrow"
 
 export const Route = createFileRoute("/reflect")({ component: Reflection })
 
-// How long to wait after the last edit before syncing to Postgres. The local
-// draft buffer (localStorage) is written every change, instantly — this only
-// debounces the network round-trip.
-const SYNC_DEBOUNCE_MS = 800
-
 function Reflection() {
   const [config, setConfig] = useState<LoadedConfig | null>(null)
-  const [entry, setEntry] = useState<DayEntry | null>(null)
+  const { entry, setEntry, load } = useEntryAutosave(config)
   const [selectedDate, setSelectedDate] = useState<string>(() =>
     defaultEntryDate(),
   )
   const [showDateInfo, setShowDateInfo] = useState(false)
-  const syncTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Load config once the account is known (the root layout only renders this
   // route once a session exists).
@@ -62,31 +54,14 @@ function Reflection() {
     if (!config) return
     let cancelled = false
     loadOrInitDay(selectedDate, config)
-      .then((e) => {
-        if (!cancelled) setEntry(e)
+      .then((day) => {
+        if (!cancelled) load(day)
       })
       .catch((err) => toast.error(`Couldn't load entry: ${err.message}`))
     return () => {
       cancelled = true
     }
-  }, [config, selectedDate])
-
-  // Every change writes the local draft instantly (survives a dropped
-  // connection), then syncs to Postgres after a short debounce.
-  useEffect(() => {
-    if (!entry) return
-    saveDraft(entry)
-    if (!config) return
-    if (syncTimer.current) clearTimeout(syncTimer.current)
-    syncTimer.current = setTimeout(() => {
-      saveDay(entry, config)
-        .then(() => clearDraft(entry.date))
-        .catch((err) => toast.error(`Sync failed, kept locally: ${err.message}`))
-    }, SYNC_DEBOUNCE_MS)
-    return () => {
-      if (syncTimer.current) clearTimeout(syncTimer.current)
-    }
-  }, [entry, config])
+  }, [config, selectedDate, load])
 
   // Auto-grow the reflection textarea to fit its content (no drag handle).
   const reflectionRef = useAutoGrow(entry?.reflection ?? "")

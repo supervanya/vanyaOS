@@ -1,13 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router"
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useState } from "react"
 import { Layers, Flag, Repeat, Moon, Monitor, Plus, X, Settings as SettingsIcon, BookOpen, TrendingUp } from "lucide-react"
 import { toast } from "sonner"
 import {
   loadConfig,
   loadOrInitDay,
-  saveDay,
-  saveDraft,
-  clearDraft,
   defaultEntryDate,
   listProjects,
   addProject,
@@ -17,7 +14,8 @@ import {
   latestRetroDates,
   isRetroDue,
 } from "../lib/storage"
-import type { DayEntry, LoadedConfig, Project } from "../lib/storage"
+import type { LoadedConfig, Project } from "../lib/storage"
+import { useEntryAutosave } from "@/hooks/useEntryAutosave"
 import { TaskBoard } from "@/components/TaskBoard"
 import { HabitChip } from "@/components/HabitChip"
 import { Button } from "@/components/ui/button"
@@ -25,8 +23,6 @@ import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
 
 export const Route = createFileRoute("/")({ component: Dashboard })
-
-const SYNC_DEBOUNCE_MS = 800
 
 // Monday of the current week, for the "week of" header.
 function weekOfLabel(): string {
@@ -106,32 +102,17 @@ function Dashboard() {
 // and there writes the same row.
 function HabitsToday() {
   const [config, setConfig] = useState<LoadedConfig | null>(null)
-  const [entry, setEntry] = useState<DayEntry | null>(null)
-  const syncTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const { entry, setEntry, load } = useEntryAutosave(config)
   const date = defaultEntryDate()
 
   useEffect(() => {
     loadConfig()
       .then((c) => {
         setConfig(c)
-        return loadOrInitDay(date, c).then(setEntry)
+        return loadOrInitDay(date, c).then(load)
       })
       .catch((err) => toast.error(`Couldn't load habits: ${err.message}`))
-  }, [date])
-
-  useEffect(() => {
-    if (!entry || !config) return
-    saveDraft(entry)
-    if (syncTimer.current) clearTimeout(syncTimer.current)
-    syncTimer.current = setTimeout(() => {
-      saveDay(entry, config)
-        .then(() => clearDraft(entry.date))
-        .catch((err) => toast.error(`Sync failed, kept locally: ${err.message}`))
-    }, SYNC_DEBOUNCE_MS)
-    return () => {
-      if (syncTimer.current) clearTimeout(syncTimer.current)
-    }
-  }, [entry, config])
+  }, [date, load])
 
   if (!config || !entry) return null
 
