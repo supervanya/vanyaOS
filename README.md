@@ -1,207 +1,56 @@
-Welcome to your new TanStack Start app! 
+# VanyaOS
 
-# Getting Started
+A personal life-OS, installed on the phone as a PWA: a command-center dashboard (the week's 1-3-5 tasks, habits, goals, one project in progress), a nightly reflection with wellness sliders, trends over time, and AI-coached retrospectives on areas of life, run with your own AI provider key.
 
-To run this application:
+**Live:** [supervanya.github.io/vanyaOS](https://supervanya.github.io/vanyaOS/) · **Where it's going:** [docs/ROADMAP.md](docs/ROADMAP.md) · **How it's built:** [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 
-```bash
-bun install
-bun --bun run dev
-```
+React 19 on Vite 8 with TanStack Router and TanStack Query, Tailwind v4 + shadcn/ui, and Supabase (Postgres with row-level security, magic-link auth, one Edge Function). TypeScript 7, Bun.
 
-# Building For Production
+## Run it locally
 
-To build this application for production:
+You need [Bun](https://bun.sh) and Docker (for the local Supabase stack).
 
 ```bash
-bun --bun run build
+bun install                  # also installs the git hooks
+bunx supabase start          # local Postgres + Auth; applies supabase/migrations
+cp .env.example .env.local   # then paste the API URL and publishable key `supabase start` printed
+bun --bun run dev            # http://localhost:3000
 ```
 
-## Testing
+Sign in with any email: the magic link lands in the local mail inbox at http://localhost:54324, not a real mailbox. To work against a copy of production data instead, run `bun run db:mirror` (it resets the local database).
 
-This project uses [Vitest](https://vitest.dev/) for testing. You can run the tests with:
+The AI coach calls your own provider. Add a key under **Settings → AI coach**; it's stored in your account row and only read by the `ai-coach` Edge Function.
 
-```bash
-bun --bun run test
-```
+## Commands
 
-## Styling
+| Command | Does |
+|---|---|
+| `bun --bun run dev` | Dev server with hot reload, reachable from a phone on the same network |
+| `bun run check` | Format check, lint (type-aware), typecheck and unused-code check — what CI runs |
+| `bun run test` | Vitest |
+| `bun --bun run build` | Production build to `dist/` |
+| `bun run format` / `bun run lint:fix` | Fix formatting / auto-fixable lint |
+| `bun run db:types` | Regenerate `src/lib/database.types.ts` after a migration |
 
-This project uses [Tailwind CSS](https://tailwindcss.com/) for styling.
+Commits are formatted, linted and typechecked by a pre-commit hook; pushes run the tests. Every PR runs the same checks in CI, and they must pass to merge.
 
-### Removing Tailwind CSS
+## Contributing
 
-If you prefer not to use Tailwind CSS:
+Read [AGENTS.md](AGENTS.md) first: where code goes, the conventions, and how issues and planning work (humans and AI agents follow the same file). The React patterns are in [docs/conventions/react.md](docs/conventions/react.md). Work is tracked in [GitHub Issues](https://github.com/supervanya/vanyaOS/issues); branch off `main` and open a PR that says `Closes #<issue>`.
 
-1. Remove the demo pages in `src/routes/demo/`
-2. Replace the Tailwind import in `src/styles.css` with your own styles
-3. Remove `tailwindcss()` from the plugins array in `vite.config.ts`
-4. Uninstall the packages: `bun install @tailwindcss/vite tailwindcss -D`
+## Deploy
 
+Merging to `main` runs [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml):
 
-## Deploy with Nitro
+1. Applies new migrations to the hosted Supabase project and deploys the Edge Function.
+2. Builds the app with the production Supabase URL and publishable key (repository variables).
+3. Publishes `dist/` to GitHub Pages under `/vanyaOS/`.
 
-This project uses Nitro as a generic server adapter, so it can run on any Node-compatible host.
+Migrations go first, so the schema never lags the app. A PR that touches `supabase/migrations/` gets a read-only dry run of them against production.
 
-```bash
-npm run build
-node dist/server/index.mjs
-```
+## Docs
 
-The build output is a self-contained Node server. To deploy, push the `dist/` directory to your host (Render, Fly.io, your own VPS, etc.) and run the server command above.
-
-For host-specific presets (Vercel, Netlify, Cloudflare, AWS Lambda, etc.) and tuning, see https://v3.nitro.build/deploy.
-
-
-
-## Routing
-
-This project uses [TanStack Router](https://tanstack.com/router) with file-based routing. Routes are managed as files in `src/routes`.
-
-### Adding A Route
-
-To add a new route to your application just add a new file in the `./src/routes` directory.
-
-TanStack will automatically generate the content of the route file for you.
-
-Now that you have two routes you can use a `Link` component to navigate between them.
-
-### Adding Links
-
-To use SPA (Single Page Application) navigation you will need to import the `Link` component from `@tanstack/react-router`.
-
-```tsx
-import { Link } from "@tanstack/react-router";
-```
-
-Then anywhere in your JSX you can use it like so:
-
-```tsx
-<Link to="/about">About</Link>
-```
-
-This will create a link that will navigate to the `/about` route.
-
-More information on the `Link` component can be found in the [Link documentation](https://tanstack.com/router/v1/docs/framework/react/api/router/linkComponent).
-
-### Using A Layout
-
-In the File Based Routing setup the layout is located in `src/routes/__root.tsx`. Anything you add to the root route will appear in all the routes. The route content will appear in the JSX where you render `{children}` in the `shellComponent`.
-
-Here is an example layout that includes a header:
-
-```tsx
-import { HeadContent, Scripts, createRootRoute } from '@tanstack/react-router'
-
-export const Route = createRootRoute({
-  head: () => ({
-    meta: [
-      { charSet: 'utf-8' },
-      { name: 'viewport', content: 'width=device-width, initial-scale=1' },
-      { title: 'My App' },
-    ],
-  }),
-  shellComponent: ({ children }) => (
-    <html lang="en">
-      <head>
-        <HeadContent />
-      </head>
-      <body>
-        <header>
-          <nav>
-            <Link to="/">Home</Link>
-            <Link to="/about">About</Link>
-          </nav>
-        </header>
-        {children}
-        <Scripts />
-      </body>
-    </html>
-  ),
-})
-```
-
-More information on layouts can be found in the [Layouts documentation](https://tanstack.com/router/latest/docs/framework/react/guide/routing-concepts#layouts).
-
-## Server Functions
-
-TanStack Start provides server functions that allow you to write server-side code that seamlessly integrates with your client components.
-
-```tsx
-import { createServerFn } from '@tanstack/react-start'
-
-const getServerTime = createServerFn({
-  method: 'GET',
-}).handler(async () => {
-  return new Date().toISOString()
-})
-
-// Use in a component
-function MyComponent() {
-  const [time, setTime] = useState('')
-  
-  useEffect(() => {
-    getServerTime().then(setTime)
-  }, [])
-  
-  return <div>Server time: {time}</div>
-}
-```
-
-## API Routes
-
-You can create API routes by using the `server` property in your route definitions:
-
-```tsx
-import { createFileRoute } from '@tanstack/react-router'
-import { json } from '@tanstack/react-start'
-
-export const Route = createFileRoute('/api/hello')({
-  server: {
-    handlers: {
-      GET: () => json({ message: 'Hello, World!' }),
-    },
-  },
-})
-```
-
-## Data Fetching
-
-There are multiple ways to fetch data in your application. You can use TanStack Query to fetch data from a server. But you can also use the `loader` functionality built into TanStack Router to load the data for a route before it's rendered.
-
-For example:
-
-```tsx
-import { createFileRoute } from '@tanstack/react-router'
-
-export const Route = createFileRoute('/people')({
-  loader: async () => {
-    const response = await fetch('https://swapi.dev/api/people')
-    return response.json()
-  },
-  component: PeopleComponent,
-})
-
-function PeopleComponent() {
-  const data = Route.useLoaderData()
-  return (
-    <ul>
-      {data.results.map((person) => (
-        <li key={person.name}>{person.name}</li>
-      ))}
-    </ul>
-  )
-}
-```
-
-Loaders simplify your data fetching logic dramatically. Check out more information in the [Loader documentation](https://tanstack.com/router/latest/docs/framework/react/guide/data-loading#loader-parameters).
-
-# Demo files
-
-Files prefixed with `demo` can be safely deleted. They are there to provide a starting point for you to play around with the features you've installed.
-
-# Learn More
-
-You can learn more about all of the offerings from TanStack in the [TanStack documentation](https://tanstack.com).
-
-For TanStack Start specific documentation, visit [TanStack Start](https://tanstack.com/start).
+- [ROADMAP.md](docs/ROADMAP.md): milestones and what "done" means for each
+- [ARCHITECTURE.md](docs/ARCHITECTURE.md): the system, the schema, the AI coach
+- [REQUIREMENTS.md](docs/REQUIREMENTS.md): the original product requirements
+- [adr/](docs/adr/): the decisions behind the stack (Vite + TanStack Router, Supabase)
