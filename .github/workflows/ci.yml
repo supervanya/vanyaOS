@@ -1,7 +1,8 @@
 name: CI
 
-# Runs on every push to a PR branch. The `Typecheck` job is a required status
-# check in the `main-branch` ruleset, so a failing typecheck blocks the merge.
+# Runs on every push to a PR branch: the same gate as the local git hooks, for
+# anything that got past them. Each job is a required status check in the
+# `main-branch` ruleset, so a failure blocks the merge.
 on:
   pull_request:
 
@@ -14,11 +15,27 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  typecheck:
-    name: Typecheck
+  check:
+    # Job names are the status-check names the ruleset requires — rename both together.
+    name: ${{ matrix.name }}
     runs-on: ubuntu-latest
+    strategy:
+      # Report every failing check, not just the first.
+      fail-fast: false
+      matrix:
+        include:
+          - name: Format
+            run: bun run format:check
+          - name: Lint
+            run: bun run lint
+          - name: Typecheck
+            run: bun run typecheck
+          - name: Test
+            run: bun run test
+          - name: Build
+            run: bun run build
     steps:
       - uses: actions/checkout@v7
       - uses: oven-sh/setup-bun@v2
       - run: bun install --frozen-lockfile
-      - run: bun run typecheck
+      - run: ${{ matrix.run }}
