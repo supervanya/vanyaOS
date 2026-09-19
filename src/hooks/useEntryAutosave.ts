@@ -1,7 +1,8 @@
+import type { LoadedConfig } from "@/features/config/api"
 import { useCallback, useEffect, useRef, useState } from "react"
 import { toast } from "sonner"
 import { clearDraft, saveDay, saveDraft } from "@/lib/storage"
-import type { DayEntry, LoadedConfig, LoadedDay } from "@/lib/storage"
+import type { DayEntry, LoadedDay } from "@/lib/storage"
 import { errorMessage } from "@/lib/errors"
 
 // How long to wait after the last edit before syncing to Postgres. The local

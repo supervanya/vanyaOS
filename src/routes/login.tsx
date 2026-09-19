@@ -1,8 +1,7 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router"
-import { useEffect, useState } from "react"
+import { createFileRoute } from "@tanstack/react-router"
+import { useState } from "react"
 import { toast } from "sonner"
 import { supabase } from "@/lib/supabaseClient"
-import { useAuth } from "@/lib/auth"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { errorMessage } from "@/lib/errors"
@@ -32,14 +31,6 @@ function Login() {
   const [pastedLink, setPastedLink] = useState("")
   const [sent, setSent] = useState(false)
   const [loading, setLoading] = useState(false)
-  const { session } = useAuth()
-  const navigate = useNavigate()
-
-  // Signed in (whether just now via verifyOtp or already) → leave /login.
-  useEffect(() => {
-    if (session) void navigate({ to: "/", replace: true })
-  }, [session, navigate])
-
   const sendLink = async () => {
     if (!email || loading) return
     setLoading(true)
@@ -69,7 +60,7 @@ function Login() {
       const { error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type: "email" })
       // Links are single-use and expire after ~1h — resending is the fix.
       if (error) toast.error(error.message)
-      // Success → onAuthStateChange sets the session; the effect above redirects.
+      // Success → the sign-in re-runs the router's auth check, which leaves /login.
     } catch (err) {
       toast.error(errorMessage(err))
     } finally {

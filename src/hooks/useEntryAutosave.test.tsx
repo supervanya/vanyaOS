@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
+import type { LoadedConfig } from "@/features/config/api"
 import { act, renderHook } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { saveDay, saveDraft } from "@/lib/storage"
-import type { DayEntry, LoadedConfig } from "@/lib/storage"
+import type { DayEntry } from "@/lib/storage"
 import { useEntryAutosave } from "./useEntryAutosave"
 
 vi.mock("@/lib/storage", () => ({

@@ -1,41 +1,31 @@
-import { useEffect, type ReactNode } from "react"
-import { Outlet, createRootRoute, useNavigate, useRouterState } from "@tanstack/react-router"
+import type { QueryClient } from "@tanstack/react-query"
+import { Outlet, createRootRouteWithContext, redirect } from "@tanstack/react-router"
 
 import { AppShell } from "@/components/AppShell"
 import { Toaster } from "@/components/ui/sonner"
-import { AuthProvider, useAuth } from "@/lib/auth"
+import { currentSession } from "@/lib/auth"
 
-export const Route = createRootRoute({ component: RootLayout })
+export type RouterContext = { queryClient: QueryClient }
+
+export const Route = createRootRouteWithContext<RouterContext>()({
+  // Solo-account guard, before anything renders or loads: signed out goes to
+  // /login, signed in never sees it. main.tsx re-runs this on sign-in/out.
+  beforeLoad: async ({ location }) => {
+    const onLogin = location.pathname.endsWith("/login")
+    const session = await currentSession()
+    if (!session && !onLogin) throw redirect({ to: "/login", replace: true })
+    if (session && onLogin) throw redirect({ to: "/", replace: true })
+  },
+  component: RootLayout,
+})
 
 function RootLayout() {
   return (
-    <AuthProvider>
+    <>
       <AppShell>
-        <AuthGate>
-          <Outlet />
-        </AuthGate>
+        <Outlet />
       </AppShell>
       <Toaster position="top-center" />
-    </AuthProvider>
+    </>
   )
-}
-
-// Solo-account guard: bounces to /login when signed out. Client-only (no
-// SSR), so the session check is async — render nothing until it resolves
-// rather than flash protected content.
-function AuthGate({ children }: { children: ReactNode }) {
-  const { session, loading } = useAuth()
-  const navigate = useNavigate()
-  const pathname = useRouterState({ select: (s) => s.location.pathname })
-  const onLoginPage = pathname.endsWith("/login")
-
-  useEffect(() => {
-    if (!loading && !session && !onLoginPage) {
-      void navigate({ to: "/login", replace: true })
-    }
-  }, [loading, session, onLoginPage, navigate])
-
-  if (loading) return null
-  if (!session && !onLoginPage) return null
-  return <>{children}</>
 }

@@ -1,3 +1,4 @@
+import { loadConfig, type LoadedConfig } from "@/features/config/api"
 import { createFileRoute, Link } from "@tanstack/react-router"
 import { useEffect, useMemo, useState } from "react"
 import {
@@ -14,7 +15,6 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 import {
-  loadConfig,
   loadOrInitDay,
   listDayDates,
   loadDay,
@@ -22,7 +22,6 @@ import {
   shiftISO,
   defaultEntryDate,
 } from "../lib/storage"
-import type { LoadedConfig } from "../lib/storage"
 import { useEntryAutosave } from "@/hooks/useEntryAutosave"
 import { wellness } from "../lib/wellness"
 import { groupMetrics } from "../lib/config"

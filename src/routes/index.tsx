@@ -1,3 +1,4 @@
+import { loadConfig, type LoadedConfig } from "@/features/config/api"
 import { createFileRoute, Link } from "@tanstack/react-router"
 import { useEffect, useState } from "react"
 import {
@@ -14,7 +15,6 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 import {
-  loadConfig,
   loadOrInitDay,
   defaultEntryDate,
   listProjects,
@@ -25,7 +25,7 @@ import {
   latestRetroDates,
   isRetroDue,
 } from "../lib/storage"
-import type { LoadedConfig, Project } from "../lib/storage"
+import type { Project } from "../lib/storage"
 import { useEntryAutosave } from "@/hooks/useEntryAutosave"
 import { TaskBoard } from "@/components/TaskBoard"
 import { HabitChip } from "@/components/HabitChip"

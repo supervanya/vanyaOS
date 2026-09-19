@@ -7,7 +7,8 @@
 
 import { FunctionsHttpError } from "@supabase/supabase-js"
 import { supabase } from "./supabaseClient"
-import { DEFAULT_CONFIG, type Config, type Metric, type Habit, type Goal } from "./config"
+import { loadConfig, type LoadedConfig } from "@/features/config/api"
+import { currentUserId } from "./auth"
 import type { Tables, TablesUpdate } from "./database.types"
 import { errorMessage } from "./errors"
 import { oneOf } from "./parse"
@@ -54,13 +55,6 @@ export type Project = {
 // including completed items (done work still occupied its slot this week).
 export const CAPS: Record<TaskSize, number> = { big: 1, medium: 3, small: 5 }
 
-// Config rows keyed by their stable slug (`key` in Postgres, `id` in the UI
-// shape) plus the slug -> row-uuid maps needed to write child tables.
-export type LoadedConfig = Config & {
-  metricRowId: Record<string, string>
-  habitRowId: Record<string, string>
-}
-
 export function todayISO(): string {
   const d = new Date()
   const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000)
@@ -81,97 +75,6 @@ export function shiftISO(dateISO: string, deltaDays: number): string {
 // the previous day, so before `cutoffHour` (local) we default to yesterday.
 export function defaultEntryDate(cutoffHour = 4): string {
   return new Date().getHours() < cutoffHour ? shiftISO(todayISO(), -1) : todayISO()
-}
-
-async function currentUserId(): Promise<string> {
-  const { data, error } = await supabase.auth.getUser()
-  if (error || !data.user) throw new Error("Not authenticated")
-  return data.user.id
-}
-
-// Seed any config.ts defaults this account doesn't have yet — first login gets
-// everything, and a default added later (e.g. a new metric) reaches existing
-// accounts on their next load. Existing rows are never touched, so DB-side
-// edits to labels/ordering survive.
-async function seedMissingDefaults(userId: string): Promise<void> {
-  const [{ data: metricKeys }, { data: habitKeys }, { data: goalKeys }] = await Promise.all([
-    supabase.from("metrics").select("key"),
-    supabase.from("habits").select("key"),
-    supabase.from("goals").select("key"),
-  ])
-  const has = (rows: { key: string }[] | null) => new Set((rows ?? []).map((r) => r.key))
-  const [metricSet, habitSet, goalSet] = [has(metricKeys), has(habitKeys), has(goalKeys)]
-
-  const missingMetrics = DEFAULT_CONFIG.metrics
-    .map((m, i) => ({
-      user_id: userId,
-      key: m.id,
-      label: m.label,
-      group_name: m.group,
-      higher_is_better: m.higherIsBetter,
-      scale: m.scale,
-      sort_order: i,
-    }))
-    .filter((r) => !metricSet.has(r.key))
-  const missingHabits = DEFAULT_CONFIG.habits
-    .map((h, i) => ({ user_id: userId, key: h.id, label: h.label, sort_order: i }))
-    .filter((r) => !habitSet.has(r.key))
-  const missingGoals = DEFAULT_CONFIG.goals
-    .map((g, i) => ({
-      user_id: userId,
-      key: g.id,
-      label: g.label,
-      progress: g.progress,
-      note: g.note ?? null,
-      sort_order: i,
-    }))
-    .filter((r) => !goalSet.has(r.key))
-
-  await Promise.all([
-    missingMetrics.length ? supabase.from("metrics").insert(missingMetrics) : null,
-    missingHabits.length ? supabase.from("habits").insert(missingHabits) : null,
-    missingGoals.length ? supabase.from("goals").insert(missingGoals) : null,
-  ])
-}
-
-export async function loadConfig(): Promise<LoadedConfig> {
-  const userId = await currentUserId()
-  await seedMissingDefaults(userId)
-
-  // Archived rows are invisible to the app but keep their uuid, so historical
-  // entry values still join (and old wellness scores still include them).
-  const [{ data: metricRows }, { data: habitRows }, { data: goalRows }] = await Promise.all([
-    supabase.from("metrics").select("*").eq("archived", false).order("sort_order"),
-    supabase.from("habits").select("*").eq("archived", false).order("sort_order"),
-    supabase.from("goals").select("*").eq("archived", false).order("sort_order"),
-  ])
-
-  const metrics: Metric[] = (metricRows ?? []).map((r) => ({
-    id: r.key,
-    label: r.label,
-    group: r.group_name,
-    higherIsBetter: r.higher_is_better,
-    scale: r.scale,
-  }))
-  const habits: Habit[] = (habitRows ?? []).map((r) => ({ id: r.key, label: r.label }))
-  const goals: Goal[] = (goalRows ?? []).map((r) => ({
-    id: r.key,
-    label: r.label,
-    progress: r.progress,
-    ...(r.note !== null && { note: r.note }),
-  }))
-
-  return {
-    // Theme management stays deferred (REQUIREMENTS.md) — active_theme is
-    // still a code default, just stamped onto each entry as before.
-    activeTheme: DEFAULT_CONFIG.activeTheme,
-    themes: DEFAULT_CONFIG.themes,
-    metrics,
-    habits,
-    goals,
-    metricRowId: Object.fromEntries((metricRows ?? []).map((r) => [r.key, r.id])),
-    habitRowId: Object.fromEntries((habitRows ?? []).map((r) => [r.key, r.id])),
-  }
 }
 
 export async function listDayDates(): Promise<string[]> {
