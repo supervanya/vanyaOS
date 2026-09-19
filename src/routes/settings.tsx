@@ -58,18 +58,17 @@ function Settings() {
       <div className="flex items-center justify-between">
         <Link
           to="/"
-          className="text-muted-foreground hover:text-foreground flex items-center gap-1.5 text-sm font-semibold tracking-tight"
+          className="flex items-center gap-1.5 text-sm font-semibold tracking-tight text-muted-foreground hover:text-foreground"
         >
           <LayoutDashboard size={15} />
           VanyaOS
         </Link>
-        <span className="text-muted-foreground text-xs">Settings</span>
+        <span className="text-xs text-muted-foreground">Settings</span>
       </div>
 
       <h1 className="mt-3 text-[15px] font-medium">Setup</h1>
-      <p className="text-muted-foreground mt-0.5 text-[11px]">
-        Archive instead of delete — history keeps its data. Changes apply
-        immediately everywhere.
+      <p className="mt-0.5 text-[11px] text-muted-foreground">
+        Archive instead of delete — history keeps its data. Changes apply immediately everywhere.
       </p>
 
       <MetricsSection />
@@ -115,7 +114,7 @@ function RetroAreasSection() {
 
   return (
     <section className="mt-6">
-      <p className="text-muted-foreground mb-2 flex items-center gap-1.5 text-xs">
+      <p className="mb-2 flex items-center gap-1.5 text-xs text-muted-foreground">
         <BookOpen size={14} /> Retro areas
       </p>
       <SortableList items={active} onReorder={reorder} className="flex flex-col gap-2">
@@ -134,7 +133,13 @@ function RetroAreasSection() {
           placeholder="New retro area…"
           className="h-8 text-[13px]"
         />
-        <Button type="button" variant="outline" size="icon-sm" aria-label="Add retro area" onClick={add}>
+        <Button
+          type="button"
+          variant="outline"
+          size="icon-sm"
+          aria-label="Add retro area"
+          onClick={add}
+        >
           <Plus />
         </Button>
       </div>
@@ -215,7 +220,7 @@ function AiSection() {
 
   return (
     <section className="mt-6">
-      <p className="text-muted-foreground mb-2 flex items-center gap-1.5 text-xs">
+      <p className="mb-2 flex items-center gap-1.5 text-xs text-muted-foreground">
         <Bot size={14} /> AI coach · bring your own provider
       </p>
       <div className="flex flex-col gap-2">
@@ -231,7 +236,7 @@ function AiSection() {
               // can't (it may belong to the previous provider).
               if (key.trim()) fetchModels(p, key.trim())
             }}
-            className="border-input bg-transparent dark:bg-input/30 h-8 rounded-md border px-2 text-[13px]"
+            className="h-8 rounded-md border border-input bg-transparent px-2 text-[13px] dark:bg-input/30"
           >
             {(Object.keys(AI_PROVIDERS) as AiProvider[]).map((p) => (
               <option key={p} value={p}>
@@ -243,7 +248,7 @@ function AiSection() {
             <select
               value={model}
               onChange={(e) => setModel(e.target.value)}
-              className="border-input bg-transparent dark:bg-input/30 h-8 min-w-0 flex-1 rounded-md border px-2 text-[13px]"
+              className="h-8 min-w-0 flex-1 rounded-md border border-input bg-transparent px-2 text-[13px] dark:bg-input/30"
             >
               {models.map((m) => (
                 <option key={m} value={m}>
@@ -299,9 +304,9 @@ function AiSection() {
         >
           {saving ? "Saving…" : "Save AI settings"}
         </Button>
-        <p className="text-muted-foreground text-[11px]">
-          Your key is stored in your own account row and only ever read by the
-          coach function — the app has no AI keys of its own.
+        <p className="text-[11px] text-muted-foreground">
+          Your key is stored in your own account row and only ever read by the coach function — the
+          app has no AI keys of its own.
         </p>
       </div>
     </section>
@@ -321,7 +326,7 @@ function RowShell({ onArchive, children }: { onArchive: () => void; children: Re
         variant="ghost"
         size="icon-sm"
         aria-label="Archive"
-        className="text-muted-foreground shrink-0"
+        className="shrink-0 text-muted-foreground"
         onClick={onArchive}
       >
         <Archive />
@@ -368,15 +373,13 @@ function ArchivedList<T extends { id: string; label: string }>({
   if (!rows.length) return null
   return (
     <details className="mt-2">
-      <summary className="text-muted-foreground cursor-pointer text-[11px]">
+      <summary className="cursor-pointer text-[11px] text-muted-foreground">
         Archived · {rows.length}
       </summary>
       <div className="mt-1.5 flex flex-col gap-1">
         {rows.map((r) => (
           <div key={r.id} className="flex items-center gap-2">
-            <span className="text-muted-foreground flex-1 text-[13px] line-through">
-              {r.label}
-            </span>
+            <span className="flex-1 text-[13px] text-muted-foreground line-through">{r.label}</span>
             <Button
               type="button"
               variant="ghost"
@@ -436,8 +439,7 @@ function MetricsSection() {
     updateConfigRow("metrics", id, p).then(reload).catch(onErr)
   }
 
-  const reorder = (reordered: MetricRow[]) =>
-    persistReorder("metrics", reordered, setRows, reload)
+  const reorder = (reordered: MetricRow[]) => persistReorder("metrics", reordered, setRows, reload)
 
   const add = () => {
     const l = label.trim()
@@ -460,7 +462,7 @@ function MetricsSection() {
 
   return (
     <section className="mt-6">
-      <p className="text-muted-foreground mb-2 flex items-center gap-1.5 text-xs">
+      <p className="mb-2 flex items-center gap-1.5 text-xs text-muted-foreground">
         <Activity size={14} /> Metrics
       </p>
       <SortableList items={active} onReorder={reorder} className="flex flex-col gap-2">
@@ -473,7 +475,7 @@ function MetricsSection() {
               className="w-24 shrink-0"
             />
             <Label
-              className="text-muted-foreground shrink-0 gap-1 text-[10px]"
+              className="shrink-0 gap-1 text-[10px] text-muted-foreground"
               title="Symptom-style: 0 is best (inverted in wellness)"
             >
               <Checkbox
@@ -513,11 +515,17 @@ function MetricsSection() {
               <option key={g} value={g} />
             ))}
           </datalist>
-          <Button type="button" variant="outline" size="icon-sm" aria-label="Add metric" onClick={add}>
+          <Button
+            type="button"
+            variant="outline"
+            size="icon-sm"
+            aria-label="Add metric"
+            onClick={add}
+          >
             <Plus />
           </Button>
         </div>
-        <Label className="text-muted-foreground gap-2 text-[11px]">
+        <Label className="gap-2 text-[11px] text-muted-foreground">
           <Checkbox
             checked={inverted}
             onCheckedChange={(v) => setInverted(v === true)}
@@ -548,8 +556,7 @@ function HabitsSection() {
   const patch = (id: string, p: Parameters<typeof updateConfigRow>[2]) =>
     updateConfigRow("habits", id, p).then(reload).catch(onErr)
 
-  const reorder = (reordered: HabitRow[]) =>
-    persistReorder("habits", reordered, setRows, reload)
+  const reorder = (reordered: HabitRow[]) => persistReorder("habits", reordered, setRows, reload)
 
   const add = () => {
     const l = label.trim()
@@ -564,7 +571,7 @@ function HabitsSection() {
 
   return (
     <section className="mt-6">
-      <p className="text-muted-foreground mb-2 flex items-center gap-1.5 text-xs">
+      <p className="mb-2 flex items-center gap-1.5 text-xs text-muted-foreground">
         <Repeat size={14} /> Habits
       </p>
       <SortableList items={active} onReorder={reorder} className="flex flex-col gap-2">
@@ -613,8 +620,7 @@ function GoalsSection() {
   const setProgressLocal = (id: string, v: number) =>
     setRows((cur) => (cur ? cur.map((r) => (r.id === id ? { ...r, progress: v } : r)) : cur))
 
-  const reorder = (reordered: GoalRow[]) =>
-    persistReorder("goals", reordered, setRows, reload)
+  const reorder = (reordered: GoalRow[]) => persistReorder("goals", reordered, setRows, reload)
 
   const add = () => {
     const l = label.trim()
@@ -629,7 +635,7 @@ function GoalsSection() {
 
   return (
     <section className="mt-6">
-      <p className="text-muted-foreground mb-2 flex items-center gap-1.5 text-xs">
+      <p className="mb-2 flex items-center gap-1.5 text-xs text-muted-foreground">
         <Flag size={14} /> Goals
       </p>
       <SortableList items={active} onReorder={reorder} className="flex flex-col gap-3">
@@ -648,7 +654,7 @@ function GoalsSection() {
                 onValueCommit={([v]) => patch(g.id, { progress: v / 100 })}
                 className="flex-1"
               />
-              <span className="text-muted-foreground w-9 text-right text-[11px] tabular-nums">
+              <span className="w-9 text-right text-[11px] text-muted-foreground tabular-nums">
                 {Math.round(g.progress * 100)}%
               </span>
               <LabelInput

@@ -10,7 +10,18 @@
     {
       "name": "vanyaos-dev-alt",
       "runtimeExecutable": "mise",
-      "runtimeArgs": ["exec", "node@24.14.1", "--", "bun", "x", "vite", "--port", "5274", "--strictPort", "--host"],
+      "runtimeArgs": [
+        "exec",
+        "node@24.14.1",
+        "--",
+        "bun",
+        "x",
+        "vite",
+        "--port",
+        "5274",
+        "--strictPort",
+        "--host"
+      ],
       "port": 5274
     }
   ]

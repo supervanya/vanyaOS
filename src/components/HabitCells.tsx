@@ -23,7 +23,10 @@ export function HabitCells({
   )
 
   return (
-    <div className={cn("relative flex h-6 touch-pan-y items-center gap-px", className)} {...handlers}>
+    <div
+      className={cn("relative flex h-6 touch-pan-y items-center gap-px", className)}
+      {...handlers}
+    >
       {buckets.map((bucket, i) => (
         <Cell
           key={bucket.start}
@@ -42,17 +45,17 @@ export function HabitCells({
 }
 
 function Cell({ bucket, tracked, active }: { bucket: Bucket; tracked: boolean; active: boolean }) {
-  const base = cn("h-3.5 flex-1 rounded-[2px]", active && "ring-foreground/60 ring-1")
+  const base = cn("h-3.5 flex-1 rounded-[2px]", active && "ring-1 ring-foreground/60")
   if (!tracked) return <span className="h-3.5 flex-1" />
   if (bucket.mean === null) {
     return (
       <span className={cn(base, "flex items-center justify-center")}>
-        <span className="bg-muted-foreground/50 size-[3px] rounded-full" />
+        <span className="size-[3px] rounded-full bg-muted-foreground/50" />
       </span>
     )
   }
   return (
-    <span className={cn(base, "bg-muted relative overflow-hidden")}>
+    <span className={cn(base, "relative overflow-hidden bg-muted")}>
       {bucket.mean > 0 && (
         <span
           className="absolute inset-0 bg-current"

@@ -44,7 +44,7 @@ function dateStamp(d = new Date()): string {
 function Dashboard() {
   return (
     <>
-      <div className="gap-6 flex flex-col">
+      <div className="flex flex-col gap-6">
         <Header />
         <Navigation />
         <Tasks />
@@ -52,10 +52,7 @@ function Dashboard() {
         <GoalsGlance />
         <ProjectsCard />
         <p className="text-center text-[11px]">
-          <Link
-            to="/playground"
-            className="text-muted-foreground hover:text-foreground underline"
-          >
+          <Link to="/playground" className="text-muted-foreground underline hover:text-foreground">
             Animation playground
           </Link>
         </p>
@@ -68,7 +65,7 @@ function Tasks() {
   /* This week's 1-3-5 (the living task list) */
   return (
     <section className="mt-4">
-      <p className="text-muted-foreground mb-2 text-xs">This week's 1-3-5</p>
+      <p className="mb-2 text-xs text-muted-foreground">This week's 1-3-5</p>
       <TaskBoard />
     </section>
   )
@@ -81,9 +78,7 @@ function Header() {
         <Layers size={17} className="text-indigo-500 dark:text-indigo-300" />
         Command center
       </span>
-      <span className="text-muted-foreground text-xs tabular-nums">
-        {dateStamp()}
-      </span>
+      <span className="text-xs text-muted-foreground tabular-nums">{dateStamp()}</span>
     </div>
   )
 }
@@ -93,31 +88,28 @@ function Navigation() {
     <div className="flex flex-col gap-2">
       <Link
         to="/reflect"
-        className="border-border bg-input/20 flex items-center gap-2.5 rounded-lg border px-4 py-3 text-[14px] font-medium"
+        className="flex items-center gap-2.5 rounded-lg border border-border bg-input/20 px-4 py-3 text-[14px] font-medium"
       >
         <Moon size={16} className="text-indigo-500 dark:text-indigo-300" />
         Evening reflection
-        <span className="text-muted-foreground ml-auto">→</span>
+        <span className="ml-auto text-muted-foreground">→</span>
       </Link>
       <Link
         to="/trends"
-        className="border-border bg-input/20 flex items-center gap-2.5 rounded-lg border px-4 py-3 text-[14px] font-medium"
+        className="flex items-center gap-2.5 rounded-lg border border-border bg-input/20 px-4 py-3 text-[14px] font-medium"
       >
-        <TrendingUp
-          size={16}
-          className="text-indigo-500 dark:text-indigo-300"
-        />
+        <TrendingUp size={16} className="text-indigo-500 dark:text-indigo-300" />
         Trends
-        <span className="text-muted-foreground ml-auto">→</span>
+        <span className="ml-auto text-muted-foreground">→</span>
       </Link>
       <RetroNavCard />
       <Link
         to="/settings"
-        className="border-border bg-input/20 flex items-center gap-2.5 rounded-lg border px-4 py-3 text-[14px] font-medium"
+        className="flex items-center gap-2.5 rounded-lg border border-border bg-input/20 px-4 py-3 text-[14px] font-medium"
       >
         <SettingsIcon size={16} className="text-muted-foreground" />
         Settings
-        <span className="text-muted-foreground ml-auto">→</span>
+        <span className="ml-auto text-muted-foreground">→</span>
       </Link>
     </div>
   )
@@ -155,7 +147,7 @@ function HabitsToday() {
 
   return (
     <section>
-      <p className="text-muted-foreground mb-2 flex items-center gap-1.5 text-xs">
+      <p className="mb-2 flex items-center gap-1.5 text-xs text-muted-foreground">
         <Repeat size={14} /> Habits today
       </p>
       <div className="flex flex-wrap gap-2">
@@ -187,21 +179,19 @@ function GoalsGlance() {
 
   return (
     <section>
-      <p className="text-muted-foreground mb-2 flex items-center gap-1.5 text-xs">
+      <p className="mb-2 flex items-center gap-1.5 text-xs text-muted-foreground">
         <Flag size={14} /> Goals
       </p>
       {config.goals.map((g) => (
         <div key={g.id} className="mb-2 flex items-center gap-3">
-          <span className="w-24 shrink-0 text-xs text-foreground/85">
-            {g.label}
-          </span>
-          <div className="bg-muted h-1.5 flex-1 overflow-hidden rounded-full">
+          <span className="w-24 shrink-0 text-xs text-foreground/85">{g.label}</span>
+          <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
             <div
-              className="bg-info h-full rounded-full"
+              className="h-full rounded-full bg-info"
               style={{ width: `${Math.round(g.progress * 100)}%` }}
             />
           </div>
-          <span className="text-muted-foreground w-12 text-right text-[11px]">
+          <span className="w-12 text-right text-[11px] text-muted-foreground">
             {g.note ?? `${Math.round(g.progress * 100)}%`}
           </span>
         </div>
@@ -217,9 +207,7 @@ function RetroNavCard() {
   useEffect(() => {
     Promise.all([listRetroAreas(), latestRetroDates()])
       .then(([areas, dates]) => {
-        const due = areas.filter(
-          (a) => !a.archived && isRetroDue(dates[a.id]),
-        ).length
+        const due = areas.filter((a) => !a.archived && isRetroDue(dates[a.id])).length
         setDueCount(due)
       })
       .catch(() => setDueCount(0))
@@ -228,16 +216,16 @@ function RetroNavCard() {
   return (
     <Link
       to="/retro"
-      className="border-border bg-input/20 flex items-center gap-2.5 rounded-lg border px-4 py-3 text-[14px] font-medium"
+      className="flex items-center gap-2.5 rounded-lg border border-border bg-input/20 px-4 py-3 text-[14px] font-medium"
     >
       <BookOpen size={16} className="text-indigo-500 dark:text-indigo-300" />
       Retrospectives
       {dueCount != null && dueCount > 0 && (
-        <span className="bg-warning/15 text-warning rounded-full px-2 py-0.5 text-[11px]">
+        <span className="rounded-full bg-warning/15 px-2 py-0.5 text-[11px] text-warning">
           {dueCount} due
         </span>
       )}
-      <span className="text-muted-foreground ml-auto">→</span>
+      <span className="ml-auto text-muted-foreground">→</span>
     </Link>
   )
 }
@@ -291,7 +279,7 @@ function ProjectsCard() {
 
   return (
     <section>
-      <p className="text-muted-foreground mb-2 flex items-center gap-1.5 text-xs">
+      <p className="mb-2 flex items-center gap-1.5 text-xs text-muted-foreground">
         <Monitor size={14} /> Projects · WIP limit 1 · tap to swap
       </p>
       <div className="flex flex-col gap-1.5">
@@ -304,25 +292,20 @@ function ProjectsCard() {
               className={cn(
                 "flex cursor-pointer items-center gap-2.5 rounded-lg border px-3.5 py-2.5 text-[13px]",
                 active
-                  ? "border-info/70 bg-info/10 text-info font-medium"
+                  ? "border-info/70 bg-info/10 font-medium text-info"
                   : "border-border text-foreground/85",
               )}
             >
               {p.emoji && <span>{p.emoji}</span>}
               <span className="flex-1">{p.name}</span>
-              <span
-                className={cn(
-                  "text-[11px]",
-                  active ? "text-info" : "text-muted-foreground",
-                )}
-              >
+              <span className={cn("text-[11px]", active ? "text-info" : "text-muted-foreground")}>
                 {active ? "in progress" : "parking lot"}
               </span>
               <Button
                 type="button"
                 variant="ghost"
                 size="icon-sm"
-                className="text-muted-foreground -mr-1.5"
+                className="-mr-1.5 text-muted-foreground"
                 onClick={(e) => {
                   e.stopPropagation()
                   remove(p)

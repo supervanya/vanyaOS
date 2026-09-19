@@ -5,9 +5,9 @@
 // source of truth once a sync succeeds; the draft is a transient write-ahead
 // copy, not a competing store.
 
-import { supabase } from './supabaseClient'
-import { DEFAULT_CONFIG, type Config, type Metric, type Habit, type Goal } from './config'
-import type { Point } from './trends'
+import { supabase } from "./supabaseClient"
+import { DEFAULT_CONFIG, type Config, type Metric, type Habit, type Goal } from "./config"
+import type { Point } from "./trends"
 
 export type DayEntry = {
   date: string // YYYY-MM-DD
@@ -20,8 +20,8 @@ export type DayEntry = {
 
 // The living task list (M2): tasks belong to no day. scope today/week counts
 // toward the weekly 1-3-5 commitment; someday is the parking lot.
-export type TaskScope = 'today' | 'week' | 'someday'
-export type TaskSize = 'big' | 'medium' | 'small'
+export type TaskScope = "today" | "week" | "someday"
+export type TaskSize = "big" | "medium" | "small"
 export type Task = {
   id: string
   scope: TaskScope
@@ -31,7 +31,7 @@ export type Task = {
   sortOrder: number
 }
 
-export type ProjectStatus = 'in_progress' | 'parking_lot'
+export type ProjectStatus = "in_progress" | "parking_lot"
 export type Project = {
   id: string
   name: string
@@ -75,7 +75,7 @@ export function defaultEntryDate(cutoffHour = 4): string {
 
 async function currentUserId(): Promise<string> {
   const { data, error } = await supabase.auth.getUser()
-  if (error || !data.user) throw new Error('Not authenticated')
+  if (error || !data.user) throw new Error("Not authenticated")
   return data.user.id
 }
 
@@ -85,9 +85,9 @@ async function currentUserId(): Promise<string> {
 // edits to labels/ordering survive.
 async function seedMissingDefaults(userId: string): Promise<void> {
   const [{ data: metricKeys }, { data: habitKeys }, { data: goalKeys }] = await Promise.all([
-    supabase.from('metrics').select('key'),
-    supabase.from('habits').select('key'),
-    supabase.from('goals').select('key'),
+    supabase.from("metrics").select("key"),
+    supabase.from("habits").select("key"),
+    supabase.from("goals").select("key"),
   ])
   const has = (rows: { key: string }[] | null) => new Set((rows ?? []).map((r) => r.key))
   const [metricSet, habitSet, goalSet] = [has(metricKeys), has(habitKeys), has(goalKeys)]
@@ -118,9 +118,9 @@ async function seedMissingDefaults(userId: string): Promise<void> {
     .filter((r) => !goalSet.has(r.key))
 
   await Promise.all([
-    missingMetrics.length ? supabase.from('metrics').insert(missingMetrics) : null,
-    missingHabits.length ? supabase.from('habits').insert(missingHabits) : null,
-    missingGoals.length ? supabase.from('goals').insert(missingGoals) : null,
+    missingMetrics.length ? supabase.from("metrics").insert(missingMetrics) : null,
+    missingHabits.length ? supabase.from("habits").insert(missingHabits) : null,
+    missingGoals.length ? supabase.from("goals").insert(missingGoals) : null,
   ])
 }
 
@@ -131,9 +131,9 @@ export async function loadConfig(): Promise<LoadedConfig> {
   // Archived rows are invisible to the app but keep their uuid, so historical
   // entry values still join (and old wellness scores still include them).
   const [{ data: metricRows }, { data: habitRows }, { data: goalRows }] = await Promise.all([
-    supabase.from('metrics').select('*').eq('archived', false).order('sort_order'),
-    supabase.from('habits').select('*').eq('archived', false).order('sort_order'),
-    supabase.from('goals').select('*').eq('archived', false).order('sort_order'),
+    supabase.from("metrics").select("*").eq("archived", false).order("sort_order"),
+    supabase.from("habits").select("*").eq("archived", false).order("sort_order"),
+    supabase.from("goals").select("*").eq("archived", false).order("sort_order"),
   ])
 
   const metrics: Metric[] = (metricRows ?? []).map((r) => ({
@@ -167,19 +167,19 @@ export async function loadConfig(): Promise<LoadedConfig> {
 export async function listDayDates(): Promise<string[]> {
   const userId = await currentUserId()
   const { data } = await supabase
-    .from('entries')
-    .select('entry_date')
-    .eq('user_id', userId)
-    .order('entry_date')
+    .from("entries")
+    .select("entry_date")
+    .eq("user_id", userId)
+    .order("entry_date")
   return (data ?? []).map((r) => r.entry_date as string)
 }
 
 async function fetchEntryRow(userId: string, date: string) {
   const { data } = await supabase
-    .from('entries')
-    .select('*')
-    .eq('user_id', userId)
-    .eq('entry_date', date)
+    .from("entries")
+    .select("*")
+    .eq("user_id", userId)
+    .eq("entry_date", date)
     .maybeSingle()
   return data
 }
@@ -187,12 +187,18 @@ async function fetchEntryRow(userId: string, date: string) {
 // Hydrates an `entries` row into the same DayEntry shape the UI has always
 // used, keyed by metric/habit *slug* (not the Postgres row uuid).
 async function hydrateEntry(
-  row: { id: string; entry_date: string; theme: string | null; reflection: string | null; updated_at: string },
+  row: {
+    id: string
+    entry_date: string
+    theme: string | null
+    reflection: string | null
+    updated_at: string
+  },
   config: LoadedConfig,
 ): Promise<DayEntry> {
   const [{ data: metricVals }, { data: habitVals }] = await Promise.all([
-    supabase.from('entry_metric_values').select('metric_id, value').eq('entry_id', row.id),
-    supabase.from('entry_habits').select('habit_id, done').eq('entry_id', row.id),
+    supabase.from("entry_metric_values").select("metric_id, value").eq("entry_id", row.id),
+    supabase.from("entry_habits").select("habit_id, done").eq("entry_id", row.id),
   ])
 
   const metricKeyById = Object.fromEntries(
@@ -218,7 +224,7 @@ async function hydrateEntry(
     theme: row.theme ?? config.activeTheme,
     metrics,
     habits,
-    reflection: row.reflection ?? '',
+    reflection: row.reflection ?? "",
     updatedAt: row.updated_at,
   }
 }
@@ -248,9 +254,9 @@ export type TrendSeries = {
 // counts entries (one per day), not the far more numerous per-metric child rows.
 export async function loadTrendSeries(config: LoadedConfig): Promise<TrendSeries> {
   const { data, error } = await supabase
-    .from('entries')
-    .select('entry_date, entry_metric_values(metric_id, value), entry_habits(habit_id, done)')
-    .order('entry_date')
+    .from("entries")
+    .select("entry_date, entry_metric_values(metric_id, value), entry_habits(habit_id, done)")
+    .order("entry_date")
   if (error) throw error
 
   const metricKeyById = invert(config.metricRowId)
@@ -286,7 +292,7 @@ export async function newEntry(date: string, config: LoadedConfig): Promise<DayE
     // habits-only day doesn't record a fake 0 on every metric.
     metrics: {},
     habits: Object.fromEntries(config.habits.map((h) => [h.id, false])),
-    reflection: '',
+    reflection: "",
     updatedAt: new Date().toISOString(),
   }
 }
@@ -298,8 +304,12 @@ export type LoadedDay = { entry: DayEntry; unsynced: boolean }
 // Reconciles the remote entry with any local draft, preferring whichever is
 // freshest by `updatedAt` — protects an in-progress edit from a dropped sync.
 export async function loadOrInitDay(date: string, config: LoadedConfig): Promise<LoadedDay> {
-  const [remote, draft] = await Promise.all([loadDay(date, config), Promise.resolve(loadDraft(date))])
-  if (draft && (!remote || draft.updatedAt > remote.updatedAt)) return { entry: draft, unsynced: true }
+  const [remote, draft] = await Promise.all([
+    loadDay(date, config),
+    Promise.resolve(loadDraft(date)),
+  ])
+  if (draft && (!remote || draft.updatedAt > remote.updatedAt))
+    return { entry: draft, unsynced: true }
   return { entry: remote ?? (await newEntry(date, config)), unsynced: false }
 }
 
@@ -307,14 +317,14 @@ export async function saveDay(entry: DayEntry, config: LoadedConfig): Promise<vo
   const userId = await currentUserId()
 
   const { data: entryRow, error } = await supabase
-    .from('entries')
+    .from("entries")
     .upsert(
       { user_id: userId, entry_date: entry.date, theme: entry.theme, reflection: entry.reflection },
-      { onConflict: 'user_id,entry_date' },
+      { onConflict: "user_id,entry_date" },
     )
     .select()
     .single()
-  if (error || !entryRow) throw error ?? new Error('Failed to save entry')
+  if (error || !entryRow) throw error ?? new Error("Failed to save entry")
 
   const entryId = entryRow.id as string
 
@@ -323,8 +333,8 @@ export async function saveDay(entry: DayEntry, config: LoadedConfig): Promise<vo
     .map(([key, value]) => ({ entry_id: entryId, metric_id: config.metricRowId[key], value }))
   if (metricRows.length) {
     const { error: mErr } = await supabase
-      .from('entry_metric_values')
-      .upsert(metricRows, { onConflict: 'entry_id,metric_id' })
+      .from("entry_metric_values")
+      .upsert(metricRows, { onConflict: "entry_id,metric_id" })
     if (mErr) throw mErr
   }
 
@@ -333,8 +343,8 @@ export async function saveDay(entry: DayEntry, config: LoadedConfig): Promise<vo
     .map(([key, done]) => ({ entry_id: entryId, habit_id: config.habitRowId[key], done }))
   if (habitRows.length) {
     const { error: hErr } = await supabase
-      .from('entry_habits')
-      .upsert(habitRows, { onConflict: 'entry_id,habit_id' })
+      .from("entry_habits")
+      .upsert(habitRows, { onConflict: "entry_id,habit_id" })
     if (hErr) throw hErr
   }
 }
@@ -344,9 +354,9 @@ export async function saveDay(entry: DayEntry, config: LoadedConfig): Promise<vo
 // sync succeeds. Never read as a source of truth on its own — only used to
 // win a freshness comparison against the remote row in loadOrInitDay.
 
-const DRAFT_PREFIX = 'vanyaos:draft:'
+const DRAFT_PREFIX = "vanyaos:draft:"
 const draftKey = (date: string) => `${DRAFT_PREFIX}${date}`
-const hasWindow = () => typeof window !== 'undefined'
+const hasWindow = () => typeof window !== "undefined"
 
 export function saveDraft(entry: DayEntry): void {
   if (hasWindow()) localStorage.setItem(draftKey(entry.date), JSON.stringify(entry))
@@ -394,41 +404,41 @@ const taskFromRow = (r: TaskRow): Task => ({
 export async function listTasks(): Promise<Task[]> {
   const weekAgo = new Date(Date.now() - 7 * 86400_000).toISOString()
   const { data, error } = await supabase
-    .from('tasks')
-    .select('id, scope, size, text, completed_at, sort_order')
-    .eq('archived', false)
+    .from("tasks")
+    .select("id, scope, size, text, completed_at, sort_order")
+    .eq("archived", false)
     .or(`completed_at.is.null,completed_at.gte.${weekAgo}`)
-    .order('sort_order')
-    .order('created_at')
+    .order("sort_order")
+    .order("created_at")
   if (error) throw error
   return (data ?? []).map(taskFromRow)
 }
 
 export async function addTask(text: string, scope: TaskScope, size: TaskSize): Promise<Task> {
   const { data, error } = await supabase
-    .from('tasks')
+    .from("tasks")
     .insert({ text, scope, size })
-    .select('id, scope, size, text, completed_at, sort_order')
+    .select("id, scope, size, text, completed_at, sort_order")
     .single()
-  if (error || !data) throw error ?? new Error('Failed to add task')
+  if (error || !data) throw error ?? new Error("Failed to add task")
   return taskFromRow(data as TaskRow)
 }
 
 export async function setTaskDone(id: string, done: boolean): Promise<void> {
   const { error } = await supabase
-    .from('tasks')
+    .from("tasks")
     .update({ completed_at: done ? new Date().toISOString() : null })
-    .eq('id', id)
+    .eq("id", id)
   if (error) throw error
 }
 
 export async function moveTask(id: string, scope: TaskScope): Promise<void> {
-  const { error } = await supabase.from('tasks').update({ scope }).eq('id', id)
+  const { error } = await supabase.from("tasks").update({ scope }).eq("id", id)
   if (error) throw error
 }
 
 export async function deleteTask(id: string): Promise<void> {
-  const { error } = await supabase.from('tasks').delete().eq('id', id)
+  const { error } = await supabase.from("tasks").delete().eq("id", id)
   if (error) throw error
 }
 
@@ -452,21 +462,21 @@ const projectFromRow = (r: ProjectRow): Project => ({
 
 export async function listProjects(): Promise<Project[]> {
   const { data, error } = await supabase
-    .from('projects')
-    .select('id, name, emoji, status, sort_order')
-    .order('sort_order')
-    .order('created_at')
+    .from("projects")
+    .select("id, name, emoji, status, sort_order")
+    .order("sort_order")
+    .order("created_at")
   if (error) throw error
   return (data ?? []).map(projectFromRow)
 }
 
 export async function addProject(name: string, emoji?: string): Promise<Project> {
   const { data, error } = await supabase
-    .from('projects')
+    .from("projects")
     .insert({ name, emoji: emoji ?? null })
-    .select('id, name, emoji, status, sort_order')
+    .select("id, name, emoji, status, sort_order")
     .single()
-  if (error || !data) throw error ?? new Error('Failed to add project')
+  if (error || !data) throw error ?? new Error("Failed to add project")
   return projectFromRow(data as ProjectRow)
 }
 
@@ -474,16 +484,16 @@ export async function addProject(name: string, emoji?: string): Promise<Project>
 // unique index (one in_progress per user) rejects the other order.
 export async function setActiveProject(id: string): Promise<void> {
   const { error: demoteErr } = await supabase
-    .from('projects')
-    .update({ status: 'parking_lot' })
-    .eq('status', 'in_progress')
+    .from("projects")
+    .update({ status: "parking_lot" })
+    .eq("status", "in_progress")
   if (demoteErr) throw demoteErr
-  const { error } = await supabase.from('projects').update({ status: 'in_progress' }).eq('id', id)
+  const { error } = await supabase.from("projects").update({ status: "in_progress" }).eq("id", id)
   if (error) throw error
 }
 
 export async function deleteProject(id: string): Promise<void> {
-  const { error } = await supabase.from('projects').delete().eq('id', id)
+  const { error } = await supabase.from("projects").delete().eq("id", id)
   if (error) throw error
 }
 
@@ -524,13 +534,13 @@ export type GoalRow = {
 export function slugify(label: string): string {
   return label
     .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '_')
-    .replace(/^_+|_+$/g, '')
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
     .slice(0, 60)
 }
 
 export async function listMetricRows(): Promise<MetricRow[]> {
-  const { data, error } = await supabase.from('metrics').select('*').order('sort_order')
+  const { data, error } = await supabase.from("metrics").select("*").order("sort_order")
   if (error) throw error
   return (data ?? []).map((r) => ({
     id: r.id,
@@ -545,7 +555,7 @@ export async function listMetricRows(): Promise<MetricRow[]> {
 }
 
 export async function listHabitRows(): Promise<HabitRow[]> {
-  const { data, error } = await supabase.from('habits').select('*').order('sort_order')
+  const { data, error } = await supabase.from("habits").select("*").order("sort_order")
   if (error) throw error
   return (data ?? []).map((r) => ({
     id: r.id,
@@ -557,7 +567,7 @@ export async function listHabitRows(): Promise<HabitRow[]> {
 }
 
 export async function listGoalRows(): Promise<GoalRow[]> {
-  const { data, error } = await supabase.from('goals').select('*').order('sort_order')
+  const { data, error } = await supabase.from("goals").select("*").order("sort_order")
   if (error) throw error
   return (data ?? []).map((r) => ({
     id: r.id,
@@ -570,7 +580,7 @@ export async function listGoalRows(): Promise<GoalRow[]> {
   }))
 }
 
-export type ConfigTable = 'metrics' | 'habits' | 'goals' | 'retro_areas'
+export type ConfigTable = "metrics" | "habits" | "goals" | "retro_areas"
 
 // Shared patch shape; snake_case DB columns assembled here so callers stay camel.
 export async function updateConfigRow(
@@ -594,7 +604,7 @@ export async function updateConfigRow(
   if (patch.note !== undefined) row.note = patch.note
   if (patch.sortOrder !== undefined) row.sort_order = patch.sortOrder
   if (patch.archived !== undefined) row.archived = patch.archived
-  const { error } = await supabase.from(table).update(row).eq('id', id)
+  const { error } = await supabase.from(table).update(row).eq("id", id)
   if (error) throw error
 }
 
@@ -611,7 +621,7 @@ export async function addMetricRow(input: {
   higherIsBetter: boolean
   sortOrder: number
 }): Promise<void> {
-  const { error } = await supabase.from('metrics').insert({
+  const { error } = await supabase.from("metrics").insert({
     key: slugify(input.label),
     label: input.label,
     group_name: input.groupName,
@@ -624,21 +634,21 @@ export async function addMetricRow(input: {
 
 export async function addHabitRow(label: string, sortOrder: number): Promise<void> {
   const { error } = await supabase
-    .from('habits')
+    .from("habits")
     .insert({ key: slugify(label), label, sort_order: sortOrder })
   if (error) throw error
 }
 
 export async function addGoalRow(label: string, sortOrder: number): Promise<void> {
   const { error } = await supabase
-    .from('goals')
+    .from("goals")
     .insert({ key: slugify(label), label, progress: 0, sort_order: sortOrder })
   if (error) throw error
 }
 
 export async function addRetroAreaRow(label: string, sortOrder: number): Promise<void> {
   const { error } = await supabase
-    .from('retro_areas')
+    .from("retro_areas")
     .insert({ key: slugify(label), label, sort_order: sortOrder })
   if (error) throw error
 }
@@ -648,30 +658,38 @@ export async function addRetroAreaRow(label: string, sortOrder: number): Promise
 // The key is write-mostly from the client: reads return whether one exists,
 // not the key itself (the Edge Function is the only reader of the value).
 
-export type AiProvider = 'anthropic' | 'openai' | 'google'
+export type AiProvider = "anthropic" | "openai" | "google"
 export type AiSettings = { provider: AiProvider; model: string; hasKey: boolean }
 
 // Static lists are a FALLBACK only — the real catalog is fetched live from the
 // provider via the Edge Function (list-models action), so it never goes stale.
 export const AI_PROVIDERS: Record<AiProvider, { label: string; models: string[] }> = {
-  anthropic: { label: 'Anthropic', models: ['claude-sonnet-5', 'claude-opus-5', 'claude-haiku-4-5'] },
-  openai: { label: 'OpenAI', models: ['gpt-5.2', 'gpt-5.2-mini'] },
-  google: { label: 'Google', models: ['gemini-3-pro', 'gemini-3-flash'] },
+  anthropic: {
+    label: "Anthropic",
+    models: ["claude-sonnet-5", "claude-opus-5", "claude-haiku-4-5"],
+  },
+  openai: { label: "OpenAI", models: ["gpt-5.2", "gpt-5.2-mini"] },
+  google: { label: "Google", models: ["gemini-3-pro", "gemini-3-flash"] },
 }
 
 // Live model catalog from the provider's own API, via the Edge Function
 // (server-side: OpenAI blocks browser CORS). Pass provider+apiKey to list from
 // a freshly pasted key BEFORE saving; omit both to use the stored settings.
-export async function listProviderModels(provider?: AiProvider, apiKey?: string): Promise<string[]> {
-  const { data, error } = await supabase.functions.invoke('ai-coach', {
-    body: { action: 'list-models', provider, apiKey },
+export async function listProviderModels(
+  provider?: AiProvider,
+  apiKey?: string,
+): Promise<string[]> {
+  const { data, error } = await supabase.functions.invoke("ai-coach", {
+    body: { action: "list-models", provider, apiKey },
   })
   if (error) {
     let detail = error.message
     try {
       const ctx = (error as { context?: Response }).context
       if (ctx) detail = (await ctx.json()).error ?? detail
-    } catch { /* keep default */ }
+    } catch {
+      /* keep default */
+    }
     throw new Error(detail)
   }
   if (data?.error) throw new Error(data.error)
@@ -682,10 +700,7 @@ export async function getAiSettings(): Promise<AiSettings | null> {
   // Deliberately NOT selecting api_key — the key value must never reach the
   // browser (it would sit in the network response and client memory). The
   // column is NOT NULL, so a row existing already means a key is stored.
-  const { data, error } = await supabase
-    .from('ai_settings')
-    .select('provider, model')
-    .maybeSingle()
+  const { data, error } = await supabase.from("ai_settings").select("provider, model").maybeSingle()
   if (error) throw error
   if (!data) return null
   return { provider: data.provider, model: data.model, hasKey: true }
@@ -698,25 +713,33 @@ export async function saveAiSettings(
 ): Promise<void> {
   const userId = await currentUserId()
   if (apiKey) {
-    const { error } = await supabase
-      .from('ai_settings')
-      .upsert({ user_id: userId, provider, model, api_key: apiKey, updated_at: new Date().toISOString() })
+    const { error } = await supabase.from("ai_settings").upsert({
+      user_id: userId,
+      provider,
+      model,
+      api_key: apiKey,
+      updated_at: new Date().toISOString(),
+    })
     if (error) throw error
   } else {
     const { error } = await supabase
-      .from('ai_settings')
+      .from("ai_settings")
       .update({ provider, model, updated_at: new Date().toISOString() })
-      .eq('user_id', userId)
+      .eq("user_id", userId)
     if (error) throw error
   }
 }
 
 // Provider-agnostic coach call: the Edge Function reads the caller's own
 // ai_settings row and dispatches. Multi-turn: pass the running transcript.
-export type CoachMsg = { role: 'user' | 'assistant'; content: string }
+export type CoachMsg = { role: "user" | "assistant"; content: string }
 
-export async function askCoach(system: string, messages: CoachMsg[], maxTokens = 4096): Promise<string> {
-  const { data, error } = await supabase.functions.invoke('ai-coach', {
+export async function askCoach(
+  system: string,
+  messages: CoachMsg[],
+  maxTokens = 4096,
+): Promise<string> {
+  const { data, error } = await supabase.functions.invoke("ai-coach", {
     body: { system, messages, maxTokens },
   })
   if (error) {
@@ -725,7 +748,9 @@ export async function askCoach(system: string, messages: CoachMsg[], maxTokens =
     try {
       const ctx = (error as { context?: Response }).context
       if (ctx) detail = (await ctx.json()).error ?? detail
-    } catch { /* keep default */ }
+    } catch {
+      /* keep default */
+    }
     throw new Error(detail)
   }
   if (data?.error) throw new Error(data.error)
@@ -751,17 +776,20 @@ export type RetroVersion = {
 }
 
 const RETRO_AREA_DEFAULTS = [
-  { key: 'finances', label: 'Finances' },
-  { key: 'health', label: 'Health' },
-  { key: 'exercise', label: 'Exercise' },
-  { key: 'work', label: 'Work' },
+  { key: "finances", label: "Finances" },
+  { key: "health", label: "Health" },
+  { key: "exercise", label: "Exercise" },
+  { key: "work", label: "Work" },
 ]
 
 // Same seeding contract as config defaults: insert missing keys only, checked
 // UNFILTERED by archived so an archived default stays archived.
 export async function listRetroAreas(): Promise<RetroArea[]> {
   const userId = await currentUserId()
-  const { data: existing, error } = await supabase.from('retro_areas').select('*').order('sort_order')
+  const { data: existing, error } = await supabase
+    .from("retro_areas")
+    .select("*")
+    .order("sort_order")
   if (error) throw error
   const have = new Set((existing ?? []).map((r) => r.key))
   const missing = RETRO_AREA_DEFAULTS.filter((d) => !have.has(d.key)).map((d, i) => ({
@@ -773,9 +801,9 @@ export async function listRetroAreas(): Promise<RetroArea[]> {
   let rows = existing ?? []
   if (missing.length) {
     const { data: inserted, error: insErr } = await supabase
-      .from('retro_areas')
+      .from("retro_areas")
       .insert(missing)
-      .select('*')
+      .select("*")
     if (insErr) throw insErr
     rows = [...rows, ...(inserted ?? [])]
   }
@@ -790,10 +818,10 @@ export async function listRetroAreas(): Promise<RetroArea[]> {
 
 export async function latestRetro(areaId: string): Promise<RetroVersion | null> {
   const { data, error } = await supabase
-    .from('retros')
-    .select('id, doc_md, ai_summary, model, created_at')
-    .eq('area_id', areaId)
-    .order('created_at', { ascending: false })
+    .from("retros")
+    .select("id, doc_md, ai_summary, model, created_at")
+    .eq("area_id", areaId)
+    .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle()
   if (error) throw error
@@ -812,10 +840,10 @@ export async function latestRetro(areaId: string): Promise<RetroVersion | null> 
 // session, not a save).
 export async function latestRetroDates(): Promise<Record<string, string>> {
   const { data, error } = await supabase
-    .from('retros')
-    .select('area_id, created_at')
-    .not('model', 'is', null)
-    .order('created_at', { ascending: false })
+    .from("retros")
+    .select("area_id, created_at")
+    .not("model", "is", null)
+    .order("created_at", { ascending: false })
   if (error) throw error
   const out: Record<string, string> = {}
   for (const r of data ?? []) {
@@ -829,11 +857,11 @@ export async function latestRetroDates(): Promise<Record<string, string>> {
 // happened before them. Null = no coach run yet (intake scans everything).
 export async function latestCoachRunAt(areaId: string): Promise<string | null> {
   const { data, error } = await supabase
-    .from('retros')
-    .select('created_at')
-    .eq('area_id', areaId)
-    .not('model', 'is', null)
-    .order('created_at', { ascending: false })
+    .from("retros")
+    .select("created_at")
+    .eq("area_id", areaId)
+    .not("model", "is", null)
+    .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle()
   if (error) throw error
@@ -848,7 +876,7 @@ export async function saveRetroVersion(
   model: string | null,
 ): Promise<void> {
   const { error } = await supabase
-    .from('retros')
+    .from("retros")
     .insert({ area_id: areaId, doc_md: docMd, ai_summary: aiSummary, model })
   if (error) throw error
 }
@@ -866,29 +894,30 @@ export function isRetroDue(lastRunISO: string | undefined): boolean {
 const FIRST_RUN_WINDOW_DAYS = 60
 
 export async function buildIntakeSignal(sinceISO: string | null): Promise<string> {
-  const since = sinceISO
-    ? sinceISO.slice(0, 10)
-    : shiftISO(todayISO(), -FIRST_RUN_WINDOW_DAYS)
+  const since = sinceISO ? sinceISO.slice(0, 10) : shiftISO(todayISO(), -FIRST_RUN_WINDOW_DAYS)
   const windowLabel = sinceISO
     ? `since the last retro (${since})`
     : `last ${FIRST_RUN_WINDOW_DAYS} days (first retro for this area)`
 
   const { data: entries, error } = await supabase
-    .from('entries')
-    .select('id, entry_date, reflection')
-    .gte('entry_date', since)
-    .order('entry_date')
+    .from("entries")
+    .select("id, entry_date, reflection")
+    .gte("entry_date", since)
+    .order("entry_date")
   if (error) throw error
   if (!entries?.length) return `(no journal data in the window: ${windowLabel})`
 
   const ids = entries.map((r) => r.id)
   const config = await loadConfig()
-  const [{ data: values, error: vErr }, { data: habitRows, error: hErr }, { data: scores, error: sErr }] =
-    await Promise.all([
-      supabase.from('entry_metric_values').select('entry_id, metric_id, value').in('entry_id', ids),
-      supabase.from('entry_habits').select('entry_id, habit_id, done').in('entry_id', ids),
-      supabase.from('entry_wellness_scores').select('entry_id, wellness').in('entry_id', ids),
-    ])
+  const [
+    { data: values, error: vErr },
+    { data: habitRows, error: hErr },
+    { data: scores, error: sErr },
+  ] = await Promise.all([
+    supabase.from("entry_metric_values").select("entry_id, metric_id, value").in("entry_id", ids),
+    supabase.from("entry_habits").select("entry_id, habit_id, done").in("entry_id", ids),
+    supabase.from("entry_wellness_scores").select("entry_id, wellness").in("entry_id", ids),
+  ])
   if (vErr) throw vErr
   if (hErr) throw hErr
   if (sErr) throw sErr
@@ -899,7 +928,7 @@ export async function buildIntakeSignal(sinceISO: string | null): Promise<string
   const half = Math.floor(entries.length / 2)
   const firstIds = new Set(entries.slice(0, half).map((r) => r.id))
   const mean = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null)
-  lines.push('', '### Metrics (0-5 sliders, averaged over the window)')
+  lines.push("", "### Metrics (0-5 sliders, averaged over the window)")
   for (const m of config.metrics) {
     const rowId = config.metricRowId[m.id]
     const vals = (values ?? []).filter((v) => v.metric_id === rowId)
@@ -907,11 +936,11 @@ export async function buildIntakeSignal(sinceISO: string | null): Promise<string
     const all = mean(vals.map((v) => Number(v.value)))!
     const early = mean(vals.filter((v) => firstIds.has(v.entry_id)).map((v) => Number(v.value)))
     const late = mean(vals.filter((v) => !firstIds.has(v.entry_id)).map((v) => Number(v.value)))
-    let trend = ''
+    let trend = ""
     if (early != null && late != null && Math.abs(late - early) >= 0.4) {
-      trend = ` (trending ${late > early ? 'up' : 'down'}: ${early.toFixed(1)} -> ${late.toFixed(1)})`
+      trend = ` (trending ${late > early ? "up" : "down"}: ${early.toFixed(1)} -> ${late.toFixed(1)})`
     }
-    const direction = m.higherIsBetter ? '' : ' [0 is best]'
+    const direction = m.higherIsBetter ? "" : " [0 is best]"
     lines.push(`- ${m.label}${direction}: avg ${all.toFixed(1)}/${m.scale}${trend}`)
   }
 
@@ -920,7 +949,7 @@ export async function buildIntakeSignal(sinceISO: string | null): Promise<string
     lines.push(`- Composite wellness: avg ${mean(wellnessVals)!.toFixed(1)}/5`)
   }
 
-  lines.push('', '### Habits (days completed / days tracked)')
+  lines.push("", "### Habits (days completed / days tracked)")
   for (const h of config.habits) {
     const rowId = config.habitRowId[h.id]
     const rows = (habitRows ?? []).filter((x) => x.habit_id === rowId)
@@ -929,19 +958,22 @@ export async function buildIntakeSignal(sinceISO: string | null): Promise<string
   }
 
   const scoreById = Object.fromEntries((scores ?? []).map((x) => [x.entry_id, Number(x.wellness)]))
-  const written = entries.filter((r) => (r.reflection ?? '').trim().length > 0)
-  lines.push('', '### Written reflections')
+  const written = entries.filter((r) => (r.reflection ?? "").trim().length > 0)
+  lines.push("", "### Written reflections")
   if (written.length) {
     for (const r of written) {
       const w = scoreById[r.id]
-      lines.push(`- ${r.entry_date}${w != null ? ` (wellness ${w.toFixed(1)}/5)` : ''}: ${r.reflection}`)
+      lines.push(
+        `- ${r.entry_date}${w != null ? ` (wellness ${w.toFixed(1)}/5)` : ""}: ${r.reflection}`,
+      )
     }
     const sliderOnly = entries.length - written.length
-    if (sliderOnly > 0) lines.push(`
+    if (sliderOnly > 0)
+      lines.push(`
 (${sliderOnly} more day(s) had slider data only, included in the averages above)`)
   } else {
-    lines.push('(none in this window - all signal is in the numbers above)')
+    lines.push("(none in this window - all signal is in the numbers above)")
   }
 
-  return lines.join('\n')
+  return lines.join("\n")
 }

@@ -5,8 +5,8 @@
 // client-side score and the AI coach's server-side view agree — this copy
 // exists because the slider needs a value before anything is saved.
 
-import type { Config } from './config'
-import type { DayEntry } from './storage'
+import type { Config } from "./config"
+import type { DayEntry } from "./storage"
 
 /** Null until at least one slider is set. */
 export function wellness(entry: DayEntry, config: Config): number | null {

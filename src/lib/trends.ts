@@ -3,26 +3,26 @@
 // React — so metric sparklines, habit cells and the slider context in Reflect
 // all share one tested implementation.
 
-import type { Metric } from './config'
+import type { Metric } from "./config"
 
 /** One logged day. Days without an entry are absent, never zero. */
 export type Point = { date: string; value: number } // date is YYYY-MM-DD
 
 export const TREND_WINDOWS = {
-  '1M': { days: 30 },
-  '3M': { days: 91 },
-  '6M': { days: 182 },
-  '1Y': { days: 365 },
+  "1M": { days: 30 },
+  "3M": { days: 91 },
+  "6M": { days: 182 },
+  "1Y": { days: 365 },
   All: { days: null },
 } as const satisfies Record<string, { days: number | null }>
 
 export type TrendWindow = keyof typeof TREND_WINDOWS
 
 export const isTrendWindow = (value: unknown): value is TrendWindow =>
-  typeof value === 'string' && Object.hasOwn(TREND_WINDOWS, value)
+  typeof value === "string" && Object.hasOwn(TREND_WINDOWS, value)
 
 /** Judged against the item's polarity: a falling symptom is "better". */
-export type Verdict = 'better' | 'worse' | 'flat'
+export type Verdict = "better" | "worse" | "flat"
 
 export type Trend = {
   early: number // average of the earlier half of the logged days
@@ -108,13 +108,17 @@ export const pointsSince = (points: Point[], from: string | null) =>
  * lower is better. For a habit that's the recent completion rate. Null when
  * there's too little data for a trend.
  */
-export function standing(trend: Trend | null, higherIsBetter: boolean, scale: number): number | null {
+export function standing(
+  trend: Trend | null,
+  higherIsBetter: boolean,
+  scale: number,
+): number | null {
   if (!trend) return null
   const share = trend.recent / scale
   return higherIsBetter ? share : 1 - share
 }
 
-export const SORT_ORDERS = ['yours', 'best', 'worst'] as const
+export const SORT_ORDERS = ["yours", "best", "worst"] as const
 export type SortOrder = (typeof SORT_ORDERS)[number]
 
 export const isSortOrder = (value: unknown): value is SortOrder =>
@@ -129,11 +133,11 @@ export function sortByStanding<T>(
   standingOf: (item: T) => number | null,
   order: SortOrder,
 ): T[] {
-  if (order === 'yours') return items
+  if (order === "yours") return items
   const ranked = items.map((item) => ({ item, standing: standingOf(item) }))
   const known = ranked.filter((r): r is { item: T; standing: number } => r.standing !== null)
   const unknown = ranked.filter((r) => r.standing === null)
-  known.sort((a, b) => (order === 'best' ? b.standing - a.standing : a.standing - b.standing))
+  known.sort((a, b) => (order === "best" ? b.standing - a.standing : a.standing - b.standing))
   return [...known, ...unknown].map((r) => r.item)
 }
 
@@ -149,7 +153,7 @@ const MONTH = 30
 
 /** Daily on 1M; weekly otherwise, until two years of data make weeks too thin to see. */
 export function bucketSize(window: TrendWindow, from: string, to: string): number {
-  if (window === '1M') return 1
+  if (window === "1M") return 1
   return toDay(to) - toDay(from) + 1 > TWO_YEARS ? MONTH : WEEK
 }
 
@@ -191,8 +195,8 @@ export function bucketize(points: Point[], from: string, to: string, size: numbe
 }
 
 function judge(change: number, higherIsBetter: boolean, flatBand: number): Verdict {
-  if (Math.abs(change) < flatBand) return 'flat'
-  return (change > 0) === higherIsBetter ? 'better' : 'worse'
+  if (Math.abs(change) < flatBand) return "flat"
+  return change > 0 === higherIsBetter ? "better" : "worse"
 }
 
 const mean = (points: Point[]) => points.reduce((sum, p) => sum + p.value, 0) / points.length

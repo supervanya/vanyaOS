@@ -1,0 +1,9 @@
+# Formatting-only commits, skipped by `git blame` and GitHub's blame view.
+# Locally: git config blame.ignoreRevsFile .git-blame-ignore-revs
+#
+# These hashes must match the commits as they exist on main, so PRs that add
+# an entry here are merged with "Create a merge commit" (squash and rebase
+# merges rewrite hashes).
+
+# style: reformat the repo with Prettier (#65)
+2dda30f71ffe31a37ca7c3926c4906569474de6f

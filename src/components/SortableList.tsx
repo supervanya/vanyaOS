@@ -81,7 +81,7 @@ function SortableItem({ id, children }: { id: string; children: ReactNode }) {
     <div
       ref={setNodeRef}
       style={{ transform: CSS.Translate.toString(transform), transition }}
-      className={cn(isDragging && "bg-background relative z-10 rounded-md shadow-md")}
+      className={cn(isDragging && "relative z-10 rounded-md bg-background shadow-md")}
     >
       <HandleContext.Provider value={handle}>{children}</HandleContext.Provider>
     </div>
@@ -101,7 +101,7 @@ export function DragHandle() {
       {...listeners}
       aria-label="Drag to reorder"
       // touch-none: without it, a drag on a phone scrolls the page instead.
-      className="text-muted-foreground hover:text-foreground flex h-8 shrink-0 cursor-grab touch-none items-center active:cursor-grabbing"
+      className="flex h-8 shrink-0 cursor-grab touch-none items-center text-muted-foreground hover:text-foreground active:cursor-grabbing"
     >
       <GripVertical size={16} />
     </button>
