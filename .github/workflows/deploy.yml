@@ -27,8 +27,8 @@ jobs:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: supabase/setup-cli@v1
+      - uses: actions/checkout@v7
+      - uses: supabase/setup-cli@v3
         with:
           # Must be >= the version that generated supabase/config.toml (see the
           # `supabase` devDependency) — the action's default lags far behind and
@@ -48,8 +48,8 @@ jobs:
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: supabase/setup-cli@v1
+      - uses: actions/checkout@v7
+      - uses: supabase/setup-cli@v3
         with:
           # Must be >= the version that generated supabase/config.toml (see the
           # `supabase` devDependency) — the action's default lags far behind and
@@ -72,11 +72,9 @@ jobs:
     needs: migrate
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-      - uses: oven-sh/setup-bun@v2
+      - uses: actions/checkout@v7
+      # Node and Bun at the versions pinned in mise.toml.
+      - uses: jdx/mise-action@v4
       - run: bun install --frozen-lockfile
       - run: bun run build
         env:
@@ -88,9 +86,11 @@ jobs:
         run: |
           cp dist/index.html dist/404.html
           touch dist/.nojekyll
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: dist
+          # v4+ drops dotfiles by default; keep .nojekyll as before.
+          include-hidden-files: true
 
   deploy:
     needs: build
@@ -100,4 +100,4 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5

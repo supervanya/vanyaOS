@@ -36,6 +36,21 @@ jobs:
             run: bun run build
     steps:
       - uses: actions/checkout@v7
-      - uses: oven-sh/setup-bun@v2
+      # Node and Bun at the versions pinned in mise.toml.
+      - uses: jdx/mise-action@v4
       - run: bun install --frozen-lockfile
       - run: ${{ matrix.run }}
+
+  # The ai-coach Edge Function runs on Deno, outside the app's tsconfig; check
+  # it the way the Supabase runtime resolves it (npm: specifiers, no package.json).
+  edge-function:
+    name: Edge Function
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - run: deno check supabase/functions/ai-coach/index.ts
+        env:
+          DENO_NO_PACKAGE_JSON: "1"
