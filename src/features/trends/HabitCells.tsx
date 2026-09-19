@@ -1,6 +1,6 @@
-import type { Bucket } from "@/features/trends/math"
+import type { Bucket } from "./math"
 import { cn } from "@/lib/utils"
-import { HoverLabel, bucketDates, useHoverIndex } from "@/components/chartHover"
+import { HoverLabel, bucketDates, useHoverIndex } from "./chartHover"
 
 /**
  * A habit's record as one row of cells: a day per cell on short windows, a

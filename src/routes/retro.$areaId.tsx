@@ -1,7 +1,7 @@
 import { useQueryClient, useSuspenseQuery } from "@tanstack/react-query"
 import { createFileRoute, Link } from "@tanstack/react-router"
 import { useEffect, useRef, useState } from "react"
-import { ArrowLeft, Pencil, Play, Send, Square } from "lucide-react"
+import { Pencil, Play, Send, Square } from "lucide-react"
 import { toast } from "sonner"
 
 import { askCoach, getAiSettings, type CoachMsg } from "@/features/ai/api"
@@ -13,6 +13,7 @@ import { Markdown } from "@/components/Markdown"
 import { cn } from "@/lib/utils"
 import { useAutoGrow } from "@/hooks/useAutoGrow"
 import { errorMessage } from "@/lib/errors"
+import { PageHeader } from "@/components/PageHeader"
 
 export const Route = createFileRoute("/retro/$areaId")({
   loader: ({ context: { queryClient }, params: { areaId } }) =>
@@ -202,16 +203,7 @@ function RetroAreaScreen({ areaId }: { areaId: string }) {
 
   return (
     <>
-      <div className="flex items-center justify-between">
-        <Link
-          to="/retro"
-          className="flex items-center gap-1.5 text-sm font-semibold tracking-tight text-muted-foreground hover:text-foreground"
-        >
-          <ArrowLeft size={15} />
-          Retrospectives
-        </Link>
-        <span className="text-xs text-muted-foreground">{area.label}</span>
-      </div>
+      <PageHeader back={{ to: "/retro", label: "Retrospectives" }} label={area.label} />
 
       {mode === "view" && version && (
         <>

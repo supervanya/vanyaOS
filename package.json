@@ -2,9 +2,6 @@
   "name": "vanyaos",
   "private": true,
   "type": "module",
-  "imports": {
-    "#/*": "./src/*"
-  },
   "scripts": {
     "prepare": "lefthook install",
     "dev": "vite dev --port 3000",

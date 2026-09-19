@@ -1,7 +1,7 @@
 import { useSuspenseQuery } from "@tanstack/react-query"
-import { createFileRoute, Link } from "@tanstack/react-router"
+import { createFileRoute } from "@tanstack/react-router"
 import { useState, type ReactNode } from "react"
-import { ArrowUpDown, LayoutDashboard, TrendingUp } from "lucide-react"
+import { ArrowUpDown, TrendingUp } from "lucide-react"
 import { Skeleton } from "@/components/ui/skeleton"
 import type { LoadedConfig } from "@/features/config/api"
 import { configQuery } from "@/features/config/queries"
@@ -26,12 +26,13 @@ import {
   windowStart,
 } from "@/features/trends/math"
 import type { Point, SortOrder, Streak, Trend, TrendWindow } from "@/features/trends/math"
-import { groupMetrics, type Metric } from "../lib/config"
-import { HabitCells } from "@/components/HabitCells"
-import { Sparkline } from "@/components/Sparkline"
-import { TrendReadout, trendTone } from "@/components/TrendReadout"
-import { WithDetail, shortDate } from "@/components/chartHover"
+import { groupMetrics, type Metric } from "@/lib/config"
+import { HabitCells } from "@/features/trends/HabitCells"
+import { Sparkline } from "@/features/trends/Sparkline"
+import { TrendReadout, trendTone } from "@/features/trends/TrendReadout"
+import { WithDetail, shortDate } from "@/features/trends/chartHover"
 import { cn } from "@/lib/utils"
+import { PageHeader } from "@/components/PageHeader"
 
 export const Route = createFileRoute("/trends")({
   loader: ({ context: { queryClient } }) =>
@@ -54,16 +55,9 @@ function Trends() {
 
   return (
     <>
-      <div className="flex items-center justify-between">
-        <Link
-          to="/"
-          className="flex items-center gap-1.5 text-sm font-semibold tracking-tight text-muted-foreground hover:text-foreground"
-        >
-          <LayoutDashboard size={15} />
-          VanyaOS
-        </Link>
+      <PageHeader>
         <WindowPicker value={trendWindow} onChange={setTrendWindow} />
-      </div>
+      </PageHeader>
 
       <div className="mt-3 flex items-center justify-between">
         <h1 className="flex items-center gap-2 text-[15px] font-medium">

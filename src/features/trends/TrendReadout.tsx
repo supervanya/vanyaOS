@@ -1,6 +1,6 @@
-import type { Trend, Verdict } from "@/features/trends/math"
+import type { Trend, Verdict } from "./math"
 import { cn } from "@/lib/utils"
-import { WithDetail } from "@/components/chartHover"
+import { WithDetail } from "./chartHover"
 
 const TONE: Record<Verdict, string> = {
   better: "text-success",

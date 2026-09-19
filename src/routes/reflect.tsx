@@ -1,5 +1,5 @@
 import { useQuery, useSuspenseQuery } from "@tanstack/react-query"
-import { createFileRoute, Link } from "@tanstack/react-router"
+import { createFileRoute } from "@tanstack/react-router"
 import { useMemo, useState } from "react"
 import {
   Moon,
@@ -11,7 +11,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Info,
-  LayoutDashboard,
 } from "lucide-react"
 import type { LoadedConfig } from "@/features/config/api"
 import { configQuery } from "@/features/config/queries"
@@ -22,10 +21,12 @@ import { wellness } from "@/features/entries/wellness"
 import { TaskBoard } from "@/features/tasks/TaskBoard"
 import { groupMetrics } from "@/lib/config"
 import { defaultEntryDate, shiftISO, todayISO } from "@/lib/dates"
-import { MetricSlider } from "@/components/MetricSlider"
+import { MetricSlider } from "@/features/entries/MetricSlider"
 import { HabitChip } from "@/components/HabitChip"
 import { useAutoGrow } from "@/hooks/useAutoGrow"
 import { Skeleton } from "@/components/ui/skeleton"
+import { PageHeader } from "@/components/PageHeader"
+import { GoalBar } from "@/components/GoalBar"
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/
 
@@ -127,14 +128,7 @@ function ReflectionDay({
   return (
     <>
       {/* Back to dashboard + date navigator */}
-      <div className="flex items-center justify-between">
-        <Link
-          to="/"
-          className="flex items-center gap-1.5 text-sm font-semibold tracking-tight text-muted-foreground hover:text-foreground"
-        >
-          <LayoutDashboard size={15} />
-          VanyaOS
-        </Link>
+      <PageHeader>
         <div className="flex items-center gap-0.5 text-xs text-muted-foreground">
           <button
             type="button"
@@ -155,7 +149,7 @@ function ReflectionDay({
             <ChevronRight size={16} />
           </button>
         </div>
-      </div>
+      </PageHeader>
 
       {/* Past-date warning (e.g. auto-set to yesterday after midnight) */}
       {isPast && (
@@ -271,18 +265,7 @@ function ReflectionDay({
           <Flag size={14} /> Goal check · what you're building toward
         </p>
         {config.goals.map((g) => (
-          <div key={g.id} className="mb-2 flex items-center gap-3">
-            <span className="w-24 shrink-0 text-xs text-foreground/85">{g.label}</span>
-            <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
-              <div
-                className="h-full rounded-full bg-info"
-                style={{ width: `${Math.round(g.progress * 100)}%` }}
-              />
-            </div>
-            <span className="w-12 text-right text-[11px] text-muted-foreground">
-              {g.note ?? `${Math.round(g.progress * 100)}%`}
-            </span>
-          </div>
+          <GoalBar key={g.id} goal={g} />
         ))}
       </section>
 

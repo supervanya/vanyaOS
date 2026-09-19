@@ -1,5 +1,6 @@
 import { useQuery, useSuspenseQuery } from "@tanstack/react-query"
-import { createFileRoute, Link } from "@tanstack/react-router"
+import { createFileRoute, Link, type LinkProps } from "@tanstack/react-router"
+import type { ReactNode } from "react"
 import {
   BookOpen,
   Flag,
@@ -24,6 +25,7 @@ import { latestRetroDatesQuery, retroAreasQuery } from "@/features/retro/queries
 import { TaskBoard } from "@/features/tasks/TaskBoard"
 import { tasksQuery } from "@/features/tasks/queries"
 import { dayOfYear, defaultEntryDate, isoWeek } from "@/lib/dates"
+import { GoalBar } from "@/components/GoalBar"
 
 export const Route = createFileRoute("/")({
   loader: async ({ context: { queryClient } }) => {
@@ -78,7 +80,7 @@ function Header() {
   return (
     <div className="flex items-center justify-between">
       <span className="flex items-center gap-2 text-[15px] font-semibold tracking-tight">
-        <Layers size={17} className="text-indigo-500 dark:text-indigo-300" />
+        <Layers size={17} className={ACCENT} />
         Command center
       </span>
       <span className="text-xs text-muted-foreground tabular-nums">{dateStamp()}</span>
@@ -89,31 +91,18 @@ function Header() {
 function Navigation() {
   return (
     <div className="flex flex-col gap-2">
-      <Link
+      <NavCard
         to="/reflect"
-        className="flex items-center gap-2.5 rounded-lg border border-border bg-input/20 px-4 py-3 text-[14px] font-medium"
-      >
-        <Moon size={16} className="text-indigo-500 dark:text-indigo-300" />
-        Evening reflection
-        <span className="ml-auto text-muted-foreground">→</span>
-      </Link>
-      <Link
-        to="/trends"
-        className="flex items-center gap-2.5 rounded-lg border border-border bg-input/20 px-4 py-3 text-[14px] font-medium"
-      >
-        <TrendingUp size={16} className="text-indigo-500 dark:text-indigo-300" />
-        Trends
-        <span className="ml-auto text-muted-foreground">→</span>
-      </Link>
+        icon={<Moon size={16} className={ACCENT} />}
+        label="Evening reflection"
+      />
+      <NavCard to="/trends" icon={<TrendingUp size={16} className={ACCENT} />} label="Trends" />
       <RetroNavCard />
-      <Link
+      <NavCard
         to="/settings"
-        className="flex items-center gap-2.5 rounded-lg border border-border bg-input/20 px-4 py-3 text-[14px] font-medium"
-      >
-        <SettingsIcon size={16} className="text-muted-foreground" />
-        Settings
-        <span className="ml-auto text-muted-foreground">→</span>
-      </Link>
+        icon={<SettingsIcon size={16} className="text-muted-foreground" />}
+        label="Settings"
+      />
     </div>
   )
 }
@@ -165,18 +154,7 @@ function GoalsGlance() {
         <Flag size={14} /> Goals
       </p>
       {config.goals.map((g) => (
-        <div key={g.id} className="mb-2 flex items-center gap-3">
-          <span className="w-24 shrink-0 text-xs text-foreground/85">{g.label}</span>
-          <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
-            <div
-              className="h-full rounded-full bg-info"
-              style={{ width: `${Math.round(g.progress * 100)}%` }}
-            />
-          </div>
-          <span className="w-12 text-right text-[11px] text-muted-foreground">
-            {g.note ?? `${Math.round(g.progress * 100)}%`}
-          </span>
-        </div>
+        <GoalBar key={g.id} goal={g} />
       ))}
     </section>
   )
@@ -193,17 +171,43 @@ function RetroNavCard() {
       : 0
 
   return (
-    <Link
+    <NavCard
       to="/retro"
+      icon={<BookOpen size={16} className={ACCENT} />}
+      label="Retrospectives"
+      badge={
+        dueCount > 0 && (
+          <span className="rounded-full bg-warning/15 px-2 py-0.5 text-[11px] text-warning">
+            {dueCount} due
+          </span>
+        )
+      }
+    />
+  )
+}
+
+const ACCENT = "text-indigo-500 dark:text-indigo-300"
+
+// A full-width link to one of the app's screens.
+function NavCard({
+  to,
+  icon,
+  label,
+  badge,
+}: {
+  to: NonNullable<LinkProps["to"]>
+  icon: ReactNode
+  label: string
+  badge?: ReactNode
+}) {
+  return (
+    <Link
+      to={to}
       className="flex items-center gap-2.5 rounded-lg border border-border bg-input/20 px-4 py-3 text-[14px] font-medium"
     >
-      <BookOpen size={16} className="text-indigo-500 dark:text-indigo-300" />
-      Retrospectives
-      {dueCount > 0 && (
-        <span className="rounded-full bg-warning/15 px-2 py-0.5 text-[11px] text-warning">
-          {dueCount} due
-        </span>
-      )}
+      {icon}
+      {label}
+      {badge}
       <span className="ml-auto text-muted-foreground">→</span>
     </Link>
   )

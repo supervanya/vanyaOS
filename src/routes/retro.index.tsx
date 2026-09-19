@@ -1,10 +1,11 @@
 import { useSuspenseQuery } from "@tanstack/react-query"
 import { createFileRoute, Link } from "@tanstack/react-router"
-import { BookOpen, LayoutDashboard } from "lucide-react"
+import { BookOpen } from "lucide-react"
 
 import { isRetroDue } from "@/features/retro/api"
 import { latestRetroDatesQuery, retroAreasQuery } from "@/features/retro/queries"
 import { cn } from "@/lib/utils"
+import { PageHeader } from "@/components/PageHeader"
 
 export const Route = createFileRoute("/retro/")({
   loader: ({ context: { queryClient } }) =>
@@ -21,16 +22,7 @@ function RetroList() {
 
   return (
     <>
-      <div className="flex items-center justify-between">
-        <Link
-          to="/"
-          className="flex items-center gap-1.5 text-sm font-semibold tracking-tight text-muted-foreground hover:text-foreground"
-        >
-          <LayoutDashboard size={15} />
-          VanyaOS
-        </Link>
-        <span className="text-xs text-muted-foreground">Retrospectives</span>
-      </div>
+      <PageHeader label="Retrospectives" />
 
       <h1 className="mt-3 flex items-center gap-2 text-[15px] font-medium">
         <BookOpen size={17} className="text-indigo-500 dark:text-indigo-300" />

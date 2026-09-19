@@ -1,6 +1,6 @@
-import type { Bucket } from "@/features/trends/math"
+import type { Bucket } from "./math"
 import { cn } from "@/lib/utils"
-import { HoverLabel, bucketDates, useHoverIndex } from "@/components/chartHover"
+import { HoverLabel, bucketDates, useHoverIndex } from "./chartHover"
 
 // Drawn in a fixed viewBox and stretched to the container's width; strokes use
 // non-scaling-stroke so the line stays 1.5px however wide the row is. Anything

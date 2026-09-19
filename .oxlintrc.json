@@ -26,6 +26,18 @@
     "react/rules-of-hooks": "error",
     "react/exhaustive-deps": "error",
     "import/no-unassigned-import": ["error", { "allow": ["**/*.css"] }],
+    // One way to import across folders: `@/…`. Siblings may use `./`.
+    "no-restricted-imports": [
+      "error",
+      {
+        "patterns": [
+          {
+            "regex": "^\\.\\./",
+            "message": "Import through the @/ alias instead of a parent-relative path."
+          }
+        ]
+      }
+    ],
 
     // Type-aware safety rules: the guardrails that catch `any` leaking in and
     // promises nobody awaits or handles.
