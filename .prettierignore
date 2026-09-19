@@ -1,0 +1,18 @@
+# Generated
+src/routeTree.gen.ts
+bun.lock
+dist
+
+# Design references, not source
+PROTOTYPES
+public
+
+# Postgres history — migrations are applied as written
+supabase/migrations
+
+# Supabase CLI local state (gitignored in supabase/.gitignore)
+supabase/.temp
+
+# Hand-edited prose: Prettier pads tables to their widest cell and rewrites
+# emphasis markers, which makes every doc diff noisy.
+*.md
