@@ -44,7 +44,7 @@ export function TaskBoard({ compact = false }: { compact?: boolean }) {
   const bySize = (size: TaskSize) =>
     tasks
       .filter((t) => onBoard(t) && t.size === size)
-      .sort(
+      .toSorted(
         (a, b) =>
           // open before completed; today before week; stable by sort order
           Number(!!a.completedAt) - Number(!!b.completedAt) ||

@@ -192,7 +192,6 @@ function AiSection() {
         setLoaded(true)
       })
       .catch(onErr)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   if (!loaded) return null
@@ -267,6 +266,7 @@ function AiSection() {
           )}
           <datalist id="ai-models">
             {AI_PROVIDERS[provider].models.map((m) => (
+              // oxlint-disable-next-line jsx-a11y/control-has-associated-label -- datalist options are labelled by their value
               <option key={m} value={m} />
             ))}
           </datalist>
@@ -335,18 +335,20 @@ function RowShell({ onArchive, children }: { onArchive: () => void; children: Re
   )
 }
 
-// An input that edits a label locally and persists on blur/Enter.
-function LabelInput({
-  value,
-  onSave,
-  className,
-}: {
+type LabelInputProps = {
   value: string
   onSave: (v: string) => void
   className?: string
-}) {
+}
+
+// An input that edits a label locally and persists on blur/Enter. Keyed by the
+// saved value so a change from the server starts a fresh draft.
+function LabelInput(props: LabelInputProps) {
+  return <LabelDraft key={props.value} {...props} />
+}
+
+function LabelDraft({ value, onSave, className }: LabelInputProps) {
   const [draft, setDraft] = useState(value)
-  useEffect(() => setDraft(value), [value])
   const commit = () => {
     const v = draft.trim()
     if (v && v !== value) onSave(v)
@@ -408,7 +410,7 @@ function persistReorder<T extends { id: string; sortOrder: number }>(
 ) {
   const next = withSortOrderSlots(reordered)
   const byId = new Map(next.map((r) => [r.id, r]))
-  setRows((cur) => cur && cur.map((r) => byId.get(r.id) ?? r).sort(bySortOrder))
+  setRows((cur) => cur && cur.map((r) => byId.get(r.id) ?? r).toSorted(bySortOrder))
 
   const moved = next.filter((r, i) => r.sortOrder !== reordered[i].sortOrder)
   updateSortOrders(table, moved).catch((err) => {
@@ -512,6 +514,7 @@ function MetricsSection() {
           />
           <datalist id="metric-groups">
             {groups.map((g) => (
+              // oxlint-disable-next-line jsx-a11y/control-has-associated-label -- datalist options are labelled by their value
               <option key={g} value={g} />
             ))}
           </datalist>

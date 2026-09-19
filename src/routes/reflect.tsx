@@ -66,31 +66,30 @@ function Reflection() {
 
   const score = useMemo(() => (entry && config ? wellness(entry, config) : null), [entry, config])
 
-  // Wellness of the most recent prior day, for the "vs last" delta.
-  const [prevScore, setPrevScore] = useState<number | null>(null)
+  // Wellness of the most recent prior day, for the "vs last" delta. Tagged with
+  // the date it was computed for, so a stale score never shows on another day.
+  const entryDate = entry?.date
+  const [prev, setPrev] = useState<{ date: string; score: number | null } | null>(null)
   useEffect(() => {
-    if (!config || !entry) {
-      setPrevScore(null)
-      return
-    }
+    if (!config || !entryDate) return
     let cancelled = false
-    const date = entry.date
     listDayDates()
       .then((dates) => {
-        const priors = dates.filter((d) => d < date)
+        const priors = dates.filter((d) => d < entryDate)
         if (!priors.length) return null
         return loadDay(priors[priors.length - 1], config)
       })
       .then((p) => {
-        if (!cancelled) setPrevScore(p ? wellness(p, config) : null)
+        if (!cancelled) setPrev({ date: entryDate, score: p ? wellness(p, config) : null })
       })
       .catch(() => {
-        if (!cancelled) setPrevScore(null)
+        if (!cancelled) setPrev({ date: entryDate, score: null })
       })
     return () => {
       cancelled = true
     }
-  }, [config, entry?.date])
+  }, [config, entryDate])
+  const prevScore = prev && prev.date === entryDate ? prev.score : null
 
   const groups = useMemo(
     () =>
@@ -174,19 +173,20 @@ function Reflection() {
       {/* Past-date warning (e.g. auto-set to yesterday after midnight) */}
       {isPast && (
         <div className="mt-2">
-          <div
-            onClick={() => setShowDateInfo((v) => !v)}
-            className="flex cursor-pointer items-center gap-2 rounded-md border border-warning/40 bg-warning/10 px-3 py-1.5 text-[12px] font-medium text-warning"
-          >
-            <Info size={14} className="shrink-0" />
-            <span>Logging for {prettyDate}, not today.</span>
+          <div className="flex items-center gap-2 rounded-md border border-warning/40 bg-warning/10 px-3 py-1.5 text-[12px] font-medium text-warning">
             <button
               type="button"
-              onClick={(e) => {
-                e.stopPropagation()
-                setSelectedDate(actualToday)
-              }}
-              className="ml-auto whitespace-nowrap underline"
+              onClick={() => setShowDateInfo((v) => !v)}
+              aria-expanded={showDateInfo}
+              className="flex flex-1 items-center gap-2 text-left"
+            >
+              <Info size={14} className="shrink-0" />
+              <span>Logging for {prettyDate}, not today.</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelectedDate(actualToday)}
+              className="whitespace-nowrap underline"
             >
               Use today
             </button>
@@ -309,7 +309,7 @@ function Reflection() {
             <HabitChip
               key={h.id}
               label={h.label}
-              on={!!entry.habits[h.id]}
+              on={entry.habits[h.id] ?? false}
               onToggle={() => toggleHabit(h.id)}
             />
           ))}

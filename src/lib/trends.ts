@@ -78,7 +78,7 @@ export function wellnessSeries(byMetric: Record<string, Point[]>, metrics: Metri
   }
   return [...scoresByDate]
     .map(([date, scores]) => ({ date, value: scores.reduce((a, b) => a + b, 0) / scores.length }))
-    .sort((a, b) => a.date.localeCompare(b.date))
+    .toSorted((a, b) => a.date.localeCompare(b.date))
 }
 
 export type Streak = { days: number; since: string | null }
@@ -172,8 +172,8 @@ export function bucketize(points: Point[], from: string, to: string, size: numbe
   const first = toDay(from)
   const last = toDay(to)
   const n = Math.ceil((last - first + 1) / size)
-  const sums = new Array<number>(n).fill(0)
-  const counts = new Array<number>(n).fill(0)
+  const sums = Array.from({ length: n }, () => 0)
+  const counts = Array.from({ length: n }, () => 0)
 
   for (const p of points) {
     const day = toDay(p.date)

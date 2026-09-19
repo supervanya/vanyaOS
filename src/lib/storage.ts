@@ -421,7 +421,7 @@ export async function addTask(text: string, scope: TaskScope, size: TaskSize): P
     .select("id, scope, size, text, completed_at, sort_order")
     .single()
   if (error || !data) throw error ?? new Error("Failed to add task")
-  return taskFromRow(data as TaskRow)
+  return taskFromRow(data)
 }
 
 export async function setTaskDone(id: string, done: boolean): Promise<void> {
@@ -477,7 +477,7 @@ export async function addProject(name: string, emoji?: string): Promise<Project>
     .select("id, name, emoji, status, sort_order")
     .single()
   if (error || !data) throw error ?? new Error("Failed to add project")
-  return projectFromRow(data as ProjectRow)
+  return projectFromRow(data)
 }
 
 // Swap which project is in progress. Demote first, then promote — the partial

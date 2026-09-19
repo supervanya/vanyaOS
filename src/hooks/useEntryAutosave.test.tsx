@@ -6,9 +6,9 @@ import type { DayEntry, LoadedConfig } from "@/lib/storage"
 import { useEntryAutosave } from "./useEntryAutosave"
 
 vi.mock("@/lib/storage", () => ({
-  saveDay: vi.fn(() => Promise.resolve()),
-  saveDraft: vi.fn(),
-  clearDraft: vi.fn(),
+  saveDay: vi.fn<typeof saveDay>(() => Promise.resolve()),
+  saveDraft: vi.fn<typeof saveDraft>(),
+  clearDraft: vi.fn<(date: string) => void>(),
 }))
 
 const config = {} as LoadedConfig

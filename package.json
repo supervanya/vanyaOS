@@ -14,6 +14,8 @@
     "typecheck": "tsc --noEmit",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "lint": "oxlint --report-unused-disable-directives-severity=error",
+    "lint:fix": "oxlint --fix",
     "db:mirror": "bash scripts/db-mirror-prod.sh"
   },
   "dependencies": {
@@ -56,6 +58,8 @@
     "@types/react-dom": "^19.2.0",
     "@vitejs/plugin-react": "^6.0.1",
     "jsdom": "^28.1.0",
+    "oxlint": "^1.83.0",
+    "oxlint-tsgolint": "^7",
     "prettier": "^3.9.8",
     "prettier-plugin-tailwindcss": "^0.8.1",
     "supabase": "^2.109.0",
