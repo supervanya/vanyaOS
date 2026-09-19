@@ -15,6 +15,7 @@
   },
   "ignorePatterns": [
     "src/routeTree.gen.ts",
+    "src/lib/database.types.ts",
     "dist",
     "PROTOTYPES",
     "public",
@@ -25,17 +26,29 @@
     "react/rules-of-hooks": "error",
     "react/exhaustive-deps": "error",
     "import/no-unassigned-import": ["error", { "allow": ["**/*.css"] }],
+    // One way to import across folders: `@/…`. Siblings may use `./`.
+    "no-restricted-imports": [
+      "error",
+      {
+        "patterns": [
+          {
+            "regex": "^\\.\\./",
+            "message": "Import through the @/ alias instead of a parent-relative path."
+          }
+        ]
+      }
+    ],
 
-    // Type-aware safety rules. Warnings until the Supabase client is typed —
-    // most findings come from its untyped rows. #70 promotes them to errors.
-    "typescript/no-floating-promises": "warn",
-    "typescript/no-misused-promises": "warn",
-    "typescript/no-unsafe-argument": "warn",
-    "typescript/no-unsafe-assignment": "warn",
-    "typescript/no-unsafe-call": "warn",
-    "typescript/no-unsafe-member-access": "warn",
-    "typescript/no-unsafe-return": "warn",
-    "typescript/no-unsafe-type-assertion": "warn",
+    // Type-aware safety rules: the guardrails that catch `any` leaking in and
+    // promises nobody awaits or handles.
+    "typescript/no-floating-promises": "error",
+    "typescript/no-misused-promises": "error",
+    "typescript/no-unsafe-argument": "error",
+    "typescript/no-unsafe-assignment": "error",
+    "typescript/no-unsafe-call": "error",
+    "typescript/no-unsafe-member-access": "error",
+    "typescript/no-unsafe-return": "error",
+    "typescript/no-unsafe-type-assertion": "error",
 
     // Off, with reasons:
     // The automatic JSX runtime doesn't need React in scope.
@@ -54,5 +67,12 @@
     "eslint/no-underscore-dangle": "off",
     // Reports the same violations as react/rules-of-hooks.
     "react/hooks": "off"
-  }
+  },
+  "overrides": [
+    {
+      // Fixtures cast partial objects to the full type they stand in for.
+      "files": ["**/*.test.ts", "**/*.test.tsx"],
+      "rules": { "typescript/no-unsafe-type-assertion": "off" }
+    }
+  ]
 }

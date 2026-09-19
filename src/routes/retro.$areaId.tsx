@@ -1,24 +1,35 @@
+import { useQueryClient, useSuspenseQuery } from "@tanstack/react-query"
 import { createFileRoute, Link } from "@tanstack/react-router"
 import { useEffect, useRef, useState } from "react"
-import { ArrowLeft, Pencil, Play, Send, Square } from "lucide-react"
+import { Pencil, Play, Send, Square } from "lucide-react"
 import { toast } from "sonner"
 
-import {
-  listRetroAreas,
-  latestRetro,
-  latestCoachRunAt,
-  saveRetroVersion,
-  buildIntakeSignal,
-  askCoach,
-  getAiSettings,
-} from "@/lib/storage"
-import type { RetroArea, RetroVersion, CoachMsg } from "@/lib/storage"
+import { askCoach, getAiSettings, type CoachMsg } from "@/features/ai/api"
+import { latestCoachRunAt, saveRetroVersion } from "@/features/retro/api"
+import { buildIntakeSignal } from "@/features/retro/intake"
+import { latestRetroQuery, retroAreasQuery } from "@/features/retro/queries"
 import { Button } from "@/components/ui/button"
 import { Markdown } from "@/components/Markdown"
 import { cn } from "@/lib/utils"
 import { useAutoGrow } from "@/hooks/useAutoGrow"
+import { errorMessage } from "@/lib/errors"
+import { PageHeader } from "@/components/PageHeader"
 
-export const Route = createFileRoute("/retro/$areaId")({ component: RetroAreaScreen })
+export const Route = createFileRoute("/retro/$areaId")({
+  loader: ({ context: { queryClient }, params: { areaId } }) =>
+    Promise.all([
+      queryClient.ensureQueryData(retroAreasQuery),
+      queryClient.ensureQueryData(latestRetroQuery(areaId)),
+    ]),
+  component: RetroAreaRoute,
+})
+
+// Switching areas keeps this route mounted; keying by area gives each one a
+// fresh screen instead of carrying over the last area's session.
+function RetroAreaRoute() {
+  const { areaId } = Route.useParams()
+  return <RetroAreaScreen key={areaId} areaId={areaId} />
+}
 
 // The coach must end the session with these exact blocks so the app can save
 // the new doc version. Parsing failure keeps the session open — never lose a doc.
@@ -55,12 +66,13 @@ function coachSystemPrompt(areaLabel: string): string {
   )
 }
 
-function RetroAreaScreen() {
-  const { areaId } = Route.useParams()
-  const [area, setArea] = useState<RetroArea | null>(null)
-  const [version, setVersion] = useState<RetroVersion | null | undefined>(undefined)
+function RetroAreaScreen({ areaId }: { areaId: string }) {
+  const queryClient = useQueryClient()
+  const area = useSuspenseQuery(retroAreasQuery).data.find((a) => a.id === areaId)
+  const { data: version } = useSuspenseQuery(latestRetroQuery(areaId))
   const [editText, setEditText] = useState("")
-  const [mode, setMode] = useState<"view" | "edit" | "session">("view")
+  // No doc yet → start in seed-by-paste mode.
+  const [mode, setMode] = useState<"view" | "edit" | "session">(version ? "view" : "edit")
 
   // Session state — transcript is client-held; only the final doc persists.
   const [transcript, setTranscript] = useState<CoachMsg[]>([])
@@ -73,33 +85,34 @@ function RetroAreaScreen() {
   const chatRef = useAutoGrow(chatDraft)
 
   useEffect(() => {
-    Promise.all([listRetroAreas(), latestRetro(areaId)])
-      .then(([areas, v]) => {
-        const a = areas.find((x) => x.id === areaId) ?? null
-        setArea(a)
-        setVersion(v)
-        if (!v) setMode("edit") // no doc yet → seed-by-paste mode
-      })
-      .catch((err) => toast.error(`Couldn't load: ${err.message}`))
-  }, [areaId])
-
-  useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [transcript, busy])
 
-  if (!area || version === undefined) return null
+  if (!area) {
+    return (
+      <p className="mt-10 text-center text-sm text-muted-foreground">
+        This retro area doesn't exist.{" "}
+        <Link to="/retro" className="underline">
+          Back to retrospectives
+        </Link>
+      </p>
+    )
+  }
+
+  // A saved version changes this doc, the retro index and the dashboard's
+  // "due" badge; wait for the refetch so the screen shows the new version.
+  const refreshRetro = () => queryClient.invalidateQueries({ queryKey: ["retro"] })
 
   const saveManual = () => {
     const doc = editText.trim()
     if (!doc) return
     saveRetroVersion(areaId, doc, null, null)
-      .then(() => latestRetro(areaId))
-      .then((v) => {
-        setVersion(v)
+      .then(refreshRetro)
+      .then(() => {
         setMode("view")
         toast.success(version ? "Doc updated (manual version)" : "Doc seeded")
       })
-      .catch((err) => toast.error(`Didn't save: ${err.message}`))
+      .catch((err) => toast.error(`Didn't save: ${errorMessage(err)}`))
   }
 
   const startSession = async () => {
@@ -130,7 +143,7 @@ function RetroAreaScreen() {
       const reply = await askCoach(coachSystemPrompt(area.label), first)
       setTranscript([...first, { role: "assistant", content: reply }])
     } catch (err) {
-      toast.error((err as Error).message)
+      toast.error(errorMessage(err))
       setMode(version ? "view" : "edit")
     } finally {
       setBusy(false)
@@ -148,7 +161,7 @@ function RetroAreaScreen() {
       const reply = await askCoach(coachSystemPrompt(area.label), next)
       setTranscript([...next, { role: "assistant", content: reply }])
     } catch (err) {
-      toast.error((err as Error).message)
+      toast.error(errorMessage(err))
       setTranscript(transcript) // roll back the unsent turn
       setChatDraft(text)
     } finally {
@@ -176,14 +189,13 @@ function RetroAreaScreen() {
         parsed.summary,
         settings ? `${settings.provider}:${settings.model}` : null,
       )
-      const v = await latestRetro(areaId)
-      setVersion(v)
+      await refreshRetro()
       setTranscript([])
       setPreSessionContext("")
       setMode("view")
       toast.success("Retro complete — doc updated")
     } catch (err) {
-      toast.error((err as Error).message)
+      toast.error(errorMessage(err))
     } finally {
       setBusy(false)
     }
@@ -191,16 +203,7 @@ function RetroAreaScreen() {
 
   return (
     <>
-      <div className="flex items-center justify-between">
-        <Link
-          to="/retro"
-          className="flex items-center gap-1.5 text-sm font-semibold tracking-tight text-muted-foreground hover:text-foreground"
-        >
-          <ArrowLeft size={15} />
-          Retrospectives
-        </Link>
-        <span className="text-xs text-muted-foreground">{area.label}</span>
-      </div>
+      <PageHeader back={{ to: "/retro", label: "Retrospectives" }} label={area.label} />
 
       {mode === "view" && version && (
         <>
@@ -220,7 +223,7 @@ function RetroAreaScreen() {
           )}
 
           <div className="mt-3 flex gap-2">
-            <Button type="button" size="sm" onClick={startSession} disabled={busy}>
+            <Button type="button" size="sm" onClick={() => void startSession()} disabled={busy}>
               <Play /> {busy ? "Starting…" : "Run retrospective"}
             </Button>
             <Button
@@ -283,7 +286,7 @@ function RetroAreaScreen() {
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={startSession}
+                onClick={() => void startSession()}
                 disabled={busy}
               >
                 <Play /> {busy ? "Starting…" : "Or draft it with your coach"}
@@ -328,7 +331,7 @@ function RetroAreaScreen() {
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !e.shiftKey) {
                     e.preventDefault()
-                    sendChat()
+                    void sendChat()
                   }
                 }}
                 rows={2}
@@ -341,7 +344,7 @@ function RetroAreaScreen() {
                 type="button"
                 size="icon"
                 aria-label="Send message"
-                onClick={sendChat}
+                onClick={() => void sendChat()}
                 disabled={busy || !chatDraft.trim()}
               >
                 <Send />
@@ -351,7 +354,7 @@ function RetroAreaScreen() {
               type="button"
               variant="outline"
               size="sm"
-              onClick={finishSession}
+              onClick={() => void finishSession()}
               disabled={busy || transcript.length < 2}
             >
               <Square /> Finish & update doc

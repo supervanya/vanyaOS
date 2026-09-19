@@ -1,5 +1,6 @@
-import { createFileRoute, Link } from "@tanstack/react-router"
-import { useEffect, useMemo, useState } from "react"
+import { useQuery, useSuspenseQuery } from "@tanstack/react-query"
+import { createFileRoute } from "@tanstack/react-router"
+import { useState } from "react"
 import {
   Moon,
   Activity,
@@ -10,113 +11,96 @@ import {
   ChevronLeft,
   ChevronRight,
   Info,
-  LayoutDashboard,
 } from "lucide-react"
-import { toast } from "sonner"
-import {
-  loadConfig,
-  loadOrInitDay,
-  listDayDates,
-  loadDay,
-  todayISO,
-  shiftISO,
-  defaultEntryDate,
-} from "../lib/storage"
-import type { LoadedConfig } from "../lib/storage"
-import { useEntryAutosave } from "@/hooks/useEntryAutosave"
-import { wellness } from "../lib/wellness"
-import { groupMetrics } from "../lib/config"
-import { MetricSlider } from "@/components/MetricSlider"
+import type { LoadedConfig } from "@/features/config/api"
+import { configQuery } from "@/features/config/queries"
+import type { LoadedDay } from "@/features/entries/api"
+import { dayQuery, previousWellnessQuery } from "@/features/entries/queries"
+import { useEntryAutosave } from "@/features/entries/useEntryAutosave"
+import { wellness } from "@/features/entries/wellness"
+import { TaskBoard } from "@/features/tasks/TaskBoard"
+import { groupMetrics } from "@/lib/config"
+import { defaultEntryDate, shiftISO, todayISO } from "@/lib/dates"
+import { MetricSlider } from "@/features/entries/MetricSlider"
 import { HabitChip } from "@/components/HabitChip"
-import { TaskBoard } from "@/components/TaskBoard"
 import { useAutoGrow } from "@/hooks/useAutoGrow"
+import { Skeleton } from "@/components/ui/skeleton"
+import { PageHeader } from "@/components/PageHeader"
+import { GoalBar } from "@/components/GoalBar"
 
-export const Route = createFileRoute("/reflect")({ component: Reflection })
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/
+
+export const Route = createFileRoute("/reflect")({
+  // The day being edited lives in the URL (?date=YYYY-MM-DD), so the loader can
+  // fetch it and back/forward step through days. No date = the default day.
+  validateSearch: (search: Record<string, unknown>): { date?: string } =>
+    typeof search.date === "string" && ISO_DATE.test(search.date) ? { date: search.date } : {},
+  loaderDeps: ({ search }) => ({ date: search.date ?? defaultEntryDate() }),
+  loader: async ({ context: { queryClient }, deps: { date } }) => {
+    void queryClient.prefetchQuery(previousWellnessQuery(date))
+    await Promise.all([
+      queryClient.ensureQueryData(configQuery),
+      queryClient.ensureQueryData(dayQuery(date)),
+    ])
+  },
+  pendingComponent: ReflectSkeleton,
+  component: Reflection,
+})
 
 function Reflection() {
-  const [config, setConfig] = useState<LoadedConfig | null>(null)
-  const { entry, setEntry, load } = useEntryAutosave(config)
-  const [selectedDate, setSelectedDate] = useState<string>(() => defaultEntryDate())
+  const selectedDate = Route.useSearch().date ?? defaultEntryDate()
+  const navigate = Route.useNavigate()
+  const { data: config } = useSuspenseQuery(configQuery)
+  const { data: day } = useSuspenseQuery(dayQuery(selectedDate))
+  const goTo = (date: string) =>
+    void navigate({ search: date === defaultEntryDate() ? {} : { date } })
+  // Keyed by date: each day gets a fresh editor seeded from its loaded entry.
+  return (
+    <ReflectionDay
+      key={selectedDate}
+      config={config}
+      loaded={day}
+      selectedDate={selectedDate}
+      goTo={goTo}
+    />
+  )
+}
+
+function ReflectionDay({
+  config,
+  loaded,
+  selectedDate,
+  goTo,
+}: {
+  config: LoadedConfig
+  loaded: LoadedDay
+  selectedDate: string
+  goTo: (date: string) => void
+}) {
+  const { entry, setEntry } = useEntryAutosave(config, loaded)
   const [showDateInfo, setShowDateInfo] = useState(false)
 
-  // Load config once the account is known (the root layout only renders this
-  // route once a session exists).
-  useEffect(() => {
-    loadConfig()
-      .then(setConfig)
-      .catch((err) => toast.error(`Couldn't load config: ${err.message}`))
-  }, [])
-
-  // Load the entry for the selected date whenever it (or config) changes.
-  useEffect(() => {
-    if (!config) return
-    let cancelled = false
-    loadOrInitDay(selectedDate, config)
-      .then((day) => {
-        if (!cancelled) load(day)
-      })
-      .catch((err) => toast.error(`Couldn't load entry: ${err.message}`))
-    return () => {
-      cancelled = true
-    }
-  }, [config, selectedDate, load])
-
   // Auto-grow the reflection textarea to fit its content (no drag handle).
-  const reflectionRef = useAutoGrow(entry?.reflection ?? "")
+  const reflectionRef = useAutoGrow(entry.reflection)
 
-  const score = useMemo(() => (entry && config ? wellness(entry, config) : null), [entry, config])
+  const score = wellness(entry, config)
 
-  // Wellness of the most recent prior day, for the "vs last" delta. Tagged with
-  // the date it was computed for, so a stale score never shows on another day.
-  const entryDate = entry?.date
-  const [prev, setPrev] = useState<{ date: string; score: number | null } | null>(null)
-  useEffect(() => {
-    if (!config || !entryDate) return
-    let cancelled = false
-    listDayDates()
-      .then((dates) => {
-        const priors = dates.filter((d) => d < entryDate)
-        if (!priors.length) return null
-        return loadDay(priors[priors.length - 1], config)
-      })
-      .then((p) => {
-        if (!cancelled) setPrev({ date: entryDate, score: p ? wellness(p, config) : null })
-      })
-      .catch(() => {
-        if (!cancelled) setPrev({ date: entryDate, score: null })
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [config, entryDate])
-  const prevScore = prev && prev.date === entryDate ? prev.score : null
+  // Wellness of the most recent prior day, for the "vs last" delta. Optional,
+  // so it doesn't hold up the page — the delta appears once it's loaded.
+  const prevScore = useQuery(previousWellnessQuery(entry.date)).data ?? null
 
-  const groups = useMemo(
-    () =>
-      groupMetrics(config?.metrics ?? []).map((g) => ({
-        ...g,
-        inverted: g.metrics.every((m) => !m.higherIsBetter),
-      })),
-    [config],
-  )
-
-  if (!config || !entry) return null
+  const groups = groupMetrics(config.metrics).map((g) => ({
+    ...g,
+    inverted: g.metrics.every((m) => !m.higherIsBetter),
+  }))
 
   const stamp = () => new Date().toISOString()
   const setMetric = (id: string, v: number) =>
-    setEntry((e) => (e ? { ...e, metrics: { ...e.metrics, [id]: v }, updatedAt: stamp() } : e))
+    setEntry((e) => ({ ...e, metrics: { ...e.metrics, [id]: v }, updatedAt: stamp() }))
   const toggleHabit = (id: string) =>
-    setEntry((e) =>
-      e
-        ? {
-            ...e,
-            habits: { ...e.habits, [id]: !e.habits[id] },
-            updatedAt: stamp(),
-          }
-        : e,
-    )
+    setEntry((e) => ({ ...e, habits: { ...e.habits, [id]: !e.habits[id] }, updatedAt: stamp() }))
   const setReflection = (text: string) =>
-    setEntry((e) => (e ? { ...e, reflection: text, updatedAt: stamp() } : e))
+    setEntry((e) => ({ ...e, reflection: text, updatedAt: stamp() }))
 
   const actualToday = todayISO()
   const isPast = selectedDate < actualToday
@@ -140,19 +124,12 @@ function Reflection() {
   return (
     <>
       {/* Back to dashboard + date navigator */}
-      <div className="flex items-center justify-between">
-        <Link
-          to="/"
-          className="flex items-center gap-1.5 text-sm font-semibold tracking-tight text-muted-foreground hover:text-foreground"
-        >
-          <LayoutDashboard size={15} />
-          VanyaOS
-        </Link>
+      <PageHeader>
         <div className="flex items-center gap-0.5 text-xs text-muted-foreground">
           <button
             type="button"
             aria-label="Previous day"
-            onClick={() => setSelectedDate((d) => shiftISO(d, -1))}
+            onClick={() => goTo(shiftISO(selectedDate, -1))}
             className="rounded p-1 hover:text-foreground"
           >
             <ChevronLeft size={16} />
@@ -162,13 +139,13 @@ function Reflection() {
             type="button"
             aria-label="Next day"
             disabled={selectedDate >= actualToday}
-            onClick={() => setSelectedDate((d) => shiftISO(d, 1))}
+            onClick={() => goTo(shiftISO(selectedDate, 1))}
             className="rounded p-1 hover:text-foreground disabled:opacity-30"
           >
             <ChevronRight size={16} />
           </button>
         </div>
-      </div>
+      </PageHeader>
 
       {/* Past-date warning (e.g. auto-set to yesterday after midnight) */}
       {isPast && (
@@ -185,7 +162,7 @@ function Reflection() {
             </button>
             <button
               type="button"
-              onClick={() => setSelectedDate(actualToday)}
+              onClick={() => goTo(actualToday)}
               className="whitespace-nowrap underline"
             >
               Use today
@@ -284,18 +261,7 @@ function Reflection() {
           <Flag size={14} /> Goal check · what you're building toward
         </p>
         {config.goals.map((g) => (
-          <div key={g.id} className="mb-2 flex items-center gap-3">
-            <span className="w-24 shrink-0 text-xs text-foreground/85">{g.label}</span>
-            <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
-              <div
-                className="h-full rounded-full bg-info"
-                style={{ width: `${Math.round(g.progress * 100)}%` }}
-              />
-            </div>
-            <span className="w-12 text-right text-[11px] text-muted-foreground">
-              {g.note ?? `${Math.round(g.progress * 100)}%`}
-            </span>
-          </div>
+          <GoalBar key={g.id} goal={g} />
         ))}
       </section>
 
@@ -339,5 +305,29 @@ function Reflection() {
         Synced to your account · theme: {entry.theme}
       </p>
     </>
+  )
+}
+
+function ReflectSkeleton() {
+  return (
+    <div className="flex flex-col" aria-busy="true" aria-label="Loading">
+      <div className="flex items-center justify-between">
+        <Skeleton className="h-4 w-20" />
+        <Skeleton className="h-4 w-28" />
+      </div>
+      <Skeleton className="mt-4 h-5 w-40" />
+      <Skeleton className="mt-2 h-10 w-16" />
+      {[0, 1, 2].map((group) => (
+        <div key={group} className="mt-6 flex flex-col gap-4">
+          <Skeleton className="h-3 w-24" />
+          {[0, 1, 2].map((row) => (
+            <div key={row} className="flex items-center gap-3">
+              <Skeleton className="h-4 w-24" />
+              <Skeleton className="h-2 flex-1" />
+            </div>
+          ))}
+        </div>
+      ))}
+    </div>
   )
 }

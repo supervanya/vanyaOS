@@ -1,41 +1,28 @@
+import { useSuspenseQuery } from "@tanstack/react-query"
 import { createFileRoute, Link } from "@tanstack/react-router"
-import { useEffect, useState } from "react"
-import { BookOpen, LayoutDashboard } from "lucide-react"
-import { toast } from "sonner"
+import { BookOpen } from "lucide-react"
 
-import { listRetroAreas, latestRetroDates, isRetroDue } from "@/lib/storage"
-import type { RetroArea } from "@/lib/storage"
+import { isRetroDue } from "@/features/retro/api"
+import { latestRetroDatesQuery, retroAreasQuery } from "@/features/retro/queries"
 import { cn } from "@/lib/utils"
+import { PageHeader } from "@/components/PageHeader"
 
-export const Route = createFileRoute("/retro/")({ component: RetroList })
+export const Route = createFileRoute("/retro/")({
+  loader: ({ context: { queryClient } }) =>
+    Promise.all([
+      queryClient.ensureQueryData(retroAreasQuery),
+      queryClient.ensureQueryData(latestRetroDatesQuery),
+    ]),
+  component: RetroList,
+})
 
 function RetroList() {
-  const [areas, setAreas] = useState<RetroArea[] | null>(null)
-  const [lastRuns, setLastRuns] = useState<Record<string, string>>({})
-
-  useEffect(() => {
-    Promise.all([listRetroAreas(), latestRetroDates()])
-      .then(([a, dates]) => {
-        setAreas(a.filter((x) => !x.archived))
-        setLastRuns(dates)
-      })
-      .catch((err) => toast.error(`Couldn't load retro areas: ${err.message}`))
-  }, [])
-
-  if (!areas) return null
+  const areas = useSuspenseQuery(retroAreasQuery).data.filter((a) => !a.archived)
+  const { data: lastRuns } = useSuspenseQuery(latestRetroDatesQuery)
 
   return (
     <>
-      <div className="flex items-center justify-between">
-        <Link
-          to="/"
-          className="flex items-center gap-1.5 text-sm font-semibold tracking-tight text-muted-foreground hover:text-foreground"
-        >
-          <LayoutDashboard size={15} />
-          VanyaOS
-        </Link>
-        <span className="text-xs text-muted-foreground">Retrospectives</span>
-      </div>
+      <PageHeader label="Retrospectives" />
 
       <h1 className="mt-3 flex items-center gap-2 text-[15px] font-medium">
         <BookOpen size={17} className="text-indigo-500 dark:text-indigo-300" />

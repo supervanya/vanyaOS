@@ -1,9 +1,13 @@
-import { createFileRoute, Link } from "@tanstack/react-router"
-import { useEffect, useState, type ReactNode } from "react"
-import { ArrowUpDown, LayoutDashboard, TrendingUp } from "lucide-react"
-import { toast } from "sonner"
-import { loadConfig, loadTrendSeries, todayISO } from "../lib/storage"
-import type { LoadedConfig, TrendSeries } from "../lib/storage"
+import { useSuspenseQuery } from "@tanstack/react-query"
+import { createFileRoute } from "@tanstack/react-router"
+import { useState, type ReactNode } from "react"
+import { ArrowUpDown, TrendingUp } from "lucide-react"
+import { Skeleton } from "@/components/ui/skeleton"
+import type { LoadedConfig } from "@/features/config/api"
+import { configQuery } from "@/features/config/queries"
+import type { TrendSeries } from "@/features/trends/api"
+import { trendSeriesQuery } from "@/features/trends/queries"
+import { todayISO } from "@/lib/dates"
 import {
   SORT_ORDERS,
   TREND_WINDOWS,
@@ -20,16 +24,25 @@ import {
   wellnessSeries,
   wellnessTrend,
   windowStart,
-} from "../lib/trends"
-import type { Point, SortOrder, Streak, Trend, TrendWindow } from "../lib/trends"
-import { groupMetrics, type Metric } from "../lib/config"
-import { HabitCells } from "@/components/HabitCells"
-import { Sparkline } from "@/components/Sparkline"
-import { TrendReadout, trendTone } from "@/components/TrendReadout"
-import { WithDetail, shortDate } from "@/components/chartHover"
+} from "@/features/trends/math"
+import type { Point, SortOrder, Streak, Trend, TrendWindow } from "@/features/trends/math"
+import { groupMetrics, type Metric } from "@/lib/config"
+import { HabitCells } from "@/features/trends/HabitCells"
+import { Sparkline } from "@/features/trends/Sparkline"
+import { TrendReadout, trendTone } from "@/features/trends/TrendReadout"
+import { WithDetail, shortDate } from "@/features/trends/chartHover"
 import { cn } from "@/lib/utils"
+import { PageHeader } from "@/components/PageHeader"
 
-export const Route = createFileRoute("/trends")({ component: Trends })
+export const Route = createFileRoute("/trends")({
+  loader: ({ context: { queryClient } }) =>
+    Promise.all([
+      queryClient.ensureQueryData(configQuery),
+      queryClient.ensureQueryData(trendSeriesQuery),
+    ]),
+  pendingComponent: TrendsSkeleton,
+  component: Trends,
+})
 
 const formatScore = (value: number) => value.toFixed(1)
 const formatRate = (value: number) => `${Math.round(value * 100)}%`
@@ -37,21 +50,14 @@ const formatRate = (value: number) => `${Math.round(value * 100)}%`
 function Trends() {
   const [trendWindow, setTrendWindow] = useStoredChoice(WINDOW_KEY, isTrendWindow, "1M")
   const [sortOrder, setSortOrder] = useStoredChoice(SORT_KEY, isSortOrder, "yours")
-  const config = useConfig()
-  const history = useTrendHistory(config)
+  const { data: config } = useSuspenseQuery(configQuery)
+  const { data: history } = useSuspenseQuery(trendSeriesQuery)
 
   return (
     <>
-      <div className="flex items-center justify-between">
-        <Link
-          to="/"
-          className="flex items-center gap-1.5 text-sm font-semibold tracking-tight text-muted-foreground hover:text-foreground"
-        >
-          <LayoutDashboard size={15} />
-          VanyaOS
-        </Link>
+      <PageHeader>
         <WindowPicker value={trendWindow} onChange={setTrendWindow} />
-      </div>
+      </PageHeader>
 
       <div className="mt-3 flex items-center justify-between">
         <h1 className="flex items-center gap-2 text-[15px] font-medium">
@@ -61,14 +67,12 @@ function Trends() {
         <SortButton value={sortOrder} onChange={setSortOrder} />
       </div>
 
-      {config && history && (
-        <TrendSections
-          config={config}
-          trendWindow={trendWindow}
-          sortOrder={sortOrder}
-          history={history}
-        />
-      )}
+      <TrendSections
+        config={config}
+        trendWindow={trendWindow}
+        sortOrder={sortOrder}
+        history={history}
+      />
     </>
   )
 }
@@ -207,7 +211,7 @@ function SortButton({
   value: SortOrder
   onChange: (next: SortOrder) => void
 }) {
-  const next = SORT_ORDERS[(SORT_ORDERS.indexOf(value) + 1) % SORT_ORDERS.length]
+  const next = SORT_ORDERS[(SORT_ORDERS.indexOf(value) + 1) % SORT_ORDERS.length] ?? "yours"
   return (
     <button
       type="button"
@@ -418,33 +422,25 @@ function useStoredChoice<T extends string>(
   return [value, choose] as const
 }
 
-function useConfig() {
-  const [config, setConfig] = useState<LoadedConfig | null>(null)
-  useEffect(() => {
-    loadConfig()
-      .then(setConfig)
-      .catch((err) => toast.error(`Couldn't load config: ${err.message}`))
-  }, [])
-  return config
-}
-
-// All history is loaded once and every window is a slice of it, so switching
-// windows is instant and a streak can count back past the window's start.
-function useTrendHistory(config: LoadedConfig | null) {
-  const [history, setHistory] = useState<TrendSeries | null>(null)
-
-  useEffect(() => {
-    if (!config) return
-    let cancelled = false
-    loadTrendSeries(config)
-      .then((h) => {
-        if (!cancelled) setHistory(h)
-      })
-      .catch((err) => toast.error(`Couldn't load trends: ${err.message}`))
-    return () => {
-      cancelled = true
-    }
-  }, [config])
-
-  return history
+function TrendsSkeleton() {
+  return (
+    <div className="flex flex-col" aria-busy="true" aria-label="Loading">
+      <div className="flex items-center justify-between">
+        <Skeleton className="h-4 w-20" />
+        <Skeleton className="h-6 w-40" />
+      </div>
+      <Skeleton className="mt-4 h-5 w-24" />
+      {[0, 1, 2].map((section) => (
+        <div key={section} className="mt-6 flex flex-col gap-3">
+          <Skeleton className="h-3 w-24" />
+          {[0, 1, 2].map((row) => (
+            <div key={row} className="flex items-center gap-3">
+              <Skeleton className="h-4 w-24" />
+              <Skeleton className="h-6 flex-1" />
+            </div>
+          ))}
+        </div>
+      ))}
+    </div>
+  )
 }

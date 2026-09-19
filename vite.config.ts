@@ -1,4 +1,4 @@
-import { defineConfig } from "vite"
+import { defineConfig } from "vitest/config"
 import { tanstackRouter } from "@tanstack/router-plugin/vite"
 import viteReact from "@vitejs/plugin-react"
 import tailwindcss from "@tailwindcss/vite"
@@ -11,6 +11,17 @@ const PROD_BASE = "/vanyaOS/"
 export default defineConfig(({ command }) => ({
   base: command === "build" ? PROD_BASE : "/",
   resolve: { tsconfigPaths: true },
+  test: {
+    // Node 25+ has its own global localStorage (undefined without a storage
+    // file) that hides jsdom's in test workers; turn Node's off.
+    execArgv: ["--no-experimental-webstorage"],
+    // Tests never talk to Supabase, but importing the client needs these set.
+    // Fixed dummies keep tests independent of .env.local (CI has none).
+    env: {
+      VITE_SUPABASE_URL: "http://127.0.0.1:1",
+      VITE_SUPABASE_PUBLISHABLE_KEY: "test-publishable-key",
+    },
+  },
   // host:true binds 0.0.0.0 so a phone on the same wifi can reach the dev server.
   server: {
     host: true,

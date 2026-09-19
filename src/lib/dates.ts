@@ -21,3 +21,25 @@ export function isoWeek(d: Date): number {
   const jan1 = Date.UTC(thursday.getUTCFullYear(), 0, 1)
   return Math.floor((thursday.getTime() - jan1) / MS_PER_DAY / 7) + 1
 }
+
+export function todayISO(): string {
+  const d = new Date()
+  const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000)
+  return local.toISOString().slice(0, 10)
+}
+
+// Shift a YYYY-MM-DD by whole days (noon anchor avoids DST/tz edge cases).
+export function shiftISO(dateISO: string, deltaDays: number): string {
+  const d = new Date(dateISO + "T12:00:00")
+  d.setDate(d.getDate() + deltaDays)
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, "0")
+  const day = String(d.getDate()).padStart(2, "0")
+  return `${y}-${m}-${day}`
+}
+
+// An evening reflection done in the early hours after midnight is really about
+// the previous day, so before `cutoffHour` (local) we default to yesterday.
+export function defaultEntryDate(cutoffHour = 4): string {
+  return new Date().getHours() < cutoffHour ? shiftISO(todayISO(), -1) : todayISO()
+}
