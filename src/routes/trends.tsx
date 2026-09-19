@@ -28,6 +28,7 @@ import { Sparkline } from "@/components/Sparkline"
 import { TrendReadout, trendTone } from "@/components/TrendReadout"
 import { WithDetail, shortDate } from "@/components/chartHover"
 import { cn } from "@/lib/utils"
+import { errorMessage } from "@/lib/errors"
 
 export const Route = createFileRoute("/trends")({ component: Trends })
 
@@ -423,7 +424,7 @@ function useConfig() {
   useEffect(() => {
     loadConfig()
       .then(setConfig)
-      .catch((err) => toast.error(`Couldn't load config: ${err.message}`))
+      .catch((err) => toast.error(`Couldn't load config: ${errorMessage(err)}`))
   }, [])
   return config
 }
@@ -440,7 +441,7 @@ function useTrendHistory(config: LoadedConfig | null) {
       .then((h) => {
         if (!cancelled) setHistory(h)
       })
-      .catch((err) => toast.error(`Couldn't load trends: ${err.message}`))
+      .catch((err) => toast.error(`Couldn't load trends: ${errorMessage(err)}`))
     return () => {
       cancelled = true
     }

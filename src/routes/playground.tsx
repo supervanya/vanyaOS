@@ -48,7 +48,7 @@ function ConfettiVariant() {
     setOn(willOn)
     if (willOn && ref.current) {
       const r = ref.current.getBoundingClientRect()
-      confetti({
+      void confetti({
         particleCount: 70,
         spread: 75,
         startVelocity: 30,
@@ -169,7 +169,7 @@ function RingVariant() {
     setOn(willOn)
     if (willOn) {
       setPulse((p) => p + 1)
-      controls.start({ scale: [1, 1.12, 1], transition: { duration: 0.3 } })
+      void controls.start({ scale: [1, 1.12, 1], transition: { duration: 0.3 } })
     }
   }
   return (

@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabaseClient"
 import { useAuth } from "@/lib/auth"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { errorMessage } from "@/lib/errors"
 
 export const Route = createFileRoute("/login")({ component: Login })
 
@@ -36,22 +37,27 @@ function Login() {
 
   // Signed in (whether just now via verifyOtp or already) → leave /login.
   useEffect(() => {
-    if (session) navigate({ to: "/", replace: true })
+    if (session) void navigate({ to: "/", replace: true })
   }, [session, navigate])
 
   const sendLink = async () => {
     if (!email || loading) return
     setLoading(true)
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: { emailRedirectTo: window.location.origin + import.meta.env.BASE_URL },
-    })
-    setLoading(false)
-    if (error) {
-      toast.error(error.message)
-      return
+    try {
+      const { error } = await supabase.auth.signInWithOtp({
+        email,
+        options: { emailRedirectTo: window.location.origin + import.meta.env.BASE_URL },
+      })
+      if (error) {
+        toast.error(error.message)
+        return
+      }
+      setSent(true)
+    } catch (err) {
+      toast.error(errorMessage(err))
+    } finally {
+      setLoading(false)
     }
-    setSent(true)
   }
 
   const tokenHash = extractTokenHash(pastedLink)
@@ -59,17 +65,16 @@ function Login() {
   const verifyPastedLink = async () => {
     if (!tokenHash || loading) return
     setLoading(true)
-    const { error } = await supabase.auth.verifyOtp({
-      token_hash: tokenHash,
-      type: "email",
-    })
-    setLoading(false)
-    if (error) {
+    try {
+      const { error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type: "email" })
       // Links are single-use and expire after ~1h — resending is the fix.
-      toast.error(error.message)
-      return
+      if (error) toast.error(error.message)
+      // Success → onAuthStateChange sets the session; the effect above redirects.
+    } catch (err) {
+      toast.error(errorMessage(err))
+    } finally {
+      setLoading(false)
     }
-    // Success → onAuthStateChange sets the session; the effect above redirects.
   }
 
   if (sent) {
@@ -88,9 +93,13 @@ function Login() {
             placeholder="Paste the sign-in link"
             value={pastedLink}
             onChange={(e) => setPastedLink(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && verifyPastedLink()}
+            onKeyDown={(e) => e.key === "Enter" && void verifyPastedLink()}
           />
-          <Button className="w-full" onClick={verifyPastedLink} disabled={loading || !tokenHash}>
+          <Button
+            className="w-full"
+            onClick={() => void verifyPastedLink()}
+            disabled={loading || !tokenHash}
+          >
             {loading ? "Signing in…" : "Sign in"}
           </Button>
           <button
@@ -119,9 +128,9 @@ function Login() {
           placeholder="you@example.com"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && sendLink()}
+          onKeyDown={(e) => e.key === "Enter" && void sendLink()}
         />
-        <Button className="w-full" onClick={sendLink} disabled={loading || !email}>
+        <Button className="w-full" onClick={() => void sendLink()} disabled={loading || !email}>
           {loading ? "Sending…" : "Send magic link"}
         </Button>
       </div>

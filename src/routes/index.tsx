@@ -33,6 +33,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
 import { dayOfYear, isoWeek } from "@/lib/dates"
+import { errorMessage } from "@/lib/errors"
 
 export const Route = createFileRoute("/")({ component: Dashboard })
 
@@ -129,7 +130,7 @@ function HabitsToday() {
         setConfig(c)
         return loadOrInitDay(date, c).then(load)
       })
-      .catch((err) => toast.error(`Couldn't load habits: ${err.message}`))
+      .catch((err) => toast.error(`Couldn't load habits: ${errorMessage(err)}`))
   }, [date, load])
 
   if (!config || !entry) return null
@@ -239,7 +240,7 @@ function ProjectsCard() {
   useEffect(() => {
     listProjects()
       .then(setProjects)
-      .catch((err) => toast.error(`Couldn't load projects: ${err.message}`))
+      .catch((err) => toast.error(`Couldn't load projects: ${errorMessage(err)}`))
   }, [])
 
   if (!projects) return null
@@ -254,7 +255,7 @@ function ProjectsCard() {
       })),
     )
     setActiveProject(p.id).catch((err) => {
-      toast.error(`Didn't save: ${err.message}`)
+      toast.error(`Didn't save: ${errorMessage(err)}`)
       setProjects(prev)
     })
   }
@@ -263,7 +264,7 @@ function ProjectsCard() {
     const prev = projects
     setProjects(projects.filter((x) => x.id !== p.id))
     deleteProject(p.id).catch((err) => {
-      toast.error(`Didn't save: ${err.message}`)
+      toast.error(`Didn't save: ${errorMessage(err)}`)
       setProjects(prev)
     })
   }
@@ -274,7 +275,7 @@ function ProjectsCard() {
     setDraft("")
     addProject(name)
       .then((p) => setProjects((cur) => (cur ? [...cur, p] : [p])))
-      .catch((err) => toast.error(`Didn't save: ${err.message}`))
+      .catch((err) => toast.error(`Didn't save: ${errorMessage(err)}`))
   }
 
   return (

@@ -30,6 +30,7 @@ import { MetricSlider } from "@/components/MetricSlider"
 import { HabitChip } from "@/components/HabitChip"
 import { TaskBoard } from "@/components/TaskBoard"
 import { useAutoGrow } from "@/hooks/useAutoGrow"
+import { errorMessage } from "@/lib/errors"
 
 export const Route = createFileRoute("/reflect")({ component: Reflection })
 
@@ -44,7 +45,7 @@ function Reflection() {
   useEffect(() => {
     loadConfig()
       .then(setConfig)
-      .catch((err) => toast.error(`Couldn't load config: ${err.message}`))
+      .catch((err) => toast.error(`Couldn't load config: ${errorMessage(err)}`))
   }, [])
 
   // Load the entry for the selected date whenever it (or config) changes.
@@ -55,7 +56,7 @@ function Reflection() {
       .then((day) => {
         if (!cancelled) load(day)
       })
-      .catch((err) => toast.error(`Couldn't load entry: ${err.message}`))
+      .catch((err) => toast.error(`Couldn't load entry: ${errorMessage(err)}`))
     return () => {
       cancelled = true
     }

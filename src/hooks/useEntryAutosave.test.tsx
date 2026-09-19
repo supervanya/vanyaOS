@@ -40,7 +40,9 @@ function loaded(unsynced: boolean) {
 describe("useEntryAutosave", () => {
   it("saves nothing when a day is loaded", () => {
     const result = loaded(false)
-    act(() => vi.runAllTimers())
+    act(() => {
+      vi.runAllTimers()
+    })
     expect(result.current.entry).toBe(day)
     expect(saveDraft).not.toHaveBeenCalled()
     expect(saveDay).not.toHaveBeenCalled()
@@ -52,7 +54,9 @@ describe("useEntryAutosave", () => {
     expect(saveDraft).toHaveBeenCalledWith(withSteps(true))
     expect(saveDay).not.toHaveBeenCalled()
 
-    act(() => vi.advanceTimersByTime(800))
+    act(() => {
+      vi.advanceTimersByTime(800)
+    })
     expect(saveDay).toHaveBeenCalledWith(withSteps(true), config)
   })
 
@@ -60,14 +64,18 @@ describe("useEntryAutosave", () => {
     const result = loaded(false)
     act(() => result.current.setEntry(withSteps(true)))
     act(() => result.current.setEntry(withSteps(false)))
-    act(() => vi.advanceTimersByTime(800))
+    act(() => {
+      vi.advanceTimersByTime(800)
+    })
     expect(saveDay).toHaveBeenCalledTimes(1)
     expect(saveDay).toHaveBeenCalledWith(withSteps(false), config)
   })
 
   it("syncs a leftover draft as soon as it loads", () => {
     loaded(true)
-    act(() => vi.advanceTimersByTime(800))
+    act(() => {
+      vi.advanceTimersByTime(800)
+    })
     expect(saveDay).toHaveBeenCalledWith(day, config)
   })
 })

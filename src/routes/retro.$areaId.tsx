@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button"
 import { Markdown } from "@/components/Markdown"
 import { cn } from "@/lib/utils"
 import { useAutoGrow } from "@/hooks/useAutoGrow"
+import { errorMessage } from "@/lib/errors"
 
 export const Route = createFileRoute("/retro/$areaId")({ component: RetroAreaScreen })
 
@@ -80,7 +81,7 @@ function RetroAreaScreen() {
         setVersion(v)
         if (!v) setMode("edit") // no doc yet → seed-by-paste mode
       })
-      .catch((err) => toast.error(`Couldn't load: ${err.message}`))
+      .catch((err) => toast.error(`Couldn't load: ${errorMessage(err)}`))
   }, [areaId])
 
   useEffect(() => {
@@ -99,7 +100,7 @@ function RetroAreaScreen() {
         setMode("view")
         toast.success(version ? "Doc updated (manual version)" : "Doc seeded")
       })
-      .catch((err) => toast.error(`Didn't save: ${err.message}`))
+      .catch((err) => toast.error(`Didn't save: ${errorMessage(err)}`))
   }
 
   const startSession = async () => {
@@ -130,7 +131,7 @@ function RetroAreaScreen() {
       const reply = await askCoach(coachSystemPrompt(area.label), first)
       setTranscript([...first, { role: "assistant", content: reply }])
     } catch (err) {
-      toast.error((err as Error).message)
+      toast.error(errorMessage(err))
       setMode(version ? "view" : "edit")
     } finally {
       setBusy(false)
@@ -148,7 +149,7 @@ function RetroAreaScreen() {
       const reply = await askCoach(coachSystemPrompt(area.label), next)
       setTranscript([...next, { role: "assistant", content: reply }])
     } catch (err) {
-      toast.error((err as Error).message)
+      toast.error(errorMessage(err))
       setTranscript(transcript) // roll back the unsent turn
       setChatDraft(text)
     } finally {
@@ -183,7 +184,7 @@ function RetroAreaScreen() {
       setMode("view")
       toast.success("Retro complete — doc updated")
     } catch (err) {
-      toast.error((err as Error).message)
+      toast.error(errorMessage(err))
     } finally {
       setBusy(false)
     }
@@ -220,7 +221,7 @@ function RetroAreaScreen() {
           )}
 
           <div className="mt-3 flex gap-2">
-            <Button type="button" size="sm" onClick={startSession} disabled={busy}>
+            <Button type="button" size="sm" onClick={() => void startSession()} disabled={busy}>
               <Play /> {busy ? "Starting…" : "Run retrospective"}
             </Button>
             <Button
@@ -283,7 +284,7 @@ function RetroAreaScreen() {
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={startSession}
+                onClick={() => void startSession()}
                 disabled={busy}
               >
                 <Play /> {busy ? "Starting…" : "Or draft it with your coach"}
@@ -328,7 +329,7 @@ function RetroAreaScreen() {
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !e.shiftKey) {
                     e.preventDefault()
-                    sendChat()
+                    void sendChat()
                   }
                 }}
                 rows={2}
@@ -341,7 +342,7 @@ function RetroAreaScreen() {
                 type="button"
                 size="icon"
                 aria-label="Send message"
-                onClick={sendChat}
+                onClick={() => void sendChat()}
                 disabled={busy || !chatDraft.trim()}
               >
                 <Send />
@@ -351,7 +352,7 @@ function RetroAreaScreen() {
               type="button"
               variant="outline"
               size="sm"
-              onClick={finishSession}
+              onClick={() => void finishSession()}
               disabled={busy || transcript.length < 2}
             >
               <Square /> Finish & update doc

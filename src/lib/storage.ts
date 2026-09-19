@@ -5,9 +5,16 @@
 // source of truth once a sync succeeds; the draft is a transient write-ahead
 // copy, not a competing store.
 
+import { FunctionsHttpError } from "@supabase/supabase-js"
 import { supabase } from "./supabaseClient"
 import { DEFAULT_CONFIG, type Config, type Metric, type Habit, type Goal } from "./config"
+import type { Tables, TablesUpdate } from "./database.types"
+import { errorMessage } from "./errors"
+import { oneOf } from "./parse"
 import type { Point } from "./trends"
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value)
 
 export type DayEntry = {
   date: string // YYYY-MM-DD
@@ -20,8 +27,10 @@ export type DayEntry = {
 
 // The living task list (M2): tasks belong to no day. scope today/week counts
 // toward the weekly 1-3-5 commitment; someday is the parking lot.
-export type TaskScope = "today" | "week" | "someday"
-export type TaskSize = "big" | "medium" | "small"
+export const TASK_SCOPES = ["today", "week", "someday"] as const
+export const TASK_SIZES = ["big", "medium", "small"] as const
+export type TaskScope = (typeof TASK_SCOPES)[number]
+export type TaskSize = (typeof TASK_SIZES)[number]
 export type Task = {
   id: string
   scope: TaskScope
@@ -31,7 +40,8 @@ export type Task = {
   sortOrder: number
 }
 
-export type ProjectStatus = "in_progress" | "parking_lot"
+export const PROJECT_STATUSES = ["in_progress", "parking_lot"] as const
+export type ProjectStatus = (typeof PROJECT_STATUSES)[number]
 export type Project = {
   id: string
   name: string
@@ -147,7 +157,7 @@ export async function loadConfig(): Promise<LoadedConfig> {
   const goals: Goal[] = (goalRows ?? []).map((r) => ({
     id: r.key,
     label: r.label,
-    progress: Number(r.progress),
+    progress: r.progress,
     note: r.note ?? undefined,
   }))
 
@@ -159,8 +169,8 @@ export async function loadConfig(): Promise<LoadedConfig> {
     metrics,
     habits,
     goals,
-    metricRowId: Object.fromEntries((metricRows ?? []).map((r) => [r.key, r.id as string])),
-    habitRowId: Object.fromEntries((habitRows ?? []).map((r) => [r.key, r.id as string])),
+    metricRowId: Object.fromEntries((metricRows ?? []).map((r) => [r.key, r.id])),
+    habitRowId: Object.fromEntries((habitRows ?? []).map((r) => [r.key, r.id])),
   }
 }
 
@@ -171,7 +181,7 @@ export async function listDayDates(): Promise<string[]> {
     .select("entry_date")
     .eq("user_id", userId)
     .order("entry_date")
-  return (data ?? []).map((r) => r.entry_date as string)
+  return (data ?? []).map((r) => r.entry_date)
 }
 
 async function fetchEntryRow(userId: string, date: string) {
@@ -210,12 +220,12 @@ async function hydrateEntry(
 
   const metrics: Record<string, number> = {}
   for (const v of metricVals ?? []) {
-    const key = metricKeyById[v.metric_id as string]
-    if (key) metrics[key] = Number(v.value)
+    const key = metricKeyById[v.metric_id]
+    if (key) metrics[key] = v.value
   }
   const habits: Record<string, boolean> = {}
   for (const h of habitVals ?? []) {
-    const key = habitKeyById[h.habit_id as string]
+    const key = habitKeyById[h.habit_id]
     if (key) habits[key] = h.done
   }
 
@@ -263,9 +273,9 @@ export async function loadTrendSeries(config: LoadedConfig): Promise<TrendSeries
   const habitKeyById = invert(config.habitRowId)
   const series: TrendSeries = { firstDate: data?.[0]?.entry_date ?? null, metrics: {}, habits: {} }
   for (const entry of data ?? []) {
-    const date = entry.entry_date as string
+    const date = entry.entry_date
     for (const v of entry.entry_metric_values) {
-      append(series.metrics, metricKeyById[v.metric_id], { date, value: Number(v.value) })
+      append(series.metrics, metricKeyById[v.metric_id], { date, value: v.value })
     }
     for (const h of entry.entry_habits) {
       append(series.habits, habitKeyById[h.habit_id], { date, value: h.done ? 1 : 0 })
@@ -326,7 +336,7 @@ export async function saveDay(entry: DayEntry, config: LoadedConfig): Promise<vo
     .single()
   if (error || !entryRow) throw error ?? new Error("Failed to save entry")
 
-  const entryId = entryRow.id as string
+  const entryId = entryRow.id
 
   const metricRows = Object.entries(entry.metrics)
     .filter(([key]) => config.metricRowId[key])
@@ -367,10 +377,27 @@ export function loadDraft(date: string): DayEntry | null {
   const raw = localStorage.getItem(draftKey(date))
   if (!raw) return null
   try {
-    return JSON.parse(raw) as DayEntry
+    const parsed: unknown = JSON.parse(raw)
+    return isDayEntry(parsed) ? parsed : null
   } catch {
     return null
   }
+}
+
+// Drafts come back from localStorage, which may hold an older shape — check
+// before trusting it, and fall back to the remote entry if it doesn't match.
+function isDayEntry(value: unknown): value is DayEntry {
+  return (
+    isRecord(value) &&
+    typeof value.date === "string" &&
+    typeof value.theme === "string" &&
+    typeof value.reflection === "string" &&
+    typeof value.updatedAt === "string" &&
+    isRecord(value.metrics) &&
+    Object.values(value.metrics).every((x) => typeof x === "number") &&
+    isRecord(value.habits) &&
+    Object.values(value.habits).every((x) => typeof x === "boolean")
+  )
 }
 
 export function clearDraft(date: string): void {
@@ -381,19 +408,15 @@ export function clearDraft(date: string): void {
 // Direct row ops with optimistic UI at the callsite — no debounced blob sync;
 // each mutation is one small write.
 
-type TaskRow = {
-  id: string
-  scope: TaskScope
-  size: TaskSize
-  text: string
-  completed_at: string | null
-  sort_order: number
-}
+type TaskRow = Pick<
+  Tables<"tasks">,
+  "id" | "scope" | "size" | "text" | "completed_at" | "sort_order"
+>
 
 const taskFromRow = (r: TaskRow): Task => ({
   id: r.id,
-  scope: r.scope,
-  size: r.size,
+  scope: oneOf(TASK_SCOPES, r.scope, "tasks.scope"),
+  size: oneOf(TASK_SIZES, r.size, "tasks.size"),
   text: r.text,
   completedAt: r.completed_at,
   sortOrder: r.sort_order,
@@ -444,19 +467,13 @@ export async function deleteTask(id: string): Promise<void> {
 
 // --- Projects (WIP limit: one) ----------------------------------------------
 
-type ProjectRow = {
-  id: string
-  name: string
-  emoji: string | null
-  status: ProjectStatus
-  sort_order: number
-}
+type ProjectRow = Pick<Tables<"projects">, "id" | "name" | "emoji" | "status" | "sort_order">
 
 const projectFromRow = (r: ProjectRow): Project => ({
   id: r.id,
   name: r.name,
   emoji: r.emoji,
-  status: r.status,
+  status: oneOf(PROJECT_STATUSES, r.status, "projects.status"),
   sortOrder: r.sort_order,
 })
 
@@ -573,7 +590,7 @@ export async function listGoalRows(): Promise<GoalRow[]> {
     id: r.id,
     key: r.key,
     label: r.label,
-    progress: Number(r.progress),
+    progress: r.progress,
     note: r.note,
     sortOrder: r.sort_order,
     archived: r.archived,
@@ -582,29 +599,46 @@ export async function listGoalRows(): Promise<GoalRow[]> {
 
 export type ConfigTable = "metrics" | "habits" | "goals" | "retro_areas"
 
-// Shared patch shape; snake_case DB columns assembled here so callers stay camel.
+// Columns every config table has. Snake_case rows are assembled here so callers
+// stay camelCase; table-specific columns go through updateMetric / updateGoal.
+export type ConfigPatch = Partial<{ label: string; sortOrder: number; archived: boolean }>
+
+function commonColumns(patch: ConfigPatch) {
+  const row: Pick<TablesUpdate<"metrics">, "label" | "sort_order" | "archived"> = {}
+  if (patch.label !== undefined) row.label = patch.label
+  if (patch.sortOrder !== undefined) row.sort_order = patch.sortOrder
+  if (patch.archived !== undefined) row.archived = patch.archived
+  return row
+}
+
 export async function updateConfigRow(
   table: ConfigTable,
   id: string,
-  patch: Partial<{
-    label: string
-    groupName: string
-    higherIsBetter: boolean
-    progress: number
-    note: string | null
-    sortOrder: number
-    archived: boolean
-  }>,
+  patch: ConfigPatch,
 ): Promise<void> {
-  const row: Record<string, unknown> = {}
-  if (patch.label !== undefined) row.label = patch.label
+  const { error } = await supabase.from(table).update(commonColumns(patch)).eq("id", id)
+  if (error) throw error
+}
+
+export async function updateMetric(
+  id: string,
+  patch: ConfigPatch & Partial<{ groupName: string; higherIsBetter: boolean }>,
+): Promise<void> {
+  const row: TablesUpdate<"metrics"> = commonColumns(patch)
   if (patch.groupName !== undefined) row.group_name = patch.groupName
   if (patch.higherIsBetter !== undefined) row.higher_is_better = patch.higherIsBetter
+  const { error } = await supabase.from("metrics").update(row).eq("id", id)
+  if (error) throw error
+}
+
+export async function updateGoal(
+  id: string,
+  patch: ConfigPatch & Partial<{ progress: number; note: string | null }>,
+): Promise<void> {
+  const row: TablesUpdate<"goals"> = commonColumns(patch)
   if (patch.progress !== undefined) row.progress = patch.progress
   if (patch.note !== undefined) row.note = patch.note
-  if (patch.sortOrder !== undefined) row.sort_order = patch.sortOrder
-  if (patch.archived !== undefined) row.archived = patch.archived
-  const { error } = await supabase.from(table).update(row).eq("id", id)
+  const { error } = await supabase.from("goals").update(row).eq("id", id)
   if (error) throw error
 }
 
@@ -658,7 +692,8 @@ export async function addRetroAreaRow(label: string, sortOrder: number): Promise
 // The key is write-mostly from the client: reads return whether one exists,
 // not the key itself (the Edge Function is the only reader of the value).
 
-export type AiProvider = "anthropic" | "openai" | "google"
+export const AI_PROVIDER_IDS = ["anthropic", "openai", "google"] as const
+export type AiProvider = (typeof AI_PROVIDER_IDS)[number]
 export type AiSettings = { provider: AiProvider; model: string; hasKey: boolean }
 
 // Static lists are a FALLBACK only — the real catalog is fetched live from the
@@ -679,21 +714,36 @@ export async function listProviderModels(
   provider?: AiProvider,
   apiKey?: string,
 ): Promise<string[]> {
-  const { data, error } = await supabase.functions.invoke("ai-coach", {
-    body: { action: "list-models", provider, apiKey },
-  })
+  const data = await invokeCoachFunction({ action: "list-models", provider, apiKey })
+  const models = data.models
+  if (!Array.isArray(models) || !models.every((m) => typeof m === "string")) {
+    throw new Error("ai-coach returned no model list")
+  }
+  return models
+}
+
+// Calls the ai-coach Edge Function and returns its JSON body, turning every
+// failure — HTTP error, `{ error }` payload, unexpected shape — into an Error
+// carrying the function's own message.
+async function invokeCoachFunction(
+  body: Record<string, unknown>,
+): Promise<Record<string, unknown>> {
+  const response = await supabase.functions.invoke<unknown>("ai-coach", { body })
+  const error: unknown = response.error
+  const data: unknown = response.data
   if (error) {
-    let detail = error.message
-    try {
-      const ctx = (error as { context?: Response }).context
-      if (ctx) detail = (await ctx.json()).error ?? detail
-    } catch {
-      /* keep default */
+    // supabase-js wraps non-2xx responses; surface the function's own message.
+    let detail = errorMessage(error)
+    const context: unknown = error instanceof FunctionsHttpError ? error.context : null
+    if (context instanceof Response) {
+      const payload: unknown = await context.json().catch(() => null)
+      if (isRecord(payload) && typeof payload.error === "string") detail = payload.error
     }
     throw new Error(detail)
   }
-  if (data?.error) throw new Error(data.error)
-  return data.models as string[]
+  if (!isRecord(data)) throw new Error("ai-coach returned an unexpected response")
+  if (typeof data.error === "string") throw new Error(data.error)
+  return data
 }
 
 export async function getAiSettings(): Promise<AiSettings | null> {
@@ -703,7 +753,11 @@ export async function getAiSettings(): Promise<AiSettings | null> {
   const { data, error } = await supabase.from("ai_settings").select("provider, model").maybeSingle()
   if (error) throw error
   if (!data) return null
-  return { provider: data.provider, model: data.model, hasKey: true }
+  return {
+    provider: oneOf(AI_PROVIDER_IDS, data.provider, "ai_settings.provider"),
+    model: data.model,
+    hasKey: true,
+  }
 }
 
 export async function saveAiSettings(
@@ -739,22 +793,9 @@ export async function askCoach(
   messages: CoachMsg[],
   maxTokens = 4096,
 ): Promise<string> {
-  const { data, error } = await supabase.functions.invoke("ai-coach", {
-    body: { system, messages, maxTokens },
-  })
-  if (error) {
-    // supabase-js wraps non-2xx responses; surface the function's own message.
-    let detail = error.message
-    try {
-      const ctx = (error as { context?: Response }).context
-      if (ctx) detail = (await ctx.json()).error ?? detail
-    } catch {
-      /* keep default */
-    }
-    throw new Error(detail)
-  }
-  if (data?.error) throw new Error(data.error)
-  return data.text as string
+  const data = await invokeCoachFunction({ system, messages, maxTokens })
+  if (typeof data.text !== "string") throw new Error("ai-coach returned no text")
+  return data.text
 }
 
 // --- Retrospectives (M4) -----------------------------------------------------
@@ -933,9 +974,9 @@ export async function buildIntakeSignal(sinceISO: string | null): Promise<string
     const rowId = config.metricRowId[m.id]
     const vals = (values ?? []).filter((v) => v.metric_id === rowId)
     if (!vals.length) continue
-    const all = mean(vals.map((v) => Number(v.value)))!
-    const early = mean(vals.filter((v) => firstIds.has(v.entry_id)).map((v) => Number(v.value)))
-    const late = mean(vals.filter((v) => !firstIds.has(v.entry_id)).map((v) => Number(v.value)))
+    const all = mean(vals.map((v) => v.value))!
+    const early = mean(vals.filter((v) => firstIds.has(v.entry_id)).map((v) => v.value))
+    const late = mean(vals.filter((v) => !firstIds.has(v.entry_id)).map((v) => v.value))
     let trend = ""
     if (early != null && late != null && Math.abs(late - early) >= 0.4) {
       trend = ` (trending ${late > early ? "up" : "down"}: ${early.toFixed(1)} -> ${late.toFixed(1)})`
@@ -944,7 +985,14 @@ export async function buildIntakeSignal(sinceISO: string | null): Promise<string
     lines.push(`- ${m.label}${direction}: avg ${all.toFixed(1)}/${m.scale}${trend}`)
   }
 
-  const wellnessVals = (scores ?? []).map((x) => Number(x.wellness))
+  // Days with no slider set have no wellness score (null). Leave them out
+  // instead of averaging them in as 0.
+  const scored = (scores ?? []).flatMap((x) =>
+    x.entry_id !== null && x.wellness !== null
+      ? [{ entryId: x.entry_id, wellness: x.wellness }]
+      : [],
+  )
+  const wellnessVals = scored.map((x) => x.wellness)
   if (wellnessVals.length) {
     lines.push(`- Composite wellness: avg ${mean(wellnessVals)!.toFixed(1)}/5`)
   }
@@ -957,12 +1005,12 @@ export async function buildIntakeSignal(sinceISO: string | null): Promise<string
     lines.push(`- ${h.label}: ${rows.filter((x) => x.done).length}/${rows.length}`)
   }
 
-  const scoreById = Object.fromEntries((scores ?? []).map((x) => [x.entry_id, Number(x.wellness)]))
+  const scoreById = new Map(scored.map((x) => [x.entryId, x.wellness]))
   const written = entries.filter((r) => (r.reflection ?? "").trim().length > 0)
   lines.push("", "### Written reflections")
   if (written.length) {
     for (const r of written) {
-      const w = scoreById[r.id]
+      const w = scoreById.get(r.id)
       lines.push(
         `- ${r.entry_date}${w != null ? ` (wellness ${w.toFixed(1)}/5)` : ""}: ${r.reflection}`,
       )

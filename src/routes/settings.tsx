@@ -20,6 +20,8 @@ import {
   listHabitRows,
   listGoalRows,
   updateConfigRow,
+  updateMetric,
+  updateGoal,
   updateSortOrders,
   addMetricRow,
   addHabitRow,
@@ -30,6 +32,7 @@ import {
   saveAiSettings,
   listProviderModels,
   AI_PROVIDERS,
+  AI_PROVIDER_IDS,
 } from "@/lib/storage"
 import type {
   MetricRow,
@@ -47,10 +50,14 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Slider } from "@/components/ui/slider"
 import { cn } from "@/lib/utils"
+import { oneOf } from "@/lib/parse"
+import { errorMessage } from "@/lib/errors"
 
 export const Route = createFileRoute("/settings")({ component: Settings })
 
-const onErr = (err: { message: string }) => toast.error(`Didn't save: ${err.message}`)
+const onErr = (err: unknown) => {
+  toast.error(`Didn't save: ${errorMessage(err)}`)
+}
 
 function Settings() {
   return (
@@ -86,7 +93,9 @@ function RetroAreasSection() {
   const [rows, setRows] = useState<RetroArea[] | null>(null)
   const [label, setLabel] = useState("")
 
-  const reload = () => listRetroAreas().then(setRows).catch(onErr)
+  const reload = () => {
+    void listRetroAreas().then(setRows).catch(onErr)
+  }
   useEffect(() => {
     reload()
   }, [])
@@ -95,8 +104,9 @@ function RetroAreasSection() {
   const active = rows.filter((r) => !r.archived)
   const archived = rows.filter((r) => r.archived)
 
-  const patch = (id: string, p: Parameters<typeof updateConfigRow>[2]) =>
-    updateConfigRow("retro_areas", id, p).then(reload).catch(onErr)
+  const patch = (id: string, p: Parameters<typeof updateConfigRow>[2]) => {
+    void updateConfigRow("retro_areas", id, p).then(reload).catch(onErr)
+  }
 
   const reorder = (reordered: RetroArea[]) =>
     persistReorder("retro_areas", reordered, setRows, reload)
@@ -173,7 +183,7 @@ function AiSection() {
       })
       .catch((err) => {
         setModels(null)
-        if (!quiet) toast.error(`Couldn't fetch models: ${(err as Error).message}`)
+        if (!quiet) toast.error(`Couldn't fetch models: ${errorMessage(err)}`)
       })
       .finally(() => setFetchingModels(false))
   }
@@ -211,7 +221,7 @@ function AiSection() {
       setKey("")
       toast.success("AI settings saved")
     } catch (err) {
-      onErr(err as { message: string })
+      onErr(err)
     } finally {
       setSaving(false)
     }
@@ -227,7 +237,7 @@ function AiSection() {
           <select
             value={provider}
             onChange={(e) => {
-              const p = e.target.value as AiProvider
+              const p = oneOf(AI_PROVIDER_IDS, e.target.value, "provider")
               setProvider(p)
               setModel(AI_PROVIDERS[p].models[0])
               setModels(null)
@@ -237,7 +247,7 @@ function AiSection() {
             }}
             className="h-8 rounded-md border border-input bg-transparent px-2 text-[13px] dark:bg-input/30"
           >
-            {(Object.keys(AI_PROVIDERS) as AiProvider[]).map((p) => (
+            {AI_PROVIDER_IDS.map((p) => (
               <option key={p} value={p}>
                 {AI_PROVIDERS[p].label}
               </option>
@@ -298,7 +308,7 @@ function AiSection() {
           type="button"
           variant="outline"
           size="sm"
-          onClick={save}
+          onClick={() => void save()}
           disabled={saving}
           className="self-start"
         >
@@ -359,7 +369,7 @@ function LabelDraft({ value, onSave, className }: LabelInputProps) {
       value={draft}
       onChange={(e) => setDraft(e.target.value)}
       onBlur={commit}
-      onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
+      onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
       className={cn("h-8 text-[13px]", className)}
     />
   )
@@ -427,7 +437,9 @@ function MetricsSection() {
   const [group, setGroup] = useState("")
   const [inverted, setInverted] = useState(false)
 
-  const reload = () => listMetricRows().then(setRows).catch(onErr)
+  const reload = () => {
+    void listMetricRows().then(setRows).catch(onErr)
+  }
   useEffect(() => {
     reload()
   }, [])
@@ -437,8 +449,8 @@ function MetricsSection() {
   const archived = rows.filter((r) => r.archived)
   const groups = [...new Set(active.map((r) => r.groupName))]
 
-  const patch = (id: string, p: Parameters<typeof updateConfigRow>[2]) => {
-    updateConfigRow("metrics", id, p).then(reload).catch(onErr)
+  const patch = (id: string, p: Parameters<typeof updateMetric>[1]) => {
+    void updateMetric(id, p).then(reload).catch(onErr)
   }
 
   const reorder = (reordered: MetricRow[]) => persistReorder("metrics", reordered, setRows, reload)
@@ -547,7 +559,9 @@ function HabitsSection() {
   const [rows, setRows] = useState<HabitRow[] | null>(null)
   const [label, setLabel] = useState("")
 
-  const reload = () => listHabitRows().then(setRows).catch(onErr)
+  const reload = () => {
+    void listHabitRows().then(setRows).catch(onErr)
+  }
   useEffect(() => {
     reload()
   }, [])
@@ -556,8 +570,9 @@ function HabitsSection() {
   const active = rows.filter((r) => !r.archived)
   const archived = rows.filter((r) => r.archived)
 
-  const patch = (id: string, p: Parameters<typeof updateConfigRow>[2]) =>
-    updateConfigRow("habits", id, p).then(reload).catch(onErr)
+  const patch = (id: string, p: Parameters<typeof updateConfigRow>[2]) => {
+    void updateConfigRow("habits", id, p).then(reload).catch(onErr)
+  }
 
   const reorder = (reordered: HabitRow[]) => persistReorder("habits", reordered, setRows, reload)
 
@@ -607,7 +622,9 @@ function GoalsSection() {
   const [rows, setRows] = useState<GoalRow[] | null>(null)
   const [label, setLabel] = useState("")
 
-  const reload = () => listGoalRows().then(setRows).catch(onErr)
+  const reload = () => {
+    void listGoalRows().then(setRows).catch(onErr)
+  }
   useEffect(() => {
     reload()
   }, [])
@@ -616,8 +633,9 @@ function GoalsSection() {
   const active = rows.filter((r) => !r.archived)
   const archived = rows.filter((r) => r.archived)
 
-  const patch = (id: string, p: Parameters<typeof updateConfigRow>[2]) =>
-    updateConfigRow("goals", id, p).then(reload).catch(onErr)
+  const patch = (id: string, p: Parameters<typeof updateGoal>[1]) => {
+    void updateGoal(id, p).then(reload).catch(onErr)
+  }
 
   // Slider drags fire continuously; update local state live, persist on commit.
   const setProgressLocal = (id: string, v: number) =>

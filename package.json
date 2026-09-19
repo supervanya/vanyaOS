@@ -18,6 +18,7 @@
     "lint": "oxlint --report-unused-disable-directives-severity=error",
     "lint:fix": "oxlint --fix",
     "check": "bun run format:check && bun run lint && bun run typecheck",
+    "db:types": "supabase gen types typescript --local --schema public > src/lib/database.types.ts",
     "db:mirror": "bash scripts/db-mirror-prod.sh"
   },
   "dependencies": {

@@ -31,7 +31,7 @@ function AuthGate({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!loading && !session && !onLoginPage) {
-      navigate({ to: "/login", replace: true })
+      void navigate({ to: "/login", replace: true })
     }
   }, [loading, session, onLoginPage, navigate])
 

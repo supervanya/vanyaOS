@@ -54,3 +54,20 @@ jobs:
       - run: deno check supabase/functions/ai-coach/index.ts
         env:
           DENO_NO_PACKAGE_JSON: "1"
+
+  # The generated DB types must match the migrations: rebuild the schema in a
+  # throwaway Postgres, regenerate, and fail on any difference. Fix locally
+  # with `bun run db:types` against a stack that has the new migration applied.
+  db-types:
+    name: DB types
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: supabase/setup-cli@v3
+        with:
+          # Keep in step with the `supabase` devDependency and deploy.yml.
+          version: 2.109.0
+      - run: supabase db start
+      - run: supabase gen types typescript --local --schema public > src/lib/database.types.ts
+      - name: Types match the migrations
+        run: git diff --exit-code -- src/lib/database.types.ts

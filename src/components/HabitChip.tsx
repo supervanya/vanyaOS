@@ -27,7 +27,7 @@ export function HabitChip({
     onToggle()
     if (willComplete && ref.current) {
       const r = ref.current.getBoundingClientRect()
-      confetti({
+      void confetti({
         particleCount: 70,
         spread: 75,
         startVelocity: 30,

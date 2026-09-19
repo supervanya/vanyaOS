@@ -3,6 +3,7 @@
 // React — so metric sparklines, habit cells and the slider context in Reflect
 // all share one tested implementation.
 
+import { isOneOf } from "./parse"
 import type { Metric } from "./config"
 
 /** One logged day. Days without an entry are absent, never zero. */
@@ -122,7 +123,7 @@ export const SORT_ORDERS = ["yours", "best", "worst"] as const
 export type SortOrder = (typeof SORT_ORDERS)[number]
 
 export const isSortOrder = (value: unknown): value is SortOrder =>
-  SORT_ORDERS.includes(value as SortOrder)
+  typeof value === "string" && isOneOf(SORT_ORDERS, value)
 
 /**
  * Items in your order, or by standing with the best or worst first. Items with

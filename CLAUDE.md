@@ -63,7 +63,7 @@ A `size/l` is a smell: try to split it into sub-issues before starting.
 
 ## Things that bite
 
-- **Supabase migrations**: verify against the local stack before `db push`. Several tables carry historical entry data — the app archives, it never hard-deletes.
+- **Supabase migrations**: verify against the local stack before `db push`. Several tables carry historical entry data — the app archives, it never hard-deletes. After a migration, run `bun run db:types` and commit `src/lib/database.types.ts` — CI fails when it drifts from the migrations.
 - **API keys**: BYO provider keys live in an RLS-protected `ai_settings` row. Never log them in Edge Functions.
 - **Retro docs**: the coach writes a *new version*, never overwrites — the owner hand-edits the same document between runs.
 - **The dashboard is the scope-creep vector.** Everything on it must be actionable in one tap or a glance; anything needing a form lives in its own section.

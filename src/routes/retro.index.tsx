@@ -6,6 +6,7 @@ import { toast } from "sonner"
 import { listRetroAreas, latestRetroDates, isRetroDue } from "@/lib/storage"
 import type { RetroArea } from "@/lib/storage"
 import { cn } from "@/lib/utils"
+import { errorMessage } from "@/lib/errors"
 
 export const Route = createFileRoute("/retro/")({ component: RetroList })
 
@@ -19,7 +20,7 @@ function RetroList() {
         setAreas(a.filter((x) => !x.archived))
         setLastRuns(dates)
       })
-      .catch((err) => toast.error(`Couldn't load retro areas: ${err.message}`))
+      .catch((err) => toast.error(`Couldn't load retro areas: ${errorMessage(err)}`))
   }, [])
 
   if (!areas) return null

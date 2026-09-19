@@ -14,9 +14,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AuthState>({ session: null, loading: true })
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      setState({ session: data.session, loading: false })
-    })
+    // A failed session read must still end loading, or the app stays blank.
+    supabase.auth
+      .getSession()
+      .then(({ data }) => setState({ session: data.session, loading: false }))
+      .catch(() => setState({ session: null, loading: false }))
     const { data: subscription } = supabase.auth.onAuthStateChange((_event, session) => {
       setState({ session, loading: false })
     })

@@ -9,6 +9,7 @@ import { HapticToggle } from "@/components/HapticToggle"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
+import { errorMessage } from "@/lib/errors"
 
 const SIZES: TaskSize[] = ["big", "medium", "small"]
 // Named by size, not by cap: a "1" was the biggest task, which read backwards.
@@ -36,7 +37,7 @@ export function TaskBoard({ compact = false }: { compact?: boolean }) {
   useEffect(() => {
     listTasks()
       .then(setTasks)
-      .catch((err) => toast.error(`Couldn't load tasks: ${err.message}`))
+      .catch((err) => toast.error(`Couldn't load tasks: ${errorMessage(err)}`))
   }, [])
 
   if (!tasks) return null
@@ -58,7 +59,7 @@ export function TaskBoard({ compact = false }: { compact?: boolean }) {
     const prev = tasks
     setTasks(next)
     op.catch((err) => {
-      toast.error(`Didn't save: ${err.message}`)
+      toast.error(`Didn't save: ${errorMessage(err)}`)
       setTasks(prev)
     })
   }
@@ -101,7 +102,7 @@ export function TaskBoard({ compact = false }: { compact?: boolean }) {
     }
     addTask(text, "week", draftSize)
       .then((t) => setTasks((cur) => (cur ? [...cur, t] : [t])))
-      .catch((err) => toast.error(`Didn't save: ${err.message}`))
+      .catch((err) => toast.error(`Didn't save: ${errorMessage(err)}`))
   }
 
   // Swap chooser: the tapped board item goes to someday; the waiting item takes
@@ -117,7 +118,7 @@ export function TaskBoard({ compact = false }: { compact?: boolean }) {
     } else {
       addTask(o.text, incomingScope, o.size)
         .then((t) => setTasks((cur) => (cur ? [...cur, t] : [t])))
-        .catch((err) => toast.error(`Didn't save: ${err.message}`))
+        .catch((err) => toast.error(`Didn't save: ${errorMessage(err)}`))
     }
   }
 
