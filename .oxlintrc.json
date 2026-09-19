@@ -1,0 +1,58 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "unicorn", "oxc", "react", "jsx-a11y", "import", "vitest"],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "error",
+    "perf": "error"
+  },
+  "options": {
+    "typeAware": true
+  },
+  "env": {
+    "browser": true,
+    "es2024": true
+  },
+  "ignorePatterns": [
+    "src/routeTree.gen.ts",
+    "dist",
+    "PROTOTYPES",
+    "public",
+    // Deno, not part of the Vite/tsconfig project; type-checked separately (#80).
+    "supabase/functions"
+  ],
+  "rules": {
+    "react/rules-of-hooks": "error",
+    "react/exhaustive-deps": "error",
+    "import/no-unassigned-import": ["error", { "allow": ["**/*.css"] }],
+
+    // Type-aware safety rules. Warnings until the Supabase client is typed —
+    // most findings come from its untyped rows. #70 promotes them to errors.
+    "typescript/no-floating-promises": "warn",
+    "typescript/no-misused-promises": "warn",
+    "typescript/no-unsafe-argument": "warn",
+    "typescript/no-unsafe-assignment": "warn",
+    "typescript/no-unsafe-call": "warn",
+    "typescript/no-unsafe-member-access": "warn",
+    "typescript/no-unsafe-return": "warn",
+    "typescript/no-unsafe-type-assertion": "warn",
+
+    // Off, with reasons:
+    // The automatic JSX runtime doesn't need React in scope.
+    "react/react-in-jsx-scope": "off",
+    // Flags the standard effect shape: early `return;` plus `return cleanup`.
+    "typescript/consistent-return": "off",
+    // Overlaps exhaustive-deps and flags intentional re-run triggers (useAutoGrow).
+    "react/exhaustive-effect-dependencies": "off",
+    // Small helpers stay next to the code that uses them.
+    "unicorn/consistent-function-scoping": "off",
+    // Index keys are correct for the fixed-length and append-only lists here.
+    "react/no-array-index-key": "off",
+    // Micro-optimisation; the spread-in-map sites are tiny lists.
+    "oxc/no-map-spread": "off",
+    // Only hits vendored shadcn/ui code (`_values`).
+    "eslint/no-underscore-dangle": "off",
+    // Reports the same violations as react/rules-of-hooks.
+    "react/hooks": "off"
+  }
+}
