@@ -1,6 +1,6 @@
 import { useQuery, useSuspenseQuery } from "@tanstack/react-query"
 import { createFileRoute } from "@tanstack/react-router"
-import { useMemo, useState } from "react"
+import { useState } from "react"
 import {
   Moon,
   Activity,
@@ -83,20 +83,16 @@ function ReflectionDay({
   // Auto-grow the reflection textarea to fit its content (no drag handle).
   const reflectionRef = useAutoGrow(entry.reflection)
 
-  const score = useMemo(() => wellness(entry, config), [entry, config])
+  const score = wellness(entry, config)
 
   // Wellness of the most recent prior day, for the "vs last" delta. Optional,
   // so it doesn't hold up the page — the delta appears once it's loaded.
   const prevScore = useQuery(previousWellnessQuery(entry.date)).data ?? null
 
-  const groups = useMemo(
-    () =>
-      groupMetrics(config.metrics).map((g) => ({
-        ...g,
-        inverted: g.metrics.every((m) => !m.higherIsBetter),
-      })),
-    [config],
-  )
+  const groups = groupMetrics(config.metrics).map((g) => ({
+    ...g,
+    inverted: g.metrics.every((m) => !m.higherIsBetter),
+  }))
 
   const stamp = () => new Date().toISOString()
   const setMetric = (id: string, v: number) =>
