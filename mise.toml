@@ -1,2 +1,5 @@
+# The toolchain, pinned once: local dev, the Claude Code preview server
+# (.claude/launch.json) and CI (jdx/mise-action) all install from here.
 [tools]
-node = "latest"
+node = "24.21.0" # current LTS line
+bun = "1.4.2"
