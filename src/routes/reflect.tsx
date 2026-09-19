@@ -1,6 +1,6 @@
-import { loadConfig, type LoadedConfig } from "@/features/config/api"
+import { useQuery } from "@tanstack/react-query"
 import { createFileRoute, Link } from "@tanstack/react-router"
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from "react"
 import {
   Moon,
   Activity,
@@ -13,65 +13,62 @@ import {
   Info,
   LayoutDashboard,
 } from "lucide-react"
-import { toast } from "sonner"
-import {
-  loadOrInitDay,
-  listDayDates,
-  loadDay,
-  todayISO,
-  shiftISO,
-  defaultEntryDate,
-} from "../lib/storage"
-import { useEntryAutosave } from "@/hooks/useEntryAutosave"
-import { wellness } from "../lib/wellness"
-import { groupMetrics } from "../lib/config"
+import type { LoadedConfig } from "@/features/config/api"
+import { configQuery } from "@/features/config/queries"
+import { listDayDates, loadDay, type LoadedDay } from "@/features/entries/api"
+import { dayQuery } from "@/features/entries/queries"
+import { useEntryAutosave } from "@/features/entries/useEntryAutosave"
+import { wellness } from "@/features/entries/wellness"
+import { TaskBoard } from "@/features/tasks/TaskBoard"
+import { groupMetrics } from "@/lib/config"
+import { defaultEntryDate, shiftISO, todayISO } from "@/lib/dates"
 import { MetricSlider } from "@/components/MetricSlider"
 import { HabitChip } from "@/components/HabitChip"
-import { TaskBoard } from "@/components/TaskBoard"
 import { useAutoGrow } from "@/hooks/useAutoGrow"
-import { errorMessage } from "@/lib/errors"
 
 export const Route = createFileRoute("/reflect")({ component: Reflection })
 
 function Reflection() {
-  const [config, setConfig] = useState<LoadedConfig | null>(null)
-  const { entry, setEntry, load } = useEntryAutosave(config)
   const [selectedDate, setSelectedDate] = useState<string>(() => defaultEntryDate())
+  const config = useQuery(configQuery)
+  const day = useQuery(dayQuery(selectedDate))
+  if (!config.data || !day.data) return null
+  // Keyed by date: each day gets a fresh editor seeded from its loaded entry.
+  return (
+    <ReflectionDay
+      key={selectedDate}
+      config={config.data}
+      loaded={day.data}
+      selectedDate={selectedDate}
+      setSelectedDate={setSelectedDate}
+    />
+  )
+}
+
+function ReflectionDay({
+  config,
+  loaded,
+  selectedDate,
+  setSelectedDate,
+}: {
+  config: LoadedConfig
+  loaded: LoadedDay
+  selectedDate: string
+  setSelectedDate: Dispatch<SetStateAction<string>>
+}) {
+  const { entry, setEntry } = useEntryAutosave(config, loaded)
   const [showDateInfo, setShowDateInfo] = useState(false)
 
-  // Load config once the account is known (the root layout only renders this
-  // route once a session exists).
-  useEffect(() => {
-    loadConfig()
-      .then(setConfig)
-      .catch((err) => toast.error(`Couldn't load config: ${errorMessage(err)}`))
-  }, [])
-
-  // Load the entry for the selected date whenever it (or config) changes.
-  useEffect(() => {
-    if (!config) return
-    let cancelled = false
-    loadOrInitDay(selectedDate, config)
-      .then((day) => {
-        if (!cancelled) load(day)
-      })
-      .catch((err) => toast.error(`Couldn't load entry: ${errorMessage(err)}`))
-    return () => {
-      cancelled = true
-    }
-  }, [config, selectedDate, load])
-
   // Auto-grow the reflection textarea to fit its content (no drag handle).
-  const reflectionRef = useAutoGrow(entry?.reflection ?? "")
+  const reflectionRef = useAutoGrow(entry.reflection)
 
-  const score = useMemo(() => (entry && config ? wellness(entry, config) : null), [entry, config])
+  const score = useMemo(() => wellness(entry, config), [entry, config])
 
   // Wellness of the most recent prior day, for the "vs last" delta. Tagged with
   // the date it was computed for, so a stale score never shows on another day.
-  const entryDate = entry?.date
+  const entryDate = entry.date
   const [prev, setPrev] = useState<{ date: string; score: number | null } | null>(null)
   useEffect(() => {
-    if (!config || !entryDate) return
     let cancelled = false
     listDayDates()
       .then((dates) => {
@@ -93,30 +90,20 @@ function Reflection() {
 
   const groups = useMemo(
     () =>
-      groupMetrics(config?.metrics ?? []).map((g) => ({
+      groupMetrics(config.metrics).map((g) => ({
         ...g,
         inverted: g.metrics.every((m) => !m.higherIsBetter),
       })),
     [config],
   )
 
-  if (!config || !entry) return null
-
   const stamp = () => new Date().toISOString()
   const setMetric = (id: string, v: number) =>
-    setEntry((e) => (e ? { ...e, metrics: { ...e.metrics, [id]: v }, updatedAt: stamp() } : e))
+    setEntry((e) => ({ ...e, metrics: { ...e.metrics, [id]: v }, updatedAt: stamp() }))
   const toggleHabit = (id: string) =>
-    setEntry((e) =>
-      e
-        ? {
-            ...e,
-            habits: { ...e.habits, [id]: !e.habits[id] },
-            updatedAt: stamp(),
-          }
-        : e,
-    )
+    setEntry((e) => ({ ...e, habits: { ...e.habits, [id]: !e.habits[id] }, updatedAt: stamp() }))
   const setReflection = (text: string) =>
-    setEntry((e) => (e ? { ...e, reflection: text, updatedAt: stamp() } : e))
+    setEntry((e) => ({ ...e, reflection: text, updatedAt: stamp() }))
 
   const actualToday = todayISO()
   const isPast = selectedDate < actualToday

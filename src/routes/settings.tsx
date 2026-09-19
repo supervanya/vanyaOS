@@ -27,21 +27,13 @@ import {
   addHabitRow,
   addGoalRow,
   addRetroAreaRow,
-  listRetroAreas,
   getAiSettings,
   saveAiSettings,
   listProviderModels,
   AI_PROVIDERS,
   AI_PROVIDER_IDS,
 } from "@/lib/storage"
-import type {
-  MetricRow,
-  HabitRow,
-  GoalRow,
-  RetroArea,
-  AiProvider,
-  ConfigTable,
-} from "@/lib/storage"
+import type { MetricRow, HabitRow, GoalRow, AiProvider, ConfigTable } from "@/lib/storage"
 import { bySortOrder, withSortOrderSlots } from "@/lib/sortOrder"
 import { DragHandle, SortableList } from "@/components/SortableList"
 import { Button } from "@/components/ui/button"
@@ -52,8 +44,16 @@ import { Slider } from "@/components/ui/slider"
 import { cn } from "@/lib/utils"
 import { oneOf } from "@/lib/parse"
 import { errorMessage } from "@/lib/errors"
+import { listRetroAreas, type RetroArea } from "@/features/retro/api"
+import { queryClient } from "@/lib/queryClient"
 
 export const Route = createFileRoute("/settings")({ component: Settings })
+
+// Other screens read config and retro areas from the query cache; after a
+// change here, refetch them. (#75 moves Settings itself onto queries.)
+const refreshAppData = () => {
+  void queryClient.invalidateQueries()
+}
 
 const onErr = (err: unknown) => {
   toast.error(`Didn't save: ${errorMessage(err)}`)
@@ -95,6 +95,7 @@ function RetroAreasSection() {
 
   const reload = () => {
     void listRetroAreas().then(setRows).catch(onErr)
+    refreshAppData()
   }
   useEffect(() => {
     reload()
@@ -439,6 +440,7 @@ function MetricsSection() {
 
   const reload = () => {
     void listMetricRows().then(setRows).catch(onErr)
+    refreshAppData()
   }
   useEffect(() => {
     reload()
@@ -561,6 +563,7 @@ function HabitsSection() {
 
   const reload = () => {
     void listHabitRows().then(setRows).catch(onErr)
+    refreshAppData()
   }
   useEffect(() => {
     reload()
@@ -624,6 +627,7 @@ function GoalsSection() {
 
   const reload = () => {
     void listGoalRows().then(setRows).catch(onErr)
+    refreshAppData()
   }
   useEffect(() => {
     reload()

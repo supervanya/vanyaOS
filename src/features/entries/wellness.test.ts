@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
-import type { Config } from "./config"
-import type { DayEntry } from "./storage"
+import type { Config } from "@/lib/config"
+import type { DayEntry } from "./api"
 import { wellness } from "./wellness"
 
 const config = {

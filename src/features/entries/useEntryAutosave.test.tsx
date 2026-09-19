@@ -1,15 +1,18 @@
 // @vitest-environment jsdom
 import type { LoadedConfig } from "@/features/config/api"
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { act, renderHook } from "@testing-library/react"
+import type { ReactNode } from "react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import { saveDay, saveDraft } from "@/lib/storage"
-import type { DayEntry } from "@/lib/storage"
+import { loadOrInitDay, saveDay, saveDraft, type DayEntry } from "./api"
+import { dayQuery } from "./queries"
 import { useEntryAutosave } from "./useEntryAutosave"
 
-vi.mock("@/lib/storage", () => ({
+vi.mock("./api", () => ({
   saveDay: vi.fn<typeof saveDay>(() => Promise.resolve()),
   saveDraft: vi.fn<typeof saveDraft>(),
   clearDraft: vi.fn<(date: string) => void>(),
+  loadOrInitDay: vi.fn<typeof loadOrInitDay>(),
 }))
 
 const config = {} as LoadedConfig
@@ -32,10 +35,14 @@ afterEach(() => {
   vi.clearAllMocks()
 })
 
+let queryClient: QueryClient
+
 function loaded(unsynced: boolean) {
-  const hook = renderHook(() => useEntryAutosave(config))
-  act(() => hook.result.current.load({ entry: day, unsynced }))
-  return hook.result
+  queryClient = new QueryClient()
+  const wrapper = ({ children }: { children: ReactNode }) => (
+    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+  )
+  return renderHook(() => useEntryAutosave(config, { entry: day, unsynced }), { wrapper }).result
 }
 
 describe("useEntryAutosave", () => {
@@ -78,5 +85,17 @@ describe("useEntryAutosave", () => {
       vi.advanceTimersByTime(800)
     })
     expect(saveDay).toHaveBeenCalledWith(day, config)
+  })
+
+  it("puts the synced entry in the day cache for other screens", async () => {
+    const result = loaded(false)
+    act(() => result.current.setEntry(withSteps(true)))
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(800)
+    })
+    expect(queryClient.getQueryData(dayQuery(day.date).queryKey)).toEqual({
+      entry: withSteps(true),
+      unsynced: false,
+    })
   })
 })

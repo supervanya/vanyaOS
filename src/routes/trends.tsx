@@ -3,7 +3,8 @@ import { createFileRoute, Link } from "@tanstack/react-router"
 import { useEffect, useState, type ReactNode } from "react"
 import { ArrowUpDown, LayoutDashboard, TrendingUp } from "lucide-react"
 import { toast } from "sonner"
-import { loadTrendSeries, todayISO } from "../lib/storage"
+import { loadTrendSeries } from "../lib/storage"
+import { todayISO } from "@/lib/dates"
 import type { TrendSeries } from "../lib/storage"
 import {
   SORT_ORDERS,

@@ -10,3 +10,6 @@ export function oneOf<T extends string>(allowed: readonly T[], value: string, co
   if (isOneOf(allowed, value)) return value
   throw new Error(`Unexpected ${column} "${value}" — expected one of: ${allowed.join(", ")}`)
 }
+
+export const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value)

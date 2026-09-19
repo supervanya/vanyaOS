@@ -4,7 +4,6 @@ import { ArrowLeft, Pencil, Play, Send, Square } from "lucide-react"
 import { toast } from "sonner"
 
 import {
-  listRetroAreas,
   latestRetro,
   latestCoachRunAt,
   saveRetroVersion,
@@ -12,14 +11,22 @@ import {
   askCoach,
   getAiSettings,
 } from "@/lib/storage"
-import type { RetroArea, RetroVersion, CoachMsg } from "@/lib/storage"
+import type { RetroVersion, CoachMsg } from "@/lib/storage"
+import { listRetroAreas, type RetroArea } from "@/features/retro/api"
 import { Button } from "@/components/ui/button"
 import { Markdown } from "@/components/Markdown"
 import { cn } from "@/lib/utils"
 import { useAutoGrow } from "@/hooks/useAutoGrow"
 import { errorMessage } from "@/lib/errors"
+import { queryClient } from "@/lib/queryClient"
 
 export const Route = createFileRoute("/retro/$areaId")({ component: RetroAreaScreen })
+
+// The dashboard's "due" badge and the retro index read from the query cache;
+// a saved version changes them. (#74 moves this screen onto queries.)
+const refreshRetroData = () => {
+  void queryClient.invalidateQueries({ queryKey: ["retro"] })
+}
 
 // The coach must end the session with these exact blocks so the app can save
 // the new doc version. Parsing failure keeps the session open — never lose a doc.
@@ -94,7 +101,10 @@ function RetroAreaScreen() {
     const doc = editText.trim()
     if (!doc) return
     saveRetroVersion(areaId, doc, null, null)
-      .then(() => latestRetro(areaId))
+      .then(() => {
+        refreshRetroData()
+        return latestRetro(areaId)
+      })
       .then((v) => {
         setVersion(v)
         setMode("view")
@@ -177,6 +187,7 @@ function RetroAreaScreen() {
         parsed.summary,
         settings ? `${settings.provider}:${settings.model}` : null,
       )
+      refreshRetroData()
       const v = await latestRetro(areaId)
       setVersion(v)
       setTranscript([])

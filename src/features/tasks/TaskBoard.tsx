@@ -1,17 +1,28 @@
-import { useEffect, useState } from "react"
+import { useSuspenseQuery } from "@tanstack/react-query"
+import { useState } from "react"
 import { ArrowUp, Plus, X, Inbox } from "lucide-react"
-import { toast } from "sonner"
 
-import { CAPS, listTasks, addTask, setTaskDone, moveTask, deleteTask } from "@/lib/storage"
-import type { Task, TaskScope, TaskSize } from "@/lib/storage"
-import { cn } from "@/lib/utils"
 import { HapticToggle } from "@/components/HapticToggle"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
-import { errorMessage } from "@/lib/errors"
+import { useOptimisticList } from "@/lib/optimistic"
+import { cn } from "@/lib/utils"
+import {
+  CAPS,
+  TASK_SIZES,
+  addTask,
+  deleteTask,
+  moveTask,
+  newTask,
+  setTaskDone,
+  type Task,
+  type TaskScope,
+  type TaskSize,
+} from "./api"
+import { tasksQuery } from "./queries"
 
-const SIZES: TaskSize[] = ["big", "medium", "small"]
+const SIZES = TASK_SIZES
 // Named by size, not by cap: a "1" was the biggest task, which read backwards.
 const SIZE_LABEL: Record<TaskSize, string> = { big: "Large", medium: "Medium", small: "Small" }
 
@@ -26,21 +37,14 @@ const onBoard = (t: Task) => t.scope === "today" || t.scope === "week"
  * hides the Someday parking lot and the add row.
  */
 export function TaskBoard({ compact = false }: { compact?: boolean }) {
-  const [tasks, setTasks] = useState<Task[] | null>(null)
+  const { data: tasks } = useSuspenseQuery(tasksQuery)
+  const apply = useOptimisticList<Task>(tasksQuery.queryKey)
   const [draft, setDraft] = useState("")
   const [draftSize, setDraftSize] = useState<TaskSize>("small")
   // A task wanting onto a full board: either brand-new text or a promotion.
   const [overflow, setOverflow] = useState<
     { kind: "new"; text: string; size: TaskSize } | { kind: "promote"; task: Task } | null
   >(null)
-
-  useEffect(() => {
-    listTasks()
-      .then(setTasks)
-      .catch((err) => toast.error(`Couldn't load tasks: ${errorMessage(err)}`))
-  }, [])
-
-  if (!tasks) return null
 
   const bySize = (size: TaskSize) =>
     tasks
@@ -55,36 +59,33 @@ export function TaskBoard({ compact = false }: { compact?: boolean }) {
   const someday = tasks.filter((t) => t.scope === "someday" && !t.completedAt)
   const slotsUsed = (size: TaskSize) => tasks.filter((t) => onBoard(t) && t.size === size).length
 
-  const mutate = (next: Task[], op: Promise<unknown>) => {
-    const prev = tasks
-    setTasks(next)
-    op.catch((err) => {
-      toast.error(`Didn't save: ${errorMessage(err)}`)
-      setTasks(prev)
-    })
-  }
-
   const toggleDone = (t: Task) => {
-    const done = !t.completedAt
-    mutate(
-      tasks.map((x) =>
-        x.id === t.id ? { ...x, completedAt: done ? new Date().toISOString() : null } : x,
-      ),
-      setTaskDone(t.id, done),
+    const completedAt = t.completedAt ? null : new Date().toISOString()
+    apply(
+      (list) => list.map((x) => (x.id === t.id ? { ...x, completedAt } : x)),
+      () => setTaskDone(t.id, completedAt !== null),
     )
   }
 
   const move = (t: Task, scope: TaskScope) =>
-    mutate(
-      tasks.map((x) => (x.id === t.id ? { ...x, scope } : x)),
-      moveTask(t.id, scope),
+    apply(
+      (list) => list.map((x) => (x.id === t.id ? { ...x, scope } : x)),
+      () => moveTask(t.id, scope),
     )
 
   const remove = (t: Task) =>
-    mutate(
-      tasks.filter((x) => x.id !== t.id),
-      deleteTask(t.id),
+    apply(
+      (list) => list.filter((x) => x.id !== t.id),
+      () => deleteTask(t.id),
     )
+
+  const add = (text: string, scope: TaskScope, size: TaskSize) => {
+    const task = newTask(text, scope, size)
+    apply(
+      (list) => [...list, task],
+      () => addTask(task),
+    )
+  }
 
   // Promote someday -> week, via the swap chooser when that size is full.
   const promote = (t: Task) => {
@@ -100,9 +101,7 @@ export function TaskBoard({ compact = false }: { compact?: boolean }) {
       setOverflow({ kind: "new", text, size: draftSize })
       return
     }
-    addTask(text, "week", draftSize)
-      .then((t) => setTasks((cur) => (cur ? [...cur, t] : [t])))
-      .catch((err) => toast.error(`Didn't save: ${errorMessage(err)}`))
+    add(text, "week", draftSize)
   }
 
   // Swap chooser: the tapped board item goes to someday; the waiting item takes
@@ -116,9 +115,7 @@ export function TaskBoard({ compact = false }: { compact?: boolean }) {
     if (o.kind === "promote") {
       move(o.task, incomingScope === "week" ? "week" : "someday")
     } else {
-      addTask(o.text, incomingScope, o.size)
-        .then((t) => setTasks((cur) => (cur ? [...cur, t] : [t])))
-        .catch((err) => toast.error(`Didn't save: ${errorMessage(err)}`))
+      add(o.text, incomingScope, o.size)
     }
   }
 

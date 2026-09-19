@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest"
-import { loadDraft, saveDraft, type DayEntry } from "./storage"
+import { loadDraft, saveDraft, type DayEntry } from "./api"
 
-vi.mock("./supabaseClient", () => ({ supabase: {} }))
+vi.mock("@/lib/supabaseClient", () => ({ supabase: {} }))
 
 const entry: DayEntry = {
   date: "2026-09-19",

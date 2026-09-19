@@ -1,158 +1,16 @@
-// Supabase-backed store (ADR-002 / ARCHITECTURE.md). Config (metrics/habits/
-// goals) and day entries live in Postgres, scoped to the logged-in account
-// via RLS. A local draft buffer (localStorage) still exists purely so a
-// dropped connection mid-edit can't lose an entry — Postgres is always the
-// source of truth once a sync succeeds; the draft is a transient write-ahead
-// copy, not a competing store.
+// What's left of the pre-feature-module store (ADR-002 / ARCHITECTURE.md):
+// trends, settings, AI and retro sessions. Each moves to src/features/<name>
+// as its screen migrates to TanStack Query; this file goes away with the last.
 
 import { FunctionsHttpError } from "@supabase/supabase-js"
 import { supabase } from "./supabaseClient"
 import { loadConfig, type LoadedConfig } from "@/features/config/api"
 import { currentUserId } from "./auth"
-import type { Tables, TablesUpdate } from "./database.types"
+import type { TablesUpdate } from "./database.types"
+import { shiftISO, todayISO } from "./dates"
 import { errorMessage } from "./errors"
-import { oneOf } from "./parse"
+import { isRecord, oneOf } from "./parse"
 import type { Point } from "./trends"
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === "object" && value !== null && !Array.isArray(value)
-
-export type DayEntry = {
-  date: string // YYYY-MM-DD
-  theme: string
-  metrics: Record<string, number> // only sliders you've set; untouched ones are absent
-  habits: Record<string, boolean>
-  reflection: string
-  updatedAt: string
-}
-
-// The living task list (M2): tasks belong to no day. scope today/week counts
-// toward the weekly 1-3-5 commitment; someday is the parking lot.
-export const TASK_SCOPES = ["today", "week", "someday"] as const
-export const TASK_SIZES = ["big", "medium", "small"] as const
-export type TaskScope = (typeof TASK_SCOPES)[number]
-export type TaskSize = (typeof TASK_SIZES)[number]
-export type Task = {
-  id: string
-  scope: TaskScope
-  size: TaskSize
-  text: string
-  completedAt: string | null
-  sortOrder: number
-}
-
-export const PROJECT_STATUSES = ["in_progress", "parking_lot"] as const
-export type ProjectStatus = (typeof PROJECT_STATUSES)[number]
-export type Project = {
-  id: string
-  name: string
-  emoji: string | null
-  status: ProjectStatus
-  sortOrder: number
-}
-
-// The 1-3-5 rule: weekly caps per size, counted over scope today+week,
-// including completed items (done work still occupied its slot this week).
-export const CAPS: Record<TaskSize, number> = { big: 1, medium: 3, small: 5 }
-
-export function todayISO(): string {
-  const d = new Date()
-  const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000)
-  return local.toISOString().slice(0, 10)
-}
-
-// Shift a YYYY-MM-DD by whole days (noon anchor avoids DST/tz edge cases).
-export function shiftISO(dateISO: string, deltaDays: number): string {
-  const d = new Date(dateISO + "T12:00:00")
-  d.setDate(d.getDate() + deltaDays)
-  const y = d.getFullYear()
-  const m = String(d.getMonth() + 1).padStart(2, "0")
-  const day = String(d.getDate()).padStart(2, "0")
-  return `${y}-${m}-${day}`
-}
-
-// An evening reflection done in the early hours after midnight is really about
-// the previous day, so before `cutoffHour` (local) we default to yesterday.
-export function defaultEntryDate(cutoffHour = 4): string {
-  return new Date().getHours() < cutoffHour ? shiftISO(todayISO(), -1) : todayISO()
-}
-
-export async function listDayDates(): Promise<string[]> {
-  const userId = await currentUserId()
-  const { data } = await supabase
-    .from("entries")
-    .select("entry_date")
-    .eq("user_id", userId)
-    .order("entry_date")
-  return (data ?? []).map((r) => r.entry_date)
-}
-
-async function fetchEntryRow(userId: string, date: string) {
-  const { data } = await supabase
-    .from("entries")
-    .select("*")
-    .eq("user_id", userId)
-    .eq("entry_date", date)
-    .maybeSingle()
-  return data
-}
-
-// Hydrates an `entries` row into the same DayEntry shape the UI has always
-// used, keyed by metric/habit *slug* (not the Postgres row uuid).
-async function hydrateEntry(
-  row: {
-    id: string
-    entry_date: string
-    theme: string | null
-    reflection: string | null
-    updated_at: string
-  },
-  config: LoadedConfig,
-): Promise<DayEntry> {
-  const [{ data: metricVals }, { data: habitVals }] = await Promise.all([
-    supabase.from("entry_metric_values").select("metric_id, value").eq("entry_id", row.id),
-    supabase.from("entry_habits").select("habit_id, done").eq("entry_id", row.id),
-  ])
-
-  const metricKeyById = Object.fromEntries(
-    Object.entries(config.metricRowId).map(([key, id]) => [id, key]),
-  )
-  const habitKeyById = Object.fromEntries(
-    Object.entries(config.habitRowId).map(([key, id]) => [id, key]),
-  )
-
-  const metrics: Record<string, number> = {}
-  for (const v of metricVals ?? []) {
-    const key = metricKeyById[v.metric_id]
-    if (key) metrics[key] = v.value
-  }
-  const habits: Record<string, boolean> = {}
-  for (const h of habitVals ?? []) {
-    const key = habitKeyById[h.habit_id]
-    if (key) habits[key] = h.done
-  }
-
-  return {
-    date: row.entry_date,
-    theme: row.theme ?? config.activeTheme,
-    metrics,
-    habits,
-    reflection: row.reflection ?? "",
-    updatedAt: row.updated_at,
-  }
-}
-
-export async function loadDay(date: string, config: LoadedConfig): Promise<DayEntry | null> {
-  const userId = await currentUserId()
-  const row = await fetchEntryRow(userId, date)
-  return row ? hydrateEntry(row, config) : null
-}
-
-export async function loadAllDays(config: LoadedConfig): Promise<DayEntry[]> {
-  const dates = await listDayDates()
-  const entries = await Promise.all(dates.map((d) => loadDay(d, config)))
-  return entries.filter((d): d is DayEntry => d !== null)
-}
 
 // Per-item daily series for the Trends screen, keyed by metric/habit slug.
 // Habit points are 1 (done) or 0 (missed).
@@ -193,231 +51,6 @@ const invert = (map: Record<string, string>) =>
 // Archived items have no slug in `config`, so their rows are skipped.
 function append(bySlug: Record<string, Point[]>, slug: string | undefined, point: Point) {
   if (slug) (bySlug[slug] ??= []).push(point)
-}
-
-// A fresh entry for `date`. (Todos no longer roll forward — the living task
-// list simply persists; see the tasks section below.)
-export async function newEntry(date: string, config: LoadedConfig): Promise<DayEntry> {
-  return {
-    date,
-    theme: config.activeTheme,
-    // No slider starts with a value: only the ones you set are saved, so a
-    // habits-only day doesn't record a fake 0 on every metric.
-    metrics: {},
-    habits: Object.fromEntries(config.habits.map((h) => [h.id, false])),
-    reflection: "",
-    updatedAt: new Date().toISOString(),
-  }
-}
-
-// A day as the page should show it. `unsynced` means it came from a local
-// draft that never reached Postgres, so it still needs saving.
-export type LoadedDay = { entry: DayEntry; unsynced: boolean }
-
-// Reconciles the remote entry with any local draft, preferring whichever is
-// freshest by `updatedAt` — protects an in-progress edit from a dropped sync.
-export async function loadOrInitDay(date: string, config: LoadedConfig): Promise<LoadedDay> {
-  const [remote, draft] = await Promise.all([
-    loadDay(date, config),
-    Promise.resolve(loadDraft(date)),
-  ])
-  if (draft && (!remote || draft.updatedAt > remote.updatedAt))
-    return { entry: draft, unsynced: true }
-  return { entry: remote ?? (await newEntry(date, config)), unsynced: false }
-}
-
-export async function saveDay(entry: DayEntry, config: LoadedConfig): Promise<void> {
-  const userId = await currentUserId()
-
-  const { data: entryRow, error } = await supabase
-    .from("entries")
-    .upsert(
-      { user_id: userId, entry_date: entry.date, theme: entry.theme, reflection: entry.reflection },
-      { onConflict: "user_id,entry_date" },
-    )
-    .select()
-    .single()
-  if (error || !entryRow) throw error ?? new Error("Failed to save entry")
-
-  const entryId = entryRow.id
-
-  // Values for archived or unknown metrics have no row id and are skipped.
-  const metricRows = Object.entries(entry.metrics).flatMap(([key, value]) => {
-    const metricId = config.metricRowId[key]
-    return metricId ? [{ entry_id: entryId, metric_id: metricId, value }] : []
-  })
-  if (metricRows.length) {
-    const { error: mErr } = await supabase
-      .from("entry_metric_values")
-      .upsert(metricRows, { onConflict: "entry_id,metric_id" })
-    if (mErr) throw mErr
-  }
-
-  const habitRows = Object.entries(entry.habits).flatMap(([key, done]) => {
-    const habitId = config.habitRowId[key]
-    return habitId ? [{ entry_id: entryId, habit_id: habitId, done }] : []
-  })
-  if (habitRows.length) {
-    const { error: hErr } = await supabase
-      .from("entry_habits")
-      .upsert(habitRows, { onConflict: "entry_id,habit_id" })
-    if (hErr) throw hErr
-  }
-}
-
-// --- Local draft buffer -----------------------------------------------------
-// Write-ahead cache only: instant on every keystroke, cleared once a Postgres
-// sync succeeds. Never read as a source of truth on its own — only used to
-// win a freshness comparison against the remote row in loadOrInitDay.
-
-const DRAFT_PREFIX = "vanyaos:draft:"
-const draftKey = (date: string) => `${DRAFT_PREFIX}${date}`
-const hasWindow = () => typeof window !== "undefined"
-
-export function saveDraft(entry: DayEntry): void {
-  if (hasWindow()) localStorage.setItem(draftKey(entry.date), JSON.stringify(entry))
-}
-
-export function loadDraft(date: string): DayEntry | null {
-  if (!hasWindow()) return null
-  const raw = localStorage.getItem(draftKey(date))
-  if (!raw) return null
-  try {
-    const parsed: unknown = JSON.parse(raw)
-    return isDayEntry(parsed) ? parsed : null
-  } catch {
-    return null
-  }
-}
-
-// Drafts come back from localStorage, which may hold an older shape — check
-// before trusting it, and fall back to the remote entry if it doesn't match.
-function isDayEntry(value: unknown): value is DayEntry {
-  return (
-    isRecord(value) &&
-    typeof value.date === "string" &&
-    typeof value.theme === "string" &&
-    typeof value.reflection === "string" &&
-    typeof value.updatedAt === "string" &&
-    isRecord(value.metrics) &&
-    Object.values(value.metrics).every((x) => typeof x === "number") &&
-    isRecord(value.habits) &&
-    Object.values(value.habits).every((x) => typeof x === "boolean")
-  )
-}
-
-export function clearDraft(date: string): void {
-  if (hasWindow()) localStorage.removeItem(draftKey(date))
-}
-
-// --- Tasks (the living 1-3-5 list) ------------------------------------------
-// Direct row ops with optimistic UI at the callsite — no debounced blob sync;
-// each mutation is one small write.
-
-type TaskRow = Pick<
-  Tables<"tasks">,
-  "id" | "scope" | "size" | "text" | "completed_at" | "sort_order"
->
-
-const taskFromRow = (r: TaskRow): Task => ({
-  id: r.id,
-  scope: oneOf(TASK_SCOPES, r.scope, "tasks.scope"),
-  size: oneOf(TASK_SIZES, r.size, "tasks.size"),
-  text: r.text,
-  completedAt: r.completed_at,
-  sortOrder: r.sort_order,
-})
-
-// Open tasks plus recently completed ones (completed stay visible on the board
-// for the week they occupied — done work still counts toward the caps).
-export async function listTasks(): Promise<Task[]> {
-  const weekAgo = new Date(Date.now() - 7 * 86400_000).toISOString()
-  const { data, error } = await supabase
-    .from("tasks")
-    .select("id, scope, size, text, completed_at, sort_order")
-    .eq("archived", false)
-    .or(`completed_at.is.null,completed_at.gte.${weekAgo}`)
-    .order("sort_order")
-    .order("created_at")
-  if (error) throw error
-  return (data ?? []).map(taskFromRow)
-}
-
-export async function addTask(text: string, scope: TaskScope, size: TaskSize): Promise<Task> {
-  const { data, error } = await supabase
-    .from("tasks")
-    .insert({ text, scope, size })
-    .select("id, scope, size, text, completed_at, sort_order")
-    .single()
-  if (error || !data) throw error ?? new Error("Failed to add task")
-  return taskFromRow(data)
-}
-
-export async function setTaskDone(id: string, done: boolean): Promise<void> {
-  const { error } = await supabase
-    .from("tasks")
-    .update({ completed_at: done ? new Date().toISOString() : null })
-    .eq("id", id)
-  if (error) throw error
-}
-
-export async function moveTask(id: string, scope: TaskScope): Promise<void> {
-  const { error } = await supabase.from("tasks").update({ scope }).eq("id", id)
-  if (error) throw error
-}
-
-export async function deleteTask(id: string): Promise<void> {
-  const { error } = await supabase.from("tasks").delete().eq("id", id)
-  if (error) throw error
-}
-
-// --- Projects (WIP limit: one) ----------------------------------------------
-
-type ProjectRow = Pick<Tables<"projects">, "id" | "name" | "emoji" | "status" | "sort_order">
-
-const projectFromRow = (r: ProjectRow): Project => ({
-  id: r.id,
-  name: r.name,
-  emoji: r.emoji,
-  status: oneOf(PROJECT_STATUSES, r.status, "projects.status"),
-  sortOrder: r.sort_order,
-})
-
-export async function listProjects(): Promise<Project[]> {
-  const { data, error } = await supabase
-    .from("projects")
-    .select("id, name, emoji, status, sort_order")
-    .order("sort_order")
-    .order("created_at")
-  if (error) throw error
-  return (data ?? []).map(projectFromRow)
-}
-
-export async function addProject(name: string, emoji?: string): Promise<Project> {
-  const { data, error } = await supabase
-    .from("projects")
-    .insert({ name, emoji: emoji ?? null })
-    .select("id, name, emoji, status, sort_order")
-    .single()
-  if (error || !data) throw error ?? new Error("Failed to add project")
-  return projectFromRow(data)
-}
-
-// Swap which project is in progress. Demote first, then promote — the partial
-// unique index (one in_progress per user) rejects the other order.
-export async function setActiveProject(id: string): Promise<void> {
-  const { error: demoteErr } = await supabase
-    .from("projects")
-    .update({ status: "parking_lot" })
-    .eq("status", "in_progress")
-  if (demoteErr) throw demoteErr
-  const { error } = await supabase.from("projects").update({ status: "in_progress" }).eq("id", id)
-  if (error) throw error
-}
-
-export async function deleteProject(id: string): Promise<void> {
-  const { error } = await supabase.from("projects").delete().eq("id", id)
-  if (error) throw error
 }
 
 // --- Settings CRUD (M3) ------------------------------------------------------
@@ -706,61 +339,12 @@ export async function askCoach(
 
 // --- Retrospectives (M4) -----------------------------------------------------
 
-export type RetroArea = {
-  id: string
-  key: string
-  label: string
-  sortOrder: number
-  archived: boolean
-}
-
 export type RetroVersion = {
   id: string
   docMd: string
   aiSummary: string | null
   model: string | null
   createdAt: string
-}
-
-const RETRO_AREA_DEFAULTS = [
-  { key: "finances", label: "Finances" },
-  { key: "health", label: "Health" },
-  { key: "exercise", label: "Exercise" },
-  { key: "work", label: "Work" },
-]
-
-// Same seeding contract as config defaults: insert missing keys only, checked
-// UNFILTERED by archived so an archived default stays archived.
-export async function listRetroAreas(): Promise<RetroArea[]> {
-  const userId = await currentUserId()
-  const { data: existing, error } = await supabase
-    .from("retro_areas")
-    .select("*")
-    .order("sort_order")
-  if (error) throw error
-  const have = new Set((existing ?? []).map((r) => r.key))
-  const missing = RETRO_AREA_DEFAULTS.filter((d) => !have.has(d.key)).map((d, i) => ({
-    user_id: userId,
-    key: d.key,
-    label: d.label,
-    sort_order: (existing?.length ?? 0) + i,
-  }))
-  let rows = existing ?? []
-  if (missing.length) {
-    const { data: inserted, error: insErr } = await supabase
-      .from("retro_areas")
-      .insert(missing)
-      .select("*")
-    if (insErr) throw insErr
-    rows = [...rows, ...(inserted ?? [])]
-  }
-  return rows.map((r) => ({
-    id: r.id,
-    key: r.key,
-    label: r.label,
-    sortOrder: r.sort_order,
-    archived: r.archived,
-  }))
 }
 
 export async function latestRetro(areaId: string): Promise<RetroVersion | null> {
@@ -780,23 +364,6 @@ export async function latestRetro(areaId: string): Promise<RetroVersion | null> 
     model: data.model,
     createdAt: data.created_at,
   }
-}
-
-// Latest COACH RUN per area (model is null for manual seeds/edits — those
-// must not reset the due clock or the intake cutoff; a retrospective is a
-// session, not a save).
-export async function latestRetroDates(): Promise<Record<string, string>> {
-  const { data, error } = await supabase
-    .from("retros")
-    .select("area_id, created_at")
-    .not("model", "is", null)
-    .order("created_at", { ascending: false })
-  if (error) throw error
-  const out: Record<string, string> = {}
-  for (const r of data ?? []) {
-    if (!(r.area_id in out)) out[r.area_id] = r.created_at
-  }
-  return out
 }
 
 // The intake cutoff for a session: when the coach last actually ran for this
@@ -826,12 +393,6 @@ export async function saveRetroVersion(
     .from("retros")
     .insert({ area_id: areaId, doc_md: docMd, ai_summary: aiSummary, model })
   if (error) throw error
-}
-
-const DUE_AFTER_DAYS = 30
-export function isRetroDue(lastRunISO: string | undefined): boolean {
-  if (!lastRunISO) return false // never-seeded areas show "start", not "due"
-  return Date.now() - new Date(lastRunISO).getTime() > DUE_AFTER_DAYS * 86400_000
 }
 
 // Intake for a retro session: EVERYTHING the journal captured in the window —

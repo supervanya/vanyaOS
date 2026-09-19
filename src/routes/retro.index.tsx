@@ -3,8 +3,7 @@ import { useEffect, useState } from "react"
 import { BookOpen, LayoutDashboard } from "lucide-react"
 import { toast } from "sonner"
 
-import { listRetroAreas, latestRetroDates, isRetroDue } from "@/lib/storage"
-import type { RetroArea } from "@/lib/storage"
+import { isRetroDue, latestRetroDates, listRetroAreas, type RetroArea } from "@/features/retro/api"
 import { cn } from "@/lib/utils"
 import { errorMessage } from "@/lib/errors"
 
