@@ -2,8 +2,8 @@ import type { Tables } from "@/lib/database.types"
 import { oneOf } from "@/lib/parse"
 import { supabase } from "@/lib/supabaseClient"
 
-export const PROJECT_STATUSES = ["in_progress", "parking_lot"] as const
-export type ProjectStatus = (typeof PROJECT_STATUSES)[number]
+const PROJECT_STATUSES = ["in_progress", "parking_lot"] as const
+type ProjectStatus = (typeof PROJECT_STATUSES)[number]
 export type Project = {
   id: string
   name: string

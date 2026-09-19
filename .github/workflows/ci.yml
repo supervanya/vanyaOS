@@ -34,6 +34,8 @@ jobs:
             run: bun run test
           - name: Build
             run: bun run build
+          - name: Knip
+            run: bun run knip
     steps:
       - uses: actions/checkout@v7
       # Node and Bun at the versions pinned in mise.toml.

@@ -32,10 +32,10 @@ export type Trend = {
 }
 
 /** Below this many logged days, a comparison is noise. */
-export const MIN_POINTS = 5
+const MIN_POINTS = 5
 /** A change smaller than this across the window reads as flat. */
-export const METRIC_FLAT_BAND = 0.3 // points on the 0-5 slider
-export const HABIT_FLAT_BAND = 0.1 // share of days done: 10 percentage points
+const METRIC_FLAT_BAND = 0.3 // points on the 0-5 slider
+const HABIT_FLAT_BAND = 0.1 // share of days done: 10 percentage points
 
 /**
  * Compares the average of the earlier half of the logged days with the later

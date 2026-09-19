@@ -4,7 +4,7 @@ import { supabase } from "@/lib/supabaseClient"
 
 // The living task list (M2): tasks belong to no day. scope today/week counts
 // toward the weekly 1-3-5 commitment; someday is the parking lot.
-export const TASK_SCOPES = ["today", "week", "someday"] as const
+const TASK_SCOPES = ["today", "week", "someday"] as const
 export const TASK_SIZES = ["big", "medium", "small"] as const
 export type TaskScope = (typeof TASK_SCOPES)[number]
 export type TaskSize = (typeof TASK_SIZES)[number]

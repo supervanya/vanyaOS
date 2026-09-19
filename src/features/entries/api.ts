@@ -91,7 +91,7 @@ export async function loadDay(date: string, config: LoadedConfig): Promise<DayEn
 
 // A fresh entry for `date`. (Todos no longer roll forward — the living task
 // list simply persists; see the tasks section below.)
-export async function newEntry(date: string, config: LoadedConfig): Promise<DayEntry> {
+async function newEntry(date: string, config: LoadedConfig): Promise<DayEntry> {
   return {
     date,
     theme: config.activeTheme,

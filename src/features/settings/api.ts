@@ -35,7 +35,7 @@ export type GoalRow = {
 }
 
 // Stable slug for a new row's key, from its label ("Cold shower" -> cold_shower).
-export function slugify(label: string): string {
+function slugify(label: string): string {
   return label
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "_")
