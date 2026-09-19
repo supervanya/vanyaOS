@@ -1,6 +1,6 @@
-import { useQuery } from "@tanstack/react-query"
+import { useQuery, useSuspenseQuery } from "@tanstack/react-query"
 import { createFileRoute, Link } from "@tanstack/react-router"
-import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from "react"
+import { useMemo, useState } from "react"
 import {
   Moon,
   Activity,
@@ -15,8 +15,8 @@ import {
 } from "lucide-react"
 import type { LoadedConfig } from "@/features/config/api"
 import { configQuery } from "@/features/config/queries"
-import { listDayDates, loadDay, type LoadedDay } from "@/features/entries/api"
-import { dayQuery } from "@/features/entries/queries"
+import type { LoadedDay } from "@/features/entries/api"
+import { dayQuery, previousWellnessQuery } from "@/features/entries/queries"
 import { useEntryAutosave } from "@/features/entries/useEntryAutosave"
 import { wellness } from "@/features/entries/wellness"
 import { TaskBoard } from "@/features/tasks/TaskBoard"
@@ -25,22 +25,42 @@ import { defaultEntryDate, shiftISO, todayISO } from "@/lib/dates"
 import { MetricSlider } from "@/components/MetricSlider"
 import { HabitChip } from "@/components/HabitChip"
 import { useAutoGrow } from "@/hooks/useAutoGrow"
+import { Skeleton } from "@/components/ui/skeleton"
 
-export const Route = createFileRoute("/reflect")({ component: Reflection })
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/
+
+export const Route = createFileRoute("/reflect")({
+  // The day being edited lives in the URL (?date=YYYY-MM-DD), so the loader can
+  // fetch it and back/forward step through days. No date = the default day.
+  validateSearch: (search: Record<string, unknown>): { date?: string } =>
+    typeof search.date === "string" && ISO_DATE.test(search.date) ? { date: search.date } : {},
+  loaderDeps: ({ search }) => ({ date: search.date ?? defaultEntryDate() }),
+  loader: async ({ context: { queryClient }, deps: { date } }) => {
+    void queryClient.prefetchQuery(previousWellnessQuery(date))
+    await Promise.all([
+      queryClient.ensureQueryData(configQuery),
+      queryClient.ensureQueryData(dayQuery(date)),
+    ])
+  },
+  pendingComponent: ReflectSkeleton,
+  component: Reflection,
+})
 
 function Reflection() {
-  const [selectedDate, setSelectedDate] = useState<string>(() => defaultEntryDate())
-  const config = useQuery(configQuery)
-  const day = useQuery(dayQuery(selectedDate))
-  if (!config.data || !day.data) return null
+  const selectedDate = Route.useSearch().date ?? defaultEntryDate()
+  const navigate = Route.useNavigate()
+  const { data: config } = useSuspenseQuery(configQuery)
+  const { data: day } = useSuspenseQuery(dayQuery(selectedDate))
+  const goTo = (date: string) =>
+    void navigate({ search: date === defaultEntryDate() ? {} : { date } })
   // Keyed by date: each day gets a fresh editor seeded from its loaded entry.
   return (
     <ReflectionDay
       key={selectedDate}
-      config={config.data}
-      loaded={day.data}
+      config={config}
+      loaded={day}
       selectedDate={selectedDate}
-      setSelectedDate={setSelectedDate}
+      goTo={goTo}
     />
   )
 }
@@ -49,12 +69,12 @@ function ReflectionDay({
   config,
   loaded,
   selectedDate,
-  setSelectedDate,
+  goTo,
 }: {
   config: LoadedConfig
   loaded: LoadedDay
   selectedDate: string
-  setSelectedDate: Dispatch<SetStateAction<string>>
+  goTo: (date: string) => void
 }) {
   const { entry, setEntry } = useEntryAutosave(config, loaded)
   const [showDateInfo, setShowDateInfo] = useState(false)
@@ -64,29 +84,9 @@ function ReflectionDay({
 
   const score = useMemo(() => wellness(entry, config), [entry, config])
 
-  // Wellness of the most recent prior day, for the "vs last" delta. Tagged with
-  // the date it was computed for, so a stale score never shows on another day.
-  const entryDate = entry.date
-  const [prev, setPrev] = useState<{ date: string; score: number | null } | null>(null)
-  useEffect(() => {
-    let cancelled = false
-    listDayDates()
-      .then((dates) => {
-        // Dates come back sorted, so the last one before today's entry is the latest.
-        const previous = dates.findLast((d) => d < entryDate)
-        return previous ? loadDay(previous, config) : null
-      })
-      .then((p) => {
-        if (!cancelled) setPrev({ date: entryDate, score: p ? wellness(p, config) : null })
-      })
-      .catch(() => {
-        if (!cancelled) setPrev({ date: entryDate, score: null })
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [config, entryDate])
-  const prevScore = prev && prev.date === entryDate ? prev.score : null
+  // Wellness of the most recent prior day, for the "vs last" delta. Optional,
+  // so it doesn't hold up the page — the delta appears once it's loaded.
+  const prevScore = useQuery(previousWellnessQuery(entry.date)).data ?? null
 
   const groups = useMemo(
     () =>
@@ -139,7 +139,7 @@ function ReflectionDay({
           <button
             type="button"
             aria-label="Previous day"
-            onClick={() => setSelectedDate((d) => shiftISO(d, -1))}
+            onClick={() => goTo(shiftISO(selectedDate, -1))}
             className="rounded p-1 hover:text-foreground"
           >
             <ChevronLeft size={16} />
@@ -149,7 +149,7 @@ function ReflectionDay({
             type="button"
             aria-label="Next day"
             disabled={selectedDate >= actualToday}
-            onClick={() => setSelectedDate((d) => shiftISO(d, 1))}
+            onClick={() => goTo(shiftISO(selectedDate, 1))}
             className="rounded p-1 hover:text-foreground disabled:opacity-30"
           >
             <ChevronRight size={16} />
@@ -172,7 +172,7 @@ function ReflectionDay({
             </button>
             <button
               type="button"
-              onClick={() => setSelectedDate(actualToday)}
+              onClick={() => goTo(actualToday)}
               className="whitespace-nowrap underline"
             >
               Use today
@@ -326,5 +326,29 @@ function ReflectionDay({
         Synced to your account · theme: {entry.theme}
       </p>
     </>
+  )
+}
+
+function ReflectSkeleton() {
+  return (
+    <div className="flex flex-col" aria-busy="true" aria-label="Loading">
+      <div className="flex items-center justify-between">
+        <Skeleton className="h-4 w-20" />
+        <Skeleton className="h-4 w-28" />
+      </div>
+      <Skeleton className="mt-4 h-5 w-40" />
+      <Skeleton className="mt-2 h-10 w-16" />
+      {[0, 1, 2].map((group) => (
+        <div key={group} className="mt-6 flex flex-col gap-4">
+          <Skeleton className="h-3 w-24" />
+          {[0, 1, 2].map((row) => (
+            <div key={row} className="flex items-center gap-3">
+              <Skeleton className="h-4 w-24" />
+              <Skeleton className="h-2 flex-1" />
+            </div>
+          ))}
+        </div>
+      ))}
+    </div>
   )
 }

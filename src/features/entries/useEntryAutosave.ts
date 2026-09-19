@@ -34,8 +34,12 @@ export function useEntryAutosave(config: LoadedConfig, loaded: LoadedDay) {
       saveDay(entry, config)
         .then(() => {
           clearDraft(entry.date)
-          // Other screens showing this day pick up the saved version.
+          // Other screens showing this day pick up the saved version, and
+          // later days' "vs last" deltas recompute.
           queryClient.setQueryData(dayQuery(entry.date).queryKey, { entry, unsynced: false })
+          void queryClient.invalidateQueries({
+            predicate: (query) => query.queryKey[2] === "previous-wellness",
+          })
         })
         .catch((err: unknown) => toast.error(`Sync failed, kept locally: ${errorMessage(err)}`))
     }, SYNC_DEBOUNCE_MS)
