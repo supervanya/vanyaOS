@@ -76,9 +76,9 @@ function Reflection() {
     let cancelled = false
     listDayDates()
       .then((dates) => {
-        const priors = dates.filter((d) => d < entryDate)
-        if (!priors.length) return null
-        return loadDay(priors[priors.length - 1], config)
+        // Dates come back sorted, so the last one before today's entry is the latest.
+        const previous = dates.findLast((d) => d < entryDate)
+        return previous ? loadDay(previous, config) : null
       })
       .then((p) => {
         if (!cancelled) setPrev({ date: entryDate, score: p ? wellness(p, config) : null })

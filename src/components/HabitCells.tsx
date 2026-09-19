@@ -21,6 +21,7 @@ export function HabitCells({
   const { index, handlers } = useHoverIndex(buckets.length, (ratio) =>
     Math.floor(ratio * buckets.length),
   )
+  const hovered = index === null ? undefined : buckets[index]
 
   return (
     <div
@@ -35,9 +36,9 @@ export function HabitCells({
           active={i === index}
         />
       ))}
-      {index !== null && (
+      {index !== null && hovered && (
         <HoverLabel left={`${((index + 0.5) / buckets.length) * 100}%`}>
-          {describe(buckets[index])}
+          {describe(hovered)}
         </HoverLabel>
       )}
     </div>

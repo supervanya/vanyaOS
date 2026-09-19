@@ -158,7 +158,7 @@ export async function loadConfig(): Promise<LoadedConfig> {
     id: r.key,
     label: r.label,
     progress: r.progress,
-    note: r.note ?? undefined,
+    ...(r.note !== null && { note: r.note }),
   }))
 
   return {
@@ -338,9 +338,11 @@ export async function saveDay(entry: DayEntry, config: LoadedConfig): Promise<vo
 
   const entryId = entryRow.id
 
-  const metricRows = Object.entries(entry.metrics)
-    .filter(([key]) => config.metricRowId[key])
-    .map(([key, value]) => ({ entry_id: entryId, metric_id: config.metricRowId[key], value }))
+  // Values for archived or unknown metrics have no row id and are skipped.
+  const metricRows = Object.entries(entry.metrics).flatMap(([key, value]) => {
+    const metricId = config.metricRowId[key]
+    return metricId ? [{ entry_id: entryId, metric_id: metricId, value }] : []
+  })
   if (metricRows.length) {
     const { error: mErr } = await supabase
       .from("entry_metric_values")
@@ -348,9 +350,10 @@ export async function saveDay(entry: DayEntry, config: LoadedConfig): Promise<vo
     if (mErr) throw mErr
   }
 
-  const habitRows = Object.entries(entry.habits)
-    .filter(([key]) => config.habitRowId[key])
-    .map(([key, done]) => ({ entry_id: entryId, habit_id: config.habitRowId[key], done }))
+  const habitRows = Object.entries(entry.habits).flatMap(([key, done]) => {
+    const habitId = config.habitRowId[key]
+    return habitId ? [{ entry_id: entryId, habit_id: habitId, done }] : []
+  })
   if (habitRows.length) {
     const { error: hErr } = await supabase
       .from("entry_habits")

@@ -208,7 +208,7 @@ function SortButton({
   value: SortOrder
   onChange: (next: SortOrder) => void
 }) {
-  const next = SORT_ORDERS[(SORT_ORDERS.indexOf(value) + 1) % SORT_ORDERS.length]
+  const next = SORT_ORDERS[(SORT_ORDERS.indexOf(value) + 1) % SORT_ORDERS.length] ?? "yours"
   return (
     <button
       type="button"

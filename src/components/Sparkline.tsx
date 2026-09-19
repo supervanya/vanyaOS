@@ -55,8 +55,11 @@ export function Sparkline({
         />
         {segments(buckets).map((segment) => {
           const line = segment.map(([i, v], k) => `${k ? "L" : "M"}${x(i)} ${y(v)}`).join(" ")
-          const [firstIndex] = segment[0]
-          const [lastIndex, lastValue] = segment[segment.length - 1]
+          const first = segment[0]
+          const last = segment.at(-1)
+          if (!first || !last) return null
+          const [firstIndex] = first
+          const [lastIndex, lastValue] = last
           return (
             <g key={firstIndex}>
               {segment.length > 1 && (

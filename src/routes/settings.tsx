@@ -161,7 +161,7 @@ function RetroAreasSection() {
 
 function AiSection() {
   const [provider, setProvider] = useState<AiProvider>("anthropic")
-  const [model, setModel] = useState(AI_PROVIDERS.anthropic.models[0])
+  const [model, setModel] = useState(AI_PROVIDERS.anthropic.models[0] ?? "")
   const [key, setKey] = useState("")
   const [hasKey, setHasKey] = useState(false)
   // Which provider the STORED key belongs to — a stored Anthropic key must
@@ -179,7 +179,7 @@ function AiSection() {
     listProviderModels(freshKey ? p : undefined, freshKey || undefined)
       .then((m) => {
         setModels(m)
-        if (m.length) setModel((cur) => (m.includes(cur) ? cur : m[0]))
+        setModel((cur) => (m.includes(cur) ? cur : (m[0] ?? cur)))
       })
       .catch((err) => {
         setModels(null)
@@ -239,7 +239,7 @@ function AiSection() {
             onChange={(e) => {
               const p = oneOf(AI_PROVIDER_IDS, e.target.value, "provider")
               setProvider(p)
-              setModel(AI_PROVIDERS[p].models[0])
+              setModel(AI_PROVIDERS[p].models[0] ?? "")
               setModels(null)
               // A fresh key in the box can list models pre-save; a stored key
               // can't (it may belong to the previous provider).
@@ -422,7 +422,7 @@ function persistReorder<T extends { id: string; sortOrder: number }>(
   const byId = new Map(next.map((r) => [r.id, r]))
   setRows((cur) => cur && cur.map((r) => byId.get(r.id) ?? r).toSorted(bySortOrder))
 
-  const moved = next.filter((r, i) => r.sortOrder !== reordered[i].sortOrder)
+  const moved = next.filter((r, i) => r.sortOrder !== reordered[i]?.sortOrder)
   updateSortOrders(table, moved).catch((err) => {
     onErr(err)
     reload()
@@ -671,8 +671,12 @@ function GoalsSection() {
                 min={0}
                 max={100}
                 step={5}
-                onValueChange={([v]) => setProgressLocal(g.id, v / 100)}
-                onValueCommit={([v]) => patch(g.id, { progress: v / 100 })}
+                onValueChange={([v]) => {
+                  if (v !== undefined) setProgressLocal(g.id, v / 100)
+                }}
+                onValueCommit={([v]) => {
+                  if (v !== undefined) patch(g.id, { progress: v / 100 })
+                }}
                 className="flex-1"
               />
               <span className="w-9 text-right text-[11px] text-muted-foreground tabular-nums">

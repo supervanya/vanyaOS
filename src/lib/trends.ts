@@ -92,9 +92,10 @@ export type Streak = { days: number; since: string | null }
 export function currentStreak(points: Point[]): Streak {
   let days = 0
   let since: string | null = null
-  for (let i = points.length - 1; i >= 0 && points[i].value === 1; i--) {
+  for (const point of points.toReversed()) {
+    if (point.value !== 1) break
     days += 1
-    since = points[i].date
+    since = point.date
   }
   return { days, since }
 }
@@ -173,24 +174,24 @@ export function bucketize(points: Point[], from: string, to: string, size: numbe
   const first = toDay(from)
   const last = toDay(to)
   const n = Math.ceil((last - first + 1) / size)
-  const sums = Array.from({ length: n }, () => 0)
-  const counts = Array.from({ length: n }, () => 0)
+  const totals = Array.from({ length: n }, () => ({ sum: 0, count: 0 }))
 
   for (const p of points) {
     const day = toDay(p.date)
     if (day < first || day > last) continue
-    const i = n - 1 - Math.floor((last - day) / size)
-    sums[i] += p.value
-    counts[i] += 1
+    const total = totals[n - 1 - Math.floor((last - day) / size)]
+    if (!total) continue
+    total.sum += p.value
+    total.count += 1
   }
 
-  return sums.map((sum, i) => {
+  return totals.map(({ sum, count }, i) => {
     const end = last - (n - 1 - i) * size
     return {
       start: fromDay(Math.max(first, end - size + 1)),
       end: fromDay(end),
-      mean: counts[i] ? sum / counts[i] : null,
-      count: counts[i],
+      mean: count ? sum / count : null,
+      count,
     }
   })
 }

@@ -10,12 +10,11 @@ import type { DayEntry } from "./storage"
 
 /** Null until at least one slider is set. */
 export function wellness(entry: DayEntry, config: Config): number | null {
-  const vals = config.metrics
-    .filter((m) => entry.metrics[m.id] !== undefined)
-    .map((m) => {
-      const v = entry.metrics[m.id]
-      return m.higherIsBetter ? v : m.scale - v
-    })
+  const vals = config.metrics.flatMap((m) => {
+    const v = entry.metrics[m.id]
+    if (v === undefined) return []
+    return [m.higherIsBetter ? v : m.scale - v]
+  })
   if (!vals.length) return null
   return vals.reduce((a, b) => a + b, 0) / vals.length
 }

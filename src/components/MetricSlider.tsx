@@ -71,7 +71,9 @@ export function MetricSlider({
       onKeyDown={(e) => {
         if (unset && SLIDER_KEYS.has(e.key)) set(min)
       }}
-      onValueChange={(v) => set(v[0])}
+      onValueChange={([v]) => {
+        if (v !== undefined) set(v)
+      }}
       className={cn(unset ? UNSET : TONE[tone], className)}
     />
   )
