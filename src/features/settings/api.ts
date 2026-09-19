@@ -1,14 +1,11 @@
-// Settings CRUD — the last of the pre-feature-module store. #75 moves it to
-// src/features/settings and deletes this file.
+import type { TablesUpdate } from "@/lib/database.types"
+import { supabase } from "@/lib/supabaseClient"
 
-import { supabase } from "./supabaseClient"
-import type { TablesUpdate } from "./database.types"
-
-// --- Settings CRUD (M3) ------------------------------------------------------
-// Full rows (uuid, archived, sort_order) for the /settings screen. Mutations
-// are by row uuid. Archive, never delete — historical entry values keep their
-// FK targets. seedMissingDefaults checks keys UNFILTERED by archived, so an
-// archived default stays archived instead of resurrecting on next load.
+// Settings CRUD (M3): full config rows (uuid, archived, sort_order) for the
+// /settings screen — unlike the active-only config other screens read
+// (features/config). Mutations are by row uuid. Archive, never delete:
+// historical entry values keep their FK targets, and seeding checks keys
+// unfiltered by archived, so an archived default stays archived.
 
 export type MetricRow = {
   id: string

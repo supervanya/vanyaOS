@@ -15,7 +15,12 @@ type ListChange<T> = {
  * says so; either way the list refetches, so the cache ends up matching the
  * database. Returns `apply(change, write)`.
  */
-export function useOptimisticList<T>(queryKey: QueryKey) {
+export function useOptimisticList<T>(
+  queryKey: QueryKey,
+  /** What to refetch afterwards; defaults to the list. Pass a prefix to also
+   * refresh data derived from it elsewhere. */
+  { invalidate = queryKey }: { invalidate?: QueryKey } = {},
+) {
   const queryClient = useQueryClient()
   const { mutate } = useMutation({
     mutationFn: ({ write }: ListChange<T>) => write(),
@@ -30,7 +35,7 @@ export function useOptimisticList<T>(queryKey: QueryKey) {
       queryClient.setQueryData(queryKey, context?.previous)
       toast.error(`Didn't save: ${errorMessage(err)}`)
     },
-    onSettled: () => queryClient.invalidateQueries({ queryKey }),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: invalidate }),
   })
   return (change: ListChange<T>["change"], write: ListChange<T>["write"]) =>
     mutate({ change, write })
