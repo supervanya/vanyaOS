@@ -11,6 +11,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "test": "vitest run",
+    "typecheck": "tsc --noEmit",
     "db:mirror": "bash scripts/db-mirror-prod.sh"
   },
   "dependencies": {
