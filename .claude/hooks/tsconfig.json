@@ -1,0 +1,16 @@
+{
+  // Claude Code hook scripts run under Bun, not in the browser — separate
+  // project from the app's tsconfig (which skips dot-directories anyway).
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ESNext"],
+    "types": ["bun"],
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "verbatimModuleSyntax": true
+  },
+  "include": ["*.ts"]
+}

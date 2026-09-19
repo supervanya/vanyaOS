@@ -13,6 +13,8 @@ bun run lint:fix      # Oxlint auto-fixes
 
 Git hooks (Lefthook, installed by `bun install`): pre-commit lints, formats and typechecks; pre-push runs the tests. Don't bypass them with `--no-verify` or `LEFTHOOK=0` — fix what they report.
 
+Claude Code hooks (`.claude/settings.json`) do the same inside a session: every edited file is formatted and linted on the spot, and ending a turn with uncommitted changes runs `check` first. When a hook reports errors, fix them — don't work around the hook.
+
 ## Where planning lives
 
 Three layers. Don't mix them up — each one rots if it absorbs the others' content.
