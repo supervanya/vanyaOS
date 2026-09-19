@@ -3,8 +3,8 @@
 // React — so metric sparklines, habit cells and the slider context in Reflect
 // all share one tested implementation.
 
-import { isOneOf } from "./parse"
-import type { Metric } from "./config"
+import { isOneOf } from "@/lib/parse"
+import type { Metric } from "@/lib/config"
 
 /** One logged day. Days without an entry are absent, never zero. */
 export type Point = { date: string; value: number } // date is YYYY-MM-DD

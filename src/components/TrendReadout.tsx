@@ -1,4 +1,4 @@
-import type { Trend, Verdict } from "@/lib/trends"
+import type { Trend, Verdict } from "@/features/trends/math"
 import { cn } from "@/lib/utils"
 import { WithDetail } from "@/components/chartHover"
 

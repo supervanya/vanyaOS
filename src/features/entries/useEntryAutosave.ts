@@ -4,6 +4,7 @@ import { toast } from "sonner"
 import type { LoadedConfig } from "@/features/config/api"
 import { errorMessage } from "@/lib/errors"
 import { clearDraft, saveDay, saveDraft, type DayEntry, type LoadedDay } from "./api"
+import { trendSeriesQuery } from "@/features/trends/queries"
 import { dayQuery } from "./queries"
 
 // How long to wait after the last edit before syncing to Postgres. The local
@@ -34,12 +35,13 @@ export function useEntryAutosave(config: LoadedConfig, loaded: LoadedDay) {
       saveDay(entry, config)
         .then(() => {
           clearDraft(entry.date)
-          // Other screens showing this day pick up the saved version, and
-          // later days' "vs last" deltas recompute.
+          // Other screens showing this day pick up the saved version; later
+          // days' "vs last" deltas and the Trends history recompute.
           queryClient.setQueryData(dayQuery(entry.date).queryKey, { entry, unsynced: false })
           void queryClient.invalidateQueries({
             predicate: (query) => query.queryKey[2] === "previous-wellness",
           })
+          void queryClient.invalidateQueries({ queryKey: trendSeriesQuery.queryKey })
         })
         .catch((err: unknown) => toast.error(`Sync failed, kept locally: ${errorMessage(err)}`))
     }, SYNC_DEBOUNCE_MS)

@@ -1,5 +1,5 @@
 import { useRef, useState, type PointerEvent, type ReactNode } from "react"
-import type { Bucket } from "@/lib/trends"
+import type { Bucket } from "@/features/trends/math"
 import { cn } from "@/lib/utils"
 
 /**

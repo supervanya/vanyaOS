@@ -27,13 +27,16 @@ import {
   addHabitRow,
   addGoalRow,
   addRetroAreaRow,
-  getAiSettings,
-  saveAiSettings,
-  listProviderModels,
+} from "@/lib/storage"
+import type { MetricRow, HabitRow, GoalRow, ConfigTable } from "@/lib/storage"
+import {
   AI_PROVIDERS,
   AI_PROVIDER_IDS,
-} from "@/lib/storage"
-import type { MetricRow, HabitRow, GoalRow, AiProvider, ConfigTable } from "@/lib/storage"
+  getAiSettings,
+  listProviderModels,
+  saveAiSettings,
+  type AiProvider,
+} from "@/features/ai/api"
 import { bySortOrder, withSortOrderSlots } from "@/lib/sortOrder"
 import { DragHandle, SortableList } from "@/components/SortableList"
 import { Button } from "@/components/ui/button"

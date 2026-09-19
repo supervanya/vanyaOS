@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import type { Metric } from "./config"
+import type { Metric } from "@/lib/config"
 import {
   bucketSize,
   bucketize,
@@ -15,7 +15,7 @@ import {
   type Point,
   type SortOrder,
   type Trend,
-} from "./trends"
+} from "./math"
 
 // Day n counted from Sep 1, 2026.
 const day = (n: number) => new Date(Date.UTC(2026, 8, 1 + n)).toISOString().slice(0, 10)

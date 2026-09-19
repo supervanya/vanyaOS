@@ -1,5 +1,5 @@
 import { queryOptions } from "@tanstack/react-query"
-import { latestRetroDates, listRetroAreas } from "./api"
+import { latestRetro, latestRetroDates, listRetroAreas } from "./api"
 
 export const retroAreasQuery = queryOptions({
   queryKey: ["retro", "areas"],
@@ -11,3 +11,7 @@ export const latestRetroDatesQuery = queryOptions({
   queryKey: ["retro", "latest-dates"],
   queryFn: latestRetroDates,
 })
+
+/** The area's current state-of-affairs doc (newest version), or null. */
+export const latestRetroQuery = (areaId: string) =>
+  queryOptions({ queryKey: ["retro", "latest", areaId], queryFn: () => latestRetro(areaId) })

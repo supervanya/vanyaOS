@@ -1,28 +1,23 @@
+import { useSuspenseQuery } from "@tanstack/react-query"
 import { createFileRoute, Link } from "@tanstack/react-router"
-import { useEffect, useState } from "react"
 import { BookOpen, LayoutDashboard } from "lucide-react"
-import { toast } from "sonner"
 
-import { isRetroDue, latestRetroDates, listRetroAreas, type RetroArea } from "@/features/retro/api"
+import { isRetroDue } from "@/features/retro/api"
+import { latestRetroDatesQuery, retroAreasQuery } from "@/features/retro/queries"
 import { cn } from "@/lib/utils"
-import { errorMessage } from "@/lib/errors"
 
-export const Route = createFileRoute("/retro/")({ component: RetroList })
+export const Route = createFileRoute("/retro/")({
+  loader: ({ context: { queryClient } }) =>
+    Promise.all([
+      queryClient.ensureQueryData(retroAreasQuery),
+      queryClient.ensureQueryData(latestRetroDatesQuery),
+    ]),
+  component: RetroList,
+})
 
 function RetroList() {
-  const [areas, setAreas] = useState<RetroArea[] | null>(null)
-  const [lastRuns, setLastRuns] = useState<Record<string, string>>({})
-
-  useEffect(() => {
-    Promise.all([listRetroAreas(), latestRetroDates()])
-      .then(([a, dates]) => {
-        setAreas(a.filter((x) => !x.archived))
-        setLastRuns(dates)
-      })
-      .catch((err) => toast.error(`Couldn't load retro areas: ${errorMessage(err)}`))
-  }, [])
-
-  if (!areas) return null
+  const areas = useSuspenseQuery(retroAreasQuery).data.filter((a) => !a.archived)
+  const { data: lastRuns } = useSuspenseQuery(latestRetroDatesQuery)
 
   return (
     <>

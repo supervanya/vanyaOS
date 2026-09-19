@@ -1,11 +1,13 @@
-import { loadConfig, type LoadedConfig } from "@/features/config/api"
+import { useSuspenseQuery } from "@tanstack/react-query"
 import { createFileRoute, Link } from "@tanstack/react-router"
-import { useEffect, useState, type ReactNode } from "react"
+import { useState, type ReactNode } from "react"
 import { ArrowUpDown, LayoutDashboard, TrendingUp } from "lucide-react"
-import { toast } from "sonner"
-import { loadTrendSeries } from "../lib/storage"
+import { Skeleton } from "@/components/ui/skeleton"
+import type { LoadedConfig } from "@/features/config/api"
+import { configQuery } from "@/features/config/queries"
+import type { TrendSeries } from "@/features/trends/api"
+import { trendSeriesQuery } from "@/features/trends/queries"
 import { todayISO } from "@/lib/dates"
-import type { TrendSeries } from "../lib/storage"
 import {
   SORT_ORDERS,
   TREND_WINDOWS,
@@ -22,17 +24,24 @@ import {
   wellnessSeries,
   wellnessTrend,
   windowStart,
-} from "../lib/trends"
-import type { Point, SortOrder, Streak, Trend, TrendWindow } from "../lib/trends"
+} from "@/features/trends/math"
+import type { Point, SortOrder, Streak, Trend, TrendWindow } from "@/features/trends/math"
 import { groupMetrics, type Metric } from "../lib/config"
 import { HabitCells } from "@/components/HabitCells"
 import { Sparkline } from "@/components/Sparkline"
 import { TrendReadout, trendTone } from "@/components/TrendReadout"
 import { WithDetail, shortDate } from "@/components/chartHover"
 import { cn } from "@/lib/utils"
-import { errorMessage } from "@/lib/errors"
 
-export const Route = createFileRoute("/trends")({ component: Trends })
+export const Route = createFileRoute("/trends")({
+  loader: ({ context: { queryClient } }) =>
+    Promise.all([
+      queryClient.ensureQueryData(configQuery),
+      queryClient.ensureQueryData(trendSeriesQuery),
+    ]),
+  pendingComponent: TrendsSkeleton,
+  component: Trends,
+})
 
 const formatScore = (value: number) => value.toFixed(1)
 const formatRate = (value: number) => `${Math.round(value * 100)}%`
@@ -40,8 +49,8 @@ const formatRate = (value: number) => `${Math.round(value * 100)}%`
 function Trends() {
   const [trendWindow, setTrendWindow] = useStoredChoice(WINDOW_KEY, isTrendWindow, "1M")
   const [sortOrder, setSortOrder] = useStoredChoice(SORT_KEY, isSortOrder, "yours")
-  const config = useConfig()
-  const history = useTrendHistory(config)
+  const { data: config } = useSuspenseQuery(configQuery)
+  const { data: history } = useSuspenseQuery(trendSeriesQuery)
 
   return (
     <>
@@ -64,14 +73,12 @@ function Trends() {
         <SortButton value={sortOrder} onChange={setSortOrder} />
       </div>
 
-      {config && history && (
-        <TrendSections
-          config={config}
-          trendWindow={trendWindow}
-          sortOrder={sortOrder}
-          history={history}
-        />
-      )}
+      <TrendSections
+        config={config}
+        trendWindow={trendWindow}
+        sortOrder={sortOrder}
+        history={history}
+      />
     </>
   )
 }
@@ -421,33 +428,25 @@ function useStoredChoice<T extends string>(
   return [value, choose] as const
 }
 
-function useConfig() {
-  const [config, setConfig] = useState<LoadedConfig | null>(null)
-  useEffect(() => {
-    loadConfig()
-      .then(setConfig)
-      .catch((err) => toast.error(`Couldn't load config: ${errorMessage(err)}`))
-  }, [])
-  return config
-}
-
-// All history is loaded once and every window is a slice of it, so switching
-// windows is instant and a streak can count back past the window's start.
-function useTrendHistory(config: LoadedConfig | null) {
-  const [history, setHistory] = useState<TrendSeries | null>(null)
-
-  useEffect(() => {
-    if (!config) return
-    let cancelled = false
-    loadTrendSeries(config)
-      .then((h) => {
-        if (!cancelled) setHistory(h)
-      })
-      .catch((err) => toast.error(`Couldn't load trends: ${errorMessage(err)}`))
-    return () => {
-      cancelled = true
-    }
-  }, [config])
-
-  return history
+function TrendsSkeleton() {
+  return (
+    <div className="flex flex-col" aria-busy="true" aria-label="Loading">
+      <div className="flex items-center justify-between">
+        <Skeleton className="h-4 w-20" />
+        <Skeleton className="h-6 w-40" />
+      </div>
+      <Skeleton className="mt-4 h-5 w-24" />
+      {[0, 1, 2].map((section) => (
+        <div key={section} className="mt-6 flex flex-col gap-3">
+          <Skeleton className="h-3 w-24" />
+          {[0, 1, 2].map((row) => (
+            <div key={row} className="flex items-center gap-3">
+              <Skeleton className="h-4 w-24" />
+              <Skeleton className="h-6 flex-1" />
+            </div>
+          ))}
+        </div>
+      ))}
+    </div>
+  )
 }

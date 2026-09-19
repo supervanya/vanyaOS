@@ -1,31 +1,33 @@
+import { useQueryClient, useSuspenseQuery } from "@tanstack/react-query"
 import { createFileRoute, Link } from "@tanstack/react-router"
 import { useEffect, useRef, useState } from "react"
 import { ArrowLeft, Pencil, Play, Send, Square } from "lucide-react"
 import { toast } from "sonner"
 
-import {
-  latestRetro,
-  latestCoachRunAt,
-  saveRetroVersion,
-  buildIntakeSignal,
-  askCoach,
-  getAiSettings,
-} from "@/lib/storage"
-import type { RetroVersion, CoachMsg } from "@/lib/storage"
-import { listRetroAreas, type RetroArea } from "@/features/retro/api"
+import { askCoach, getAiSettings, type CoachMsg } from "@/features/ai/api"
+import { latestCoachRunAt, saveRetroVersion } from "@/features/retro/api"
+import { buildIntakeSignal } from "@/features/retro/intake"
+import { latestRetroQuery, retroAreasQuery } from "@/features/retro/queries"
 import { Button } from "@/components/ui/button"
 import { Markdown } from "@/components/Markdown"
 import { cn } from "@/lib/utils"
 import { useAutoGrow } from "@/hooks/useAutoGrow"
 import { errorMessage } from "@/lib/errors"
-import { queryClient } from "@/lib/queryClient"
 
-export const Route = createFileRoute("/retro/$areaId")({ component: RetroAreaScreen })
+export const Route = createFileRoute("/retro/$areaId")({
+  loader: ({ context: { queryClient }, params: { areaId } }) =>
+    Promise.all([
+      queryClient.ensureQueryData(retroAreasQuery),
+      queryClient.ensureQueryData(latestRetroQuery(areaId)),
+    ]),
+  component: RetroAreaRoute,
+})
 
-// The dashboard's "due" badge and the retro index read from the query cache;
-// a saved version changes them. (#74 moves this screen onto queries.)
-const refreshRetroData = () => {
-  void queryClient.invalidateQueries({ queryKey: ["retro"] })
+// Switching areas keeps this route mounted; keying by area gives each one a
+// fresh screen instead of carrying over the last area's session.
+function RetroAreaRoute() {
+  const { areaId } = Route.useParams()
+  return <RetroAreaScreen key={areaId} areaId={areaId} />
 }
 
 // The coach must end the session with these exact blocks so the app can save
@@ -63,12 +65,13 @@ function coachSystemPrompt(areaLabel: string): string {
   )
 }
 
-function RetroAreaScreen() {
-  const { areaId } = Route.useParams()
-  const [area, setArea] = useState<RetroArea | null>(null)
-  const [version, setVersion] = useState<RetroVersion | null | undefined>(undefined)
+function RetroAreaScreen({ areaId }: { areaId: string }) {
+  const queryClient = useQueryClient()
+  const area = useSuspenseQuery(retroAreasQuery).data.find((a) => a.id === areaId)
+  const { data: version } = useSuspenseQuery(latestRetroQuery(areaId))
   const [editText, setEditText] = useState("")
-  const [mode, setMode] = useState<"view" | "edit" | "session">("view")
+  // No doc yet → start in seed-by-paste mode.
+  const [mode, setMode] = useState<"view" | "edit" | "session">(version ? "view" : "edit")
 
   // Session state — transcript is client-held; only the final doc persists.
   const [transcript, setTranscript] = useState<CoachMsg[]>([])
@@ -81,32 +84,30 @@ function RetroAreaScreen() {
   const chatRef = useAutoGrow(chatDraft)
 
   useEffect(() => {
-    Promise.all([listRetroAreas(), latestRetro(areaId)])
-      .then(([areas, v]) => {
-        const a = areas.find((x) => x.id === areaId) ?? null
-        setArea(a)
-        setVersion(v)
-        if (!v) setMode("edit") // no doc yet → seed-by-paste mode
-      })
-      .catch((err) => toast.error(`Couldn't load: ${errorMessage(err)}`))
-  }, [areaId])
-
-  useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [transcript, busy])
 
-  if (!area || version === undefined) return null
+  if (!area) {
+    return (
+      <p className="mt-10 text-center text-sm text-muted-foreground">
+        This retro area doesn't exist.{" "}
+        <Link to="/retro" className="underline">
+          Back to retrospectives
+        </Link>
+      </p>
+    )
+  }
+
+  // A saved version changes this doc, the retro index and the dashboard's
+  // "due" badge; wait for the refetch so the screen shows the new version.
+  const refreshRetro = () => queryClient.invalidateQueries({ queryKey: ["retro"] })
 
   const saveManual = () => {
     const doc = editText.trim()
     if (!doc) return
     saveRetroVersion(areaId, doc, null, null)
+      .then(refreshRetro)
       .then(() => {
-        refreshRetroData()
-        return latestRetro(areaId)
-      })
-      .then((v) => {
-        setVersion(v)
         setMode("view")
         toast.success(version ? "Doc updated (manual version)" : "Doc seeded")
       })
@@ -187,9 +188,7 @@ function RetroAreaScreen() {
         parsed.summary,
         settings ? `${settings.provider}:${settings.model}` : null,
       )
-      refreshRetroData()
-      const v = await latestRetro(areaId)
-      setVersion(v)
+      await refreshRetro()
       setTranscript([])
       setPreSessionContext("")
       setMode("view")

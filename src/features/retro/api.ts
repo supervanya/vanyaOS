@@ -72,3 +72,64 @@ export function isRetroDue(lastRunISO: string | undefined): boolean {
   if (!lastRunISO) return false // never-seeded areas show "start", not "due"
   return Date.now() - new Date(lastRunISO).getTime() > DUE_AFTER_DAYS * 86400_000
 }
+
+export type RetroVersion = {
+  id: string
+  docMd: string
+  aiSummary: string | null
+  model: string | null
+  createdAt: string
+}
+
+export async function latestRetro(areaId: string): Promise<RetroVersion | null> {
+  const { data, error } = await supabase
+    .from("retros")
+    .select("id, doc_md, ai_summary, model, created_at")
+    .eq("area_id", areaId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  if (error) throw error
+  if (!data) return null
+  return {
+    id: data.id,
+    docMd: data.doc_md,
+    aiSummary: data.ai_summary,
+    model: data.model,
+    createdAt: data.created_at,
+  }
+}
+
+// The intake cutoff for a session: when the coach last actually ran for this
+// area. Manual doc edits in between must not swallow the reflections that
+// happened before them. Null = no coach run yet (intake scans everything).
+export async function latestCoachRunAt(areaId: string): Promise<string | null> {
+  const { data, error } = await supabase
+    .from("retros")
+    .select("created_at")
+    .eq("area_id", areaId)
+    .not("model", "is", null)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  if (error) throw error
+  return data?.created_at ?? null
+}
+
+// Every save is a NEW version — the doc history is the point.
+export async function saveRetroVersion(
+  areaId: string,
+  docMd: string,
+  aiSummary: string | null,
+  model: string | null,
+): Promise<void> {
+  const { error } = await supabase
+    .from("retros")
+    .insert({ area_id: areaId, doc_md: docMd, ai_summary: aiSummary, model })
+  if (error) throw error
+}
+
+// Intake for a retro session: EVERYTHING the journal captured in the window —
+// per-metric slider values (averaged, with trend), habit completion, wellness,
+// and any written reflections. Slider-only days are first-class signal: most
+// entries have no text, and the coach must still see the numbers.
