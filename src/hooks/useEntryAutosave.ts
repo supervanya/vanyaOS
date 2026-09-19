@@ -22,9 +22,9 @@ export function useEntryAutosave(config: LoadedConfig | null) {
   const [entry, setEntry] = useState<DayEntry | null>(null)
   const baseline = useRef<DayEntry | null>(null)
 
-  const load = useCallback(({ entry, unsynced }: LoadedDay) => {
-    baseline.current = unsynced ? null : entry
-    setEntry(entry)
+  const load = useCallback(({ entry: loaded, unsynced }: LoadedDay) => {
+    baseline.current = unsynced ? null : loaded
+    setEntry(loaded)
   }, [])
 
   useEffect(() => {

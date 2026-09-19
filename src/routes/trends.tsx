@@ -170,15 +170,14 @@ function WindowPicker({
   onChange: (next: TrendWindow) => void
 }) {
   return (
-    <div role="radiogroup" aria-label="Time window" className="flex rounded-lg bg-muted p-0.5">
+    <fieldset aria-label="Time window" className="flex min-w-0 rounded-lg bg-muted p-0.5">
       {Object.keys(TREND_WINDOWS)
         .filter(isTrendWindow)
         .map((w) => (
           <button
             key={w}
             type="button"
-            role="radio"
-            aria-checked={w === value}
+            aria-pressed={w === value}
             onClick={() => onChange(w)}
             className={cn(
               "rounded-md px-2 py-1 text-xs font-medium",
@@ -190,7 +189,7 @@ function WindowPicker({
             {w}
           </button>
         ))}
-    </div>
+    </fieldset>
   )
 }
 

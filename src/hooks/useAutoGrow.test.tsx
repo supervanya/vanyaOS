@@ -11,7 +11,7 @@ Object.defineProperty(HTMLTextAreaElement.prototype, "scrollHeight", {
     return this.value.split("\n").length * 20
   },
 })
-window.scrollTo = vi.fn()
+window.scrollTo = vi.fn<() => void>()
 
 function Field({ initial = "" }: { initial?: string }) {
   const [value, setValue] = useState(initial)

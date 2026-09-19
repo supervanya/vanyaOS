@@ -155,7 +155,7 @@ function HabitsToday() {
           <HabitChip
             key={h.id}
             label={h.label}
-            on={!!entry.habits[h.id]}
+            on={entry.habits[h.id] ?? false}
             onToggle={() => toggleHabit(h.id)}
           />
         ))}
@@ -288,28 +288,32 @@ function ProjectsCard() {
           return (
             <div
               key={p.id}
-              onClick={() => activate(p)}
               className={cn(
-                "flex cursor-pointer items-center gap-2.5 rounded-lg border px-3.5 py-2.5 text-[13px]",
+                "flex items-center rounded-lg border pr-2 text-[13px]",
                 active
                   ? "border-info/70 bg-info/10 font-medium text-info"
                   : "border-border text-foreground/85",
               )}
             >
-              {p.emoji && <span>{p.emoji}</span>}
-              <span className="flex-1">{p.name}</span>
-              <span className={cn("text-[11px]", active ? "text-info" : "text-muted-foreground")}>
-                {active ? "in progress" : "parking lot"}
-              </span>
+              <button
+                type="button"
+                onClick={() => activate(p)}
+                aria-pressed={active}
+                className="flex flex-1 items-center gap-2.5 py-2.5 pl-3.5 text-left"
+              >
+                {p.emoji && <span>{p.emoji}</span>}
+                <span className="flex-1">{p.name}</span>
+                <span className={cn("text-[11px]", active ? "text-info" : "text-muted-foreground")}>
+                  {active ? "in progress" : "parking lot"}
+                </span>
+              </button>
               <Button
                 type="button"
                 variant="ghost"
                 size="icon-sm"
-                className="-mr-1.5 text-muted-foreground"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  remove(p)
-                }}
+                aria-label={`Delete ${p.name}`}
+                className="ml-1 text-muted-foreground"
+                onClick={() => remove(p)}
               >
                 <X />
               </Button>

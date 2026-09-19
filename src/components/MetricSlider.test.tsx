@@ -13,7 +13,7 @@ globalThis.ResizeObserver ??= class {
 afterEach(cleanup)
 
 function renderSlider(value: number | undefined) {
-  const onValueChange = vi.fn()
+  const onValueChange = vi.fn<(value: number) => void>()
   render(<MetricSlider value={value} onValueChange={onValueChange} tone="success" />)
   return { slider: screen.getByRole("slider"), onValueChange }
 }
