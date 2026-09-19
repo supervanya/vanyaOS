@@ -194,27 +194,27 @@ function RetroAreaScreen() {
       <div className="flex items-center justify-between">
         <Link
           to="/retro"
-          className="text-muted-foreground hover:text-foreground flex items-center gap-1.5 text-sm font-semibold tracking-tight"
+          className="flex items-center gap-1.5 text-sm font-semibold tracking-tight text-muted-foreground hover:text-foreground"
         >
           <ArrowLeft size={15} />
           Retrospectives
         </Link>
-        <span className="text-muted-foreground text-xs">{area.label}</span>
+        <span className="text-xs text-muted-foreground">{area.label}</span>
       </div>
 
       {mode === "view" && version && (
         <>
           <div className="mt-3 flex items-center gap-2">
             <h1 className="text-[15px] font-medium">{area.label}</h1>
-            <span className="text-muted-foreground ml-auto text-[11px]">
+            <span className="ml-auto text-[11px] text-muted-foreground">
               v. {new Date(version.createdAt).toLocaleDateString()}
               {version.model ? ` · ${version.model}` : " · manual"}
             </span>
           </div>
 
           {version.aiSummary && (
-            <div className="border-info/40 bg-info/10 mt-2 rounded-md border px-3 py-2 text-[12px]">
-              <p className="text-info mb-0.5 font-medium">Last retro summary</p>
+            <div className="mt-2 rounded-md border border-info/40 bg-info/10 px-3 py-2 text-[12px]">
+              <p className="mb-0.5 font-medium text-info">Last retro summary</p>
               <Markdown>{version.aiSummary}</Markdown>
             </div>
           )}
@@ -242,10 +242,10 @@ function RetroAreaScreen() {
             value={preSessionContext}
             onChange={(e) => setPreSessionContext(e.target.value)}
             rows={2}
-            className="border-input bg-input/30 focus-visible:border-ring mt-3 w-full resize-none overflow-hidden rounded-lg border p-2.5 text-[13px] outline-none"
+            className="mt-3 w-full resize-none overflow-hidden rounded-lg border border-input bg-input/30 p-2.5 text-[13px] outline-none focus-visible:border-ring"
           />
 
-          <div className="border-border bg-input/20 mt-3 overflow-x-auto rounded-lg border p-3">
+          <div className="mt-3 overflow-x-auto rounded-lg border border-border bg-input/20 p-3">
             <Markdown>{version.docMd}</Markdown>
           </div>
         </>
@@ -257,9 +257,9 @@ function RetroAreaScreen() {
             {version ? `Edit ${area.label} doc` : `Seed ${area.label}`}
           </h1>
           {!version && (
-            <p className="text-muted-foreground mt-0.5 text-[11px]">
-              Paste your existing state-of-affairs markdown — numbers,
-              checklists, everything. This becomes version 1.
+            <p className="mt-0.5 text-[11px] text-muted-foreground">
+              Paste your existing state-of-affairs markdown — numbers, checklists, everything. This
+              becomes version 1.
             </p>
           )}
           <textarea
@@ -268,7 +268,7 @@ function RetroAreaScreen() {
             onChange={(e) => setEditText(e.target.value)}
             rows={18}
             placeholder={`# ${area.label} — state of affairs\n\n…`}
-            className="border-input bg-input/30 focus-visible:border-ring mt-3 w-full resize-none overflow-hidden rounded-lg border p-3 font-mono text-[12px] leading-relaxed outline-none"
+            className="mt-3 w-full resize-none overflow-hidden rounded-lg border border-input bg-input/30 p-3 font-mono text-[12px] leading-relaxed outline-none focus-visible:border-ring"
           />
           <div className="mt-2 flex gap-2">
             <Button type="button" size="sm" onClick={saveManual} disabled={!editText.trim()}>
@@ -279,7 +279,13 @@ function RetroAreaScreen() {
                 Cancel
               </Button>
             ) : (
-              <Button type="button" variant="outline" size="sm" onClick={startSession} disabled={busy}>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={startSession}
+                disabled={busy}
+              >
                 <Play /> {busy ? "Starting…" : "Or draft it with your coach"}
               </Button>
             )}
@@ -298,22 +304,22 @@ function RetroAreaScreen() {
                 className={cn(
                   "max-w-[92%] rounded-lg px-3 py-2 text-[13px] leading-relaxed",
                   m.role === "assistant"
-                    ? "border-border bg-input/20 self-start border"
-                    : "bg-primary text-primary-foreground self-end whitespace-pre-wrap",
+                    ? "self-start border border-border bg-input/20"
+                    : "self-end bg-primary whitespace-pre-wrap text-primary-foreground",
                 )}
               >
                 {m.role === "assistant" ? <Markdown>{m.content}</Markdown> : m.content}
               </div>
             ))}
             {busy && (
-              <p className="text-muted-foreground animate-pulse self-start text-[12px]">
+              <p className="animate-pulse self-start text-[12px] text-muted-foreground">
                 coach is thinking…
               </p>
             )}
             <div ref={chatEndRef} />
           </div>
 
-          <div className="bg-background sticky bottom-0 mt-3 flex flex-col gap-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+          <div className="sticky bottom-0 mt-3 flex flex-col gap-2 bg-background pb-[max(0.5rem,env(safe-area-inset-bottom))]">
             <div className="flex items-end gap-2">
               <textarea
                 ref={chatRef}
@@ -329,7 +335,7 @@ function RetroAreaScreen() {
                 placeholder="Reply to your coach…"
                 // Capped: this bar is sticky, so an uncapped reply would push
                 // the transcript off screen. Past the cap it scrolls.
-                className="border-input bg-input/30 focus-visible:border-ring max-h-[40dvh] w-full resize-none overflow-y-auto rounded-lg border p-2.5 text-[13px] outline-none"
+                className="max-h-[40dvh] w-full resize-none overflow-y-auto rounded-lg border border-input bg-input/30 p-2.5 text-[13px] outline-none focus-visible:border-ring"
               />
               <Button
                 type="button"

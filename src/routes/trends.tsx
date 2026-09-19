@@ -45,7 +45,7 @@ function Trends() {
       <div className="flex items-center justify-between">
         <Link
           to="/"
-          className="text-muted-foreground hover:text-foreground flex items-center gap-1.5 text-sm font-semibold tracking-tight"
+          className="flex items-center gap-1.5 text-sm font-semibold tracking-tight text-muted-foreground hover:text-foreground"
         >
           <LayoutDashboard size={15} />
           VanyaOS
@@ -170,7 +170,7 @@ function WindowPicker({
   onChange: (next: TrendWindow) => void
 }) {
   return (
-    <div role="radiogroup" aria-label="Time window" className="bg-muted flex rounded-lg p-0.5">
+    <div role="radiogroup" aria-label="Time window" className="flex rounded-lg bg-muted p-0.5">
       {Object.keys(TREND_WINDOWS)
         .filter(isTrendWindow)
         .map((w) => (
@@ -216,7 +216,9 @@ function SortButton({
       title={`Switch to ${SORT_LABEL[next].toLowerCase()}`}
       className={cn(
         "flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium",
-        value === "yours" ? "text-muted-foreground hover:text-foreground" : "bg-muted text-foreground",
+        value === "yours"
+          ? "text-muted-foreground hover:text-foreground"
+          : "bg-muted text-foreground",
       )}
     >
       <ArrowUpDown size={13} />
@@ -252,7 +254,7 @@ function metricSections(
 }
 
 function SortNote({ children }: { children: ReactNode }) {
-  return <p className="text-muted-foreground mb-1.5 text-[11px]">{children}</p>
+  return <p className="mb-1.5 text-[11px] text-muted-foreground">{children}</p>
 }
 
 function Section({
@@ -266,9 +268,9 @@ function Section({
 }) {
   return (
     <section className="mt-6">
-      <p className="text-muted-foreground mb-1 text-xs">{title}</p>
+      <p className="mb-1 text-xs text-muted-foreground">{title}</p>
       {note}
-      <div className="divide-border divide-y">{children}</div>
+      <div className="divide-y divide-border">{children}</div>
     </section>
   )
 }
@@ -347,7 +349,7 @@ function StreakCount({ streak }: { streak: Streak }) {
   return (
     <WithDetail
       detail={detail}
-      className={cn("text-muted-foreground text-xs tabular-nums", !streak.days && "opacity-50")}
+      className={cn("text-xs text-muted-foreground tabular-nums", !streak.days && "opacity-50")}
     >
       <span className="sr-only">Current streak: </span>
       {streak.days}d
@@ -358,11 +360,14 @@ function StreakCount({ streak }: { streak: Streak }) {
 // Key for the habit cells and the streak count.
 function HabitLegend({ cellDays }: { cellDays: number }) {
   return (
-    <p className="text-muted-foreground mb-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
-      <LegendItem swatch={<span className="bg-muted-foreground size-2.5 rounded-[2px]" />} label="done" />
-      <LegendItem swatch={<span className="bg-muted size-2.5 rounded-[2px]" />} label="missed" />
+    <p className="mb-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
       <LegendItem
-        swatch={<span className="bg-muted-foreground/50 mx-[3.5px] size-[3px] rounded-full" />}
+        swatch={<span className="size-2.5 rounded-[2px] bg-muted-foreground" />}
+        label="done"
+      />
+      <LegendItem swatch={<span className="size-2.5 rounded-[2px] bg-muted" />} label="missed" />
+      <LegendItem
+        swatch={<span className="mx-[3.5px] size-[3px] rounded-full bg-muted-foreground/50" />}
         label="no entry"
       />
       <span>12d = streak</span>

@@ -77,9 +77,9 @@ function Login() {
       <div className="flex min-h-[70dvh] flex-col items-center justify-center">
         <div className="w-full max-w-xs space-y-3 text-center">
           <p className="text-lg font-medium">Check your inbox</p>
-          <p className="text-muted-foreground text-sm">
-            Tap the link we sent to {email} — or, in the installed app, copy the
-            link from the email and paste it here:
+          <p className="text-sm text-muted-foreground">
+            Tap the link we sent to {email} — or, in the installed app, copy the link from the email
+            and paste it here:
           </p>
           <Input
             type="text"
@@ -90,11 +90,7 @@ function Login() {
             onChange={(e) => setPastedLink(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && verifyPastedLink()}
           />
-          <Button
-            className="w-full"
-            onClick={verifyPastedLink}
-            disabled={loading || !tokenHash}
-          >
+          <Button className="w-full" onClick={verifyPastedLink} disabled={loading || !tokenHash}>
             {loading ? "Signing in…" : "Sign in"}
           </Button>
           <button
@@ -103,7 +99,7 @@ function Login() {
               setSent(false)
               setPastedLink("")
             }}
-            className="text-muted-foreground hover:text-foreground text-xs underline"
+            className="text-xs text-muted-foreground underline hover:text-foreground"
           >
             Use a different email
           </button>

@@ -24,8 +24,20 @@ const series = (values: number[]): Point[] => values.map((value, n) => ({ date: 
 const at = (...pairs: [n: number, value: number][]): Point[] =>
   pairs.map(([n, value]) => ({ date: day(n), value }))
 
-const mood: Metric = { id: "mood", label: "Mood", group: "Stimulation", higherIsBetter: true, scale: 5 }
-const brainFog: Metric = { id: "brain_fog", label: "Brain fog", group: "Symptoms", higherIsBetter: false, scale: 5 }
+const mood: Metric = {
+  id: "mood",
+  label: "Mood",
+  group: "Stimulation",
+  higherIsBetter: true,
+  scale: 5,
+}
+const brainFog: Metric = {
+  id: "brain_fog",
+  label: "Brain fog",
+  group: "Symptoms",
+  higherIsBetter: false,
+  scale: 5,
+}
 
 describe("metricTrend", () => {
   it("compares the earlier half of the logged days with the later half", () => {

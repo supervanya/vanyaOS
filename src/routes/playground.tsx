@@ -1,61 +1,53 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { useRef, useState } from "react";
-import { motion, AnimatePresence, useAnimationControls } from "motion/react";
-import { Check, ArrowLeft } from "lucide-react";
-import confetti from "canvas-confetti";
+import { createFileRoute, Link } from "@tanstack/react-router"
+import { useRef, useState } from "react"
+import { motion, AnimatePresence, useAnimationControls } from "motion/react"
+import { Check, ArrowLeft } from "lucide-react"
+import confetti from "canvas-confetti"
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/utils"
 
-export const Route = createFileRoute("/playground")({ component: Playground });
+export const Route = createFileRoute("/playground")({ component: Playground })
 
 // ---- shared bits -----------------------------------------------------------
 
 function buzz() {
   if (typeof navigator !== "undefined" && "vibrate" in navigator) {
-    navigator.vibrate?.(7);
+    navigator.vibrate?.(7)
   }
 }
 
 const pillCls = (on: boolean) =>
   cn(
     "relative inline-flex h-12 w-44 items-center justify-center rounded-full border text-sm font-medium transition-colors select-none",
-    on
-      ? "border-success/50 bg-success/15 text-success"
-      : "text-muted-foreground border-border",
-  );
+    on ? "border-success/50 bg-success/15 text-success" : "border-border text-muted-foreground",
+  )
 
 // invisible native switch overlay -> iOS Taptic Engine on real taps
-function HapticInput({
-  checked,
-  onToggle,
-}: {
-  checked: boolean;
-  onToggle: () => void;
-}) {
+function HapticInput({ checked, onToggle }: { checked: boolean; onToggle: () => void }) {
   return (
     <input
       type="checkbox"
       {...{ switch: "" }}
       checked={checked}
       onChange={() => {
-        buzz();
-        onToggle();
+        buzz()
+        onToggle()
       }}
       className="absolute inset-0 m-0 size-full cursor-pointer opacity-0 [clip-path:inset(0)]"
     />
-  );
+  )
 }
 
 // ---- A. Confetti -----------------------------------------------------------
 
 function ConfettiVariant() {
-  const [on, setOn] = useState(false);
-  const ref = useRef<HTMLSpanElement>(null);
+  const [on, setOn] = useState(false)
+  const ref = useRef<HTMLSpanElement>(null)
   const toggle = () => {
-    const willOn = !on;
-    setOn(willOn);
+    const willOn = !on
+    setOn(willOn)
     if (willOn && ref.current) {
-      const r = ref.current.getBoundingClientRect();
+      const r = ref.current.getBoundingClientRect()
       confetti({
         particleCount: 70,
         spread: 75,
@@ -66,28 +58,28 @@ function ConfettiVariant() {
           x: (r.left + r.width / 2) / window.innerWidth,
           y: (r.top + r.height / 2) / window.innerHeight,
         },
-      });
+      })
     }
-  };
+  }
   return (
     <span ref={ref} className={pillCls(on)}>
       <span>Habit</span>
       <HapticInput checked={on} onToggle={toggle} />
     </span>
-  );
+  )
 }
 
 // ---- B. Particle burst -----------------------------------------------------
 
 function ParticleVariant() {
-  const [on, setOn] = useState(false);
-  const [burst, setBurst] = useState(0);
+  const [on, setOn] = useState(false)
+  const [burst, setBurst] = useState(0)
   const toggle = () => {
-    const willOn = !on;
-    setOn(willOn);
-    if (willOn) setBurst((b) => b + 1);
-  };
-  const colors = ["#34d399", "#fbbf24", "#60a5fa", "#f472b6"];
+    const willOn = !on
+    setOn(willOn)
+    if (willOn) setBurst((b) => b + 1)
+  }
+  const colors = ["#34d399", "#fbbf24", "#60a5fa", "#f472b6"]
   return (
     <span className={pillCls(on)}>
       <span>Habit</span>
@@ -97,8 +89,8 @@ function ParticleVariant() {
           className="pointer-events-none absolute inset-0 flex items-center justify-center"
         >
           {Array.from({ length: 12 }).map((_, i) => {
-            const angle = (i / 12) * Math.PI * 2;
-            const dist = 34 + (i % 3) * 9;
+            const angle = (i / 12) * Math.PI * 2
+            const dist = 34 + (i % 3) * 9
             return (
               <motion.span
                 key={i}
@@ -113,19 +105,19 @@ function ParticleVariant() {
                 className="absolute size-1.5 rounded-full"
                 style={{ background: colors[i % colors.length] }}
               />
-            );
+            )
           })}
         </span>
       )}
       <HapticInput checked={on} onToggle={toggle} />
     </span>
-  );
+  )
 }
 
 // ---- C. Radial fill + center check ----------------------------------------
 
 function FillVariant() {
-  const [on, setOn] = useState(false);
+  const [on, setOn] = useState(false)
   return (
     <span
       className={cn(
@@ -134,7 +126,7 @@ function FillVariant() {
       )}
     >
       <motion.span
-        className="bg-success absolute inset-0 rounded-full"
+        className="absolute inset-0 rounded-full bg-success"
         initial={false}
         animate={{ scale: on ? 1 : 0, opacity: on ? 1 : 0 }}
         transition={{ type: "spring", stiffness: 260, damping: 22 }}
@@ -163,30 +155,30 @@ function FillVariant() {
       </AnimatePresence>
       <HapticInput checked={on} onToggle={() => setOn((v) => !v)} />
     </span>
-  );
+  )
 }
 
 // ---- D. Glow ring pulse + pop ---------------------------------------------
 
 function RingVariant() {
-  const [on, setOn] = useState(false);
-  const [pulse, setPulse] = useState(0);
-  const controls = useAnimationControls();
+  const [on, setOn] = useState(false)
+  const [pulse, setPulse] = useState(0)
+  const controls = useAnimationControls()
   const toggle = () => {
-    const willOn = !on;
-    setOn(willOn);
+    const willOn = !on
+    setOn(willOn)
     if (willOn) {
-      setPulse((p) => p + 1);
-      controls.start({ scale: [1, 1.12, 1], transition: { duration: 0.3 } });
+      setPulse((p) => p + 1)
+      controls.start({ scale: [1, 1.12, 1], transition: { duration: 0.3 } })
     }
-  };
+  }
   return (
     <motion.span animate={controls} className={pillCls(on)}>
       <span>Habit</span>
       {pulse > 0 && (
         <motion.span
           key={pulse}
-          className="border-success pointer-events-none absolute inset-0 rounded-full border-2"
+          className="pointer-events-none absolute inset-0 rounded-full border-2 border-success"
           initial={{ scale: 1, opacity: 0.7 }}
           animate={{ scale: 1.5, opacity: 0 }}
           transition={{ duration: 0.5, ease: "easeOut" }}
@@ -194,13 +186,13 @@ function RingVariant() {
       )}
       <HapticInput checked={on} onToggle={toggle} />
     </motion.span>
-  );
+  )
 }
 
 // ---- E. Corner stamp -------------------------------------------------------
 
 function StampVariant() {
-  const [on, setOn] = useState(false);
+  const [on, setOn] = useState(false)
   return (
     <span className={pillCls(on)}>
       <span>Habit</span>
@@ -212,7 +204,7 @@ function StampVariant() {
             animate={{ scale: 1, opacity: 1, rotate: -10 }}
             exit={{ scale: 0, opacity: 0 }}
             transition={{ type: "spring", stiffness: 600, damping: 18 }}
-            className="border-success text-success absolute -top-2 right-2 rounded-md border-2 px-1.5 py-0.5 text-[10px] font-bold tracking-wide uppercase"
+            className="absolute -top-2 right-2 rounded-md border-2 border-success px-1.5 py-0.5 text-[10px] font-bold tracking-wide text-success uppercase"
           >
             Done
           </motion.span>
@@ -220,20 +212,20 @@ function StampVariant() {
       </AnimatePresence>
       <HapticInput checked={on} onToggle={() => setOn((v) => !v)} />
     </span>
-  );
+  )
 }
 
 // ---- F. Emoji pop ----------------------------------------------------------
 
 function EmojiVariant() {
-  const [on, setOn] = useState(false);
-  const [burst, setBurst] = useState(0);
+  const [on, setOn] = useState(false)
+  const [burst, setBurst] = useState(0)
   const toggle = () => {
-    const willOn = !on;
-    setOn(willOn);
-    if (willOn) setBurst((b) => b + 1);
-  };
-  const emojis = ["🎉", "✨", "⭐️", "💪", "🔥"];
+    const willOn = !on
+    setOn(willOn)
+    if (willOn) setBurst((b) => b + 1)
+  }
+  const emojis = ["🎉", "✨", "⭐️", "💪", "🔥"]
   return (
     <span className={pillCls(on)}>
       <span>Habit</span>
@@ -243,8 +235,8 @@ function EmojiVariant() {
           className="pointer-events-none absolute inset-0 flex items-center justify-center"
         >
           {Array.from({ length: 6 }).map((_, i) => {
-            const angle = -Math.PI / 2 + ((i - 2.5) / 6) * Math.PI * 1.2;
-            const dist = 42;
+            const angle = -Math.PI / 2 + ((i - 2.5) / 6) * Math.PI * 1.2
+            const dist = 42
             return (
               <motion.span
                 key={i}
@@ -260,13 +252,13 @@ function EmojiVariant() {
               >
                 {emojis[i % emojis.length]}
               </motion.span>
-            );
+            )
           })}
         </span>
       )}
       <HapticInput checked={on} onToggle={toggle} />
     </span>
-  );
+  )
 }
 
 // ---- page ------------------------------------------------------------------
@@ -302,22 +294,21 @@ const VARIANTS: { name: string; desc: string; el: React.ReactNode }[] = [
     desc: "A little spray of 🎉✨⭐️ shoots upward.",
     el: <EmojiVariant />,
   },
-];
+]
 
 function Playground() {
   return (
     <>
       <Link
         to="/"
-        className="text-muted-foreground hover:text-foreground mb-4 inline-flex items-center gap-1 text-xs"
+        className="mb-4 inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
       >
         <ArrowLeft size={14} /> Back to reflection
       </Link>
       <h1 className="text-lg font-semibold">Habit animation playground</h1>
-      <p className="text-muted-foreground mt-1 text-xs">
-        Tap each habit to feel its completion animation (tap again to reset).
-        None of them shift layout. The reflection screen currently uses{" "}
-        <strong>A · Confetti</strong>.
+      <p className="mt-1 text-xs text-muted-foreground">
+        Tap each habit to feel its completion animation (tap again to reset). None of them shift
+        layout. The reflection screen currently uses <strong>A · Confetti</strong>.
       </p>
 
       <div className="mt-6 flex flex-col gap-6">
@@ -325,14 +316,12 @@ function Playground() {
           <div key={v.name} className="flex flex-col gap-2">
             <div className="flex items-baseline justify-between gap-3">
               <span className="text-sm font-medium">{v.name}</span>
-              <span className="text-muted-foreground text-right text-[11px]">
-                {v.desc}
-              </span>
+              <span className="text-right text-[11px] text-muted-foreground">{v.desc}</span>
             </div>
             <div className="flex justify-center py-2">{v.el}</div>
           </div>
         ))}
       </div>
     </>
-  );
+  )
 }

@@ -1,12 +1,12 @@
-import { defineConfig } from "vite";
-import { tanstackRouter } from "@tanstack/router-plugin/vite";
-import viteReact from "@vitejs/plugin-react";
-import tailwindcss from "@tailwindcss/vite";
-import { VitePWA } from "vite-plugin-pwa";
+import { defineConfig } from "vite"
+import { tanstackRouter } from "@tanstack/router-plugin/vite"
+import viteReact from "@vitejs/plugin-react"
+import tailwindcss from "@tailwindcss/vite"
+import { VitePWA } from "vite-plugin-pwa"
 
 // GitHub Pages serves this project site at https://supervanya.github.io/vanyaOS/
 // so production assets/routes live under /vanyaOS/. Dev stays at / for the LAN preview.
-const PROD_BASE = "/vanyaOS/";
+const PROD_BASE = "/vanyaOS/"
 
 export default defineConfig(({ command }) => ({
   base: command === "build" ? PROD_BASE : "/",
@@ -45,4 +45,4 @@ export default defineConfig(({ command }) => ({
       },
     }),
   ],
-}));
+}))

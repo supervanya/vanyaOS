@@ -14,10 +14,10 @@ export function Markdown({ children, className }: { children: string; className?
   return (
     <div
       className={cn(
-        "prose prose-sm dark:prose-invert max-w-none",
+        "prose prose-sm max-w-none dark:prose-invert",
         // tighter rhythm than the prose default — these render inside chat
         // bubbles and cards, not long-form articles
-        "prose-p:my-1.5 prose-headings:my-2 prose-ul:my-1.5 prose-ol:my-1.5 prose-li:my-0.5 prose-pre:my-2 prose-hr:my-3",
+        "prose-headings:my-2 prose-p:my-1.5 prose-pre:my-2 prose-ol:my-1.5 prose-ul:my-1.5 prose-li:my-0.5 prose-hr:my-3",
         className,
       )}
     >

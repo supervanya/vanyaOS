@@ -29,21 +29,21 @@ function RetroList() {
       <div className="flex items-center justify-between">
         <Link
           to="/"
-          className="text-muted-foreground hover:text-foreground flex items-center gap-1.5 text-sm font-semibold tracking-tight"
+          className="flex items-center gap-1.5 text-sm font-semibold tracking-tight text-muted-foreground hover:text-foreground"
         >
           <LayoutDashboard size={15} />
           VanyaOS
         </Link>
-        <span className="text-muted-foreground text-xs">Retrospectives</span>
+        <span className="text-xs text-muted-foreground">Retrospectives</span>
       </div>
 
       <h1 className="mt-3 flex items-center gap-2 text-[15px] font-medium">
         <BookOpen size={17} className="text-indigo-500 dark:text-indigo-300" />
         Fitness areas
       </h1>
-      <p className="text-muted-foreground mt-0.5 text-[11px]">
-        Each area keeps a living state-of-affairs doc, updated by running a
-        retrospective with your coach.
+      <p className="mt-0.5 text-[11px] text-muted-foreground">
+        Each area keeps a living state-of-affairs doc, updated by running a retrospective with your
+        coach.
       </p>
 
       <div className="mt-4 flex flex-col gap-2">
@@ -55,7 +55,7 @@ function RetroList() {
               key={a.id}
               to="/retro/$areaId"
               params={{ areaId: a.id }}
-              className="border-border bg-input/20 flex items-center gap-2.5 rounded-lg border px-4 py-3 text-[14px] font-medium"
+              className="flex items-center gap-2.5 rounded-lg border border-border bg-input/20 px-4 py-3 text-[14px] font-medium"
             >
               {a.label}
               <span

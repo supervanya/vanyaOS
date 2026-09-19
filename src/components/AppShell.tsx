@@ -9,13 +9,7 @@ import { cn } from "@/lib/utils"
  * normal browser, so it looks unchanged there). Applied once in the root layout
  * so pages don't each repeat the container.
  */
-export function AppShell({
-  children,
-  className,
-}: {
-  children: ReactNode
-  className?: string
-}) {
+export function AppShell({ children, className }: { children: ReactNode; className?: string }) {
   return (
     <div
       className={cn(

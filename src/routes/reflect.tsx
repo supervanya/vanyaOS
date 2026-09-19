@@ -36,9 +36,7 @@ export const Route = createFileRoute("/reflect")({ component: Reflection })
 function Reflection() {
   const [config, setConfig] = useState<LoadedConfig | null>(null)
   const { entry, setEntry, load } = useEntryAutosave(config)
-  const [selectedDate, setSelectedDate] = useState<string>(() =>
-    defaultEntryDate(),
-  )
+  const [selectedDate, setSelectedDate] = useState<string>(() => defaultEntryDate())
   const [showDateInfo, setShowDateInfo] = useState(false)
 
   // Load config once the account is known (the root layout only renders this
@@ -66,10 +64,7 @@ function Reflection() {
   // Auto-grow the reflection textarea to fit its content (no drag handle).
   const reflectionRef = useAutoGrow(entry?.reflection ?? "")
 
-  const score = useMemo(
-    () => (entry && config ? wellness(entry, config) : null),
-    [entry, config],
-  )
+  const score = useMemo(() => (entry && config ? wellness(entry, config) : null), [entry, config])
 
   // Wellness of the most recent prior day, for the "vs last" delta.
   const [prevScore, setPrevScore] = useState<number | null>(null)
@@ -110,9 +105,7 @@ function Reflection() {
 
   const stamp = () => new Date().toISOString()
   const setMetric = (id: string, v: number) =>
-    setEntry((e) =>
-      e ? { ...e, metrics: { ...e.metrics, [id]: v }, updatedAt: stamp() } : e,
-    )
+    setEntry((e) => (e ? { ...e, metrics: { ...e.metrics, [id]: v }, updatedAt: stamp() } : e))
   const toggleHabit = (id: string) =>
     setEntry((e) =>
       e
@@ -128,10 +121,11 @@ function Reflection() {
 
   const actualToday = todayISO()
   const isPast = selectedDate < actualToday
-  const prettyDate = new Date(selectedDate + "T00:00:00").toLocaleDateString(
-    undefined,
-    { weekday: "short", month: "short", day: "numeric" },
-  )
+  const prettyDate = new Date(selectedDate + "T00:00:00").toLocaleDateString(undefined, {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  })
 
   // Color-code wellness on the 0-5 scale; there's no score until a slider is set.
   const scoreColor =
@@ -150,29 +144,27 @@ function Reflection() {
       <div className="flex items-center justify-between">
         <Link
           to="/"
-          className="text-muted-foreground hover:text-foreground flex items-center gap-1.5 text-sm font-semibold tracking-tight"
+          className="flex items-center gap-1.5 text-sm font-semibold tracking-tight text-muted-foreground hover:text-foreground"
         >
           <LayoutDashboard size={15} />
           VanyaOS
         </Link>
-        <div className="text-muted-foreground flex items-center gap-0.5 text-xs">
+        <div className="flex items-center gap-0.5 text-xs text-muted-foreground">
           <button
             type="button"
             aria-label="Previous day"
             onClick={() => setSelectedDate((d) => shiftISO(d, -1))}
-            className="hover:text-foreground rounded p-1"
+            className="rounded p-1 hover:text-foreground"
           >
             <ChevronLeft size={16} />
           </button>
-          <span className="min-w-[88px] text-center tabular-nums">
-            {prettyDate}
-          </span>
+          <span className="min-w-[88px] text-center tabular-nums">{prettyDate}</span>
           <button
             type="button"
             aria-label="Next day"
             disabled={selectedDate >= actualToday}
             onClick={() => setSelectedDate((d) => shiftISO(d, 1))}
-            className="hover:text-foreground rounded p-1 disabled:opacity-30"
+            className="rounded p-1 hover:text-foreground disabled:opacity-30"
           >
             <ChevronRight size={16} />
           </button>
@@ -184,7 +176,7 @@ function Reflection() {
         <div className="mt-2">
           <div
             onClick={() => setShowDateInfo((v) => !v)}
-            className="border-warning/40 bg-warning/10 text-warning flex cursor-pointer items-center gap-2 rounded-md border px-3 py-1.5 text-[12px] font-medium"
+            className="flex cursor-pointer items-center gap-2 rounded-md border border-warning/40 bg-warning/10 px-3 py-1.5 text-[12px] font-medium text-warning"
           >
             <Info size={14} className="shrink-0" />
             <span>Logging for {prettyDate}, not today.</span>
@@ -200,9 +192,9 @@ function Reflection() {
             </button>
           </div>
           {showDateInfo && (
-            <p className="text-muted-foreground mt-1 px-1 text-[11px]">
-              It's the early hours after midnight, so the reflection defaults to
-              the previous day. Use the ‹ › arrows to pick another date.
+            <p className="mt-1 px-1 text-[11px] text-muted-foreground">
+              It's the early hours after midnight, so the reflection defaults to the previous day.
+              Use the ‹ › arrows to pick another date.
             </p>
           )}
         </div>
@@ -218,7 +210,7 @@ function Reflection() {
         <span className={`text-4xl font-semibold tabular-nums ${scoreColor}`}>
           {score === null ? "–" : score.toFixed(1)}
         </span>
-        <span className="text-muted-foreground text-xs">wellness</span>
+        <span className="text-xs text-muted-foreground">wellness</span>
         {delta != null && (
           <span
             className={`text-xs font-medium ${
@@ -229,13 +221,12 @@ function Reflection() {
                   : "text-muted-foreground"
             }`}
           >
-            {delta > 0.05 ? "▲" : delta < -0.05 ? "▼" : "—"}{" "}
-            {delta > 0 ? "+" : ""}
+            {delta > 0.05 ? "▲" : delta < -0.05 ? "▼" : "—"} {delta > 0 ? "+" : ""}
             {delta.toFixed(1)} vs last
           </span>
         )}
       </div>
-      <p className="text-muted-foreground mt-0.5 text-[11px]">
+      <p className="mt-0.5 text-[11px] text-muted-foreground">
         symptoms inverted · theme: {entry.theme}
       </p>
 
@@ -261,9 +252,7 @@ function Reflection() {
             const val = entry.metrics[m.id] // undefined until you set it
             return (
               <div key={m.id} className="mb-4 flex items-center gap-3">
-                <span className="w-24 shrink-0 text-[13px] text-foreground/85">
-                  {m.label}
-                </span>
+                <span className="w-24 shrink-0 text-[13px] text-foreground/85">{m.label}</span>
                 <div className="flex-1">
                   <MetricSlider
                     value={val}
@@ -272,7 +261,7 @@ function Reflection() {
                     tone={inverted ? "danger" : "success"}
                     onValueChange={(v) => setMetric(m.id, v)}
                   />
-                  <div className="text-muted-foreground mt-1 flex justify-between px-1 text-[9px] tabular-nums">
+                  <div className="mt-1 flex justify-between px-1 text-[9px] text-muted-foreground tabular-nums">
                     {Array.from({ length: m.scale + 1 }, (_, i) => (
                       <span key={i}>{i}</span>
                     ))}
@@ -291,21 +280,19 @@ function Reflection() {
 
       {/* Goals */}
       <section className="mt-5">
-        <p className="text-muted-foreground mb-2 flex items-center gap-1.5 text-xs">
+        <p className="mb-2 flex items-center gap-1.5 text-xs text-muted-foreground">
           <Flag size={14} /> Goal check · what you're building toward
         </p>
         {config.goals.map((g) => (
           <div key={g.id} className="mb-2 flex items-center gap-3">
-            <span className="w-24 shrink-0 text-xs text-foreground/85">
-              {g.label}
-            </span>
-            <div className="bg-muted h-1.5 flex-1 overflow-hidden rounded-full">
+            <span className="w-24 shrink-0 text-xs text-foreground/85">{g.label}</span>
+            <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
               <div
-                className="bg-info h-full rounded-full"
+                className="h-full rounded-full bg-info"
                 style={{ width: `${Math.round(g.progress * 100)}%` }}
               />
             </div>
-            <span className="text-muted-foreground w-12 text-right text-[11px]">
+            <span className="w-12 text-right text-[11px] text-muted-foreground">
               {g.note ?? `${Math.round(g.progress * 100)}%`}
             </span>
           </div>
@@ -314,7 +301,7 @@ function Reflection() {
 
       {/* Habits */}
       <section className="mt-5">
-        <p className="text-muted-foreground mb-2 flex items-center gap-1.5 text-xs">
+        <p className="mb-2 flex items-center gap-1.5 text-xs text-muted-foreground">
           <Repeat size={14} /> Habits
         </p>
         <div className="flex flex-wrap gap-2">
@@ -332,7 +319,7 @@ function Reflection() {
       {/* The week's 1-3-5, reviewed as part of the ritual — same living list
           as the dashboard (compact: no parking lot, no add row). */}
       <section className="mt-5">
-        <p className="text-muted-foreground mb-2 text-xs">This week's 1-3-5</p>
+        <p className="mb-2 text-xs text-muted-foreground">This week's 1-3-5</p>
         <TaskBoard compact />
       </section>
 
@@ -344,11 +331,11 @@ function Reflection() {
           value={entry.reflection}
           onChange={(ev) => setReflection(ev.target.value)}
           placeholder="Verbal reflection: how was today? (copied out with your metrics)"
-          className="border-input bg-input/30 focus-visible:border-ring focus-visible:ring-ring/50 w-full resize-none overflow-hidden rounded-lg border p-3 text-base outline-none focus-visible:ring-[3px]"
+          className="w-full resize-none overflow-hidden rounded-lg border border-input bg-input/30 p-3 text-base outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
         />
       </section>
 
-      <p className="text-muted-foreground mt-3 text-center text-[11px]">
+      <p className="mt-3 text-center text-[11px] text-muted-foreground">
         Synced to your account · theme: {entry.theme}
       </p>
     </>

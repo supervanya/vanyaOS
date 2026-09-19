@@ -45,7 +45,7 @@ export function HoverLabel({
     <span
       role="tooltip"
       className={cn(
-        "bg-foreground text-background pointer-events-none absolute bottom-full z-10 mb-1.5 rounded px-1.5 py-0.5 text-[11px] font-medium whitespace-nowrap tabular-nums",
+        "pointer-events-none absolute bottom-full z-10 mb-1.5 rounded bg-foreground px-1.5 py-0.5 text-[11px] font-medium whitespace-nowrap text-background tabular-nums",
         align === "end" ? "right-0" : "-translate-x-1/2",
       )}
       style={align === "center" ? { left } : undefined}

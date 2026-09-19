@@ -95,10 +95,10 @@ export function Sparkline({
 function HoverMarker({ left, top, label }: { left: string; top: string | null; label: string }) {
   return (
     <>
-      <span className="bg-border pointer-events-none absolute inset-y-0 w-px" style={{ left }} />
+      <span className="pointer-events-none absolute inset-y-0 w-px bg-border" style={{ left }} />
       {top && (
         <span
-          className="ring-background pointer-events-none absolute size-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-current ring-2"
+          className="pointer-events-none absolute size-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-current ring-2 ring-background"
           style={{ left, top }}
         />
       )}

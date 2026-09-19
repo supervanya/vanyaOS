@@ -34,11 +34,7 @@ export function TrendReadout({
   className?: string
 }) {
   if (!trend) {
-    return (
-      <span className={cn("text-muted-foreground text-xs", className)}>
-        Too few entries
-      </span>
-    )
+    return <span className={cn("text-xs text-muted-foreground", className)}>Too few entries</span>
   }
 
   const word = WORD[trend.verdict]

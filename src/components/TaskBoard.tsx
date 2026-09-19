@@ -2,14 +2,7 @@ import { useEffect, useState } from "react"
 import { ArrowUp, Plus, X, Inbox } from "lucide-react"
 import { toast } from "sonner"
 
-import {
-  CAPS,
-  listTasks,
-  addTask,
-  setTaskDone,
-  moveTask,
-  deleteTask,
-} from "@/lib/storage"
+import { CAPS, listTasks, addTask, setTaskDone, moveTask, deleteTask } from "@/lib/storage"
 import type { Task, TaskScope, TaskSize } from "@/lib/storage"
 import { cn } from "@/lib/utils"
 import { HapticToggle } from "@/components/HapticToggle"
@@ -51,11 +44,12 @@ export function TaskBoard({ compact = false }: { compact?: boolean }) {
   const bySize = (size: TaskSize) =>
     tasks
       .filter((t) => onBoard(t) && t.size === size)
-      .sort((a, b) =>
-        // open before completed; today before week; stable by sort order
-        Number(!!a.completedAt) - Number(!!b.completedAt) ||
-        Number(b.scope === "today") - Number(a.scope === "today") ||
-        a.sortOrder - b.sortOrder,
+      .sort(
+        (a, b) =>
+          // open before completed; today before week; stable by sort order
+          Number(!!a.completedAt) - Number(!!b.completedAt) ||
+          Number(b.scope === "today") - Number(a.scope === "today") ||
+          a.sortOrder - b.sortOrder,
       )
   const someday = tasks.filter((t) => t.scope === "someday" && !t.completedAt)
   const slotsUsed = (size: TaskSize) => tasks.filter((t) => onBoard(t) && t.size === size).length
@@ -80,10 +74,16 @@ export function TaskBoard({ compact = false }: { compact?: boolean }) {
   }
 
   const move = (t: Task, scope: TaskScope) =>
-    mutate(tasks.map((x) => (x.id === t.id ? { ...x, scope } : x)), moveTask(t.id, scope))
+    mutate(
+      tasks.map((x) => (x.id === t.id ? { ...x, scope } : x)),
+      moveTask(t.id, scope),
+    )
 
   const remove = (t: Task) =>
-    mutate(tasks.filter((x) => x.id !== t.id), deleteTask(t.id))
+    mutate(
+      tasks.filter((x) => x.id !== t.id),
+      deleteTask(t.id),
+    )
 
   // Promote someday -> week, via the swap chooser when that size is full.
   const promote = (t: Task) => {
@@ -121,8 +121,16 @@ export function TaskBoard({ compact = false }: { compact?: boolean }) {
     }
   }
 
-  const overflowSize = overflow ? (overflow.kind === "new" ? overflow.size : overflow.task.size) : null
-  const overflowText = overflow ? (overflow.kind === "new" ? overflow.text : overflow.task.text) : null
+  const overflowSize = overflow
+    ? overflow.kind === "new"
+      ? overflow.size
+      : overflow.task.size
+    : null
+  const overflowText = overflow
+    ? overflow.kind === "new"
+      ? overflow.text
+      : overflow.task.text
+    : null
 
   return (
     <div>
@@ -145,7 +153,7 @@ export function TaskBoard({ compact = false }: { compact?: boolean }) {
             </div>
             <div className="flex flex-col gap-1.5">
               {items.length === 0 && (
-                <p className="text-muted-foreground/60 text-[12px]">nothing picked</p>
+                <p className="text-[12px] text-muted-foreground/60">nothing picked</p>
               )}
               {items.map((t) => (
                 <div key={t.id} className="flex items-center gap-2.5">
@@ -201,20 +209,23 @@ export function TaskBoard({ compact = false }: { compact?: boolean }) {
 
       {/* Cap-exceeded swap chooser */}
       {overflow && overflowSize && (
-        <div className="border-warning/40 bg-warning/10 mt-3 rounded-lg border p-3">
+        <div className="mt-3 rounded-lg border border-warning/40 bg-warning/10 p-3">
           <p className="text-[12px] font-medium">
-            {SIZE_LABEL[overflowSize]} is full ({CAPS[overflowSize]}/{CAPS[overflowSize]}). Swap
-            one out for “{overflowText}”?
+            {SIZE_LABEL[overflowSize]} is full ({CAPS[overflowSize]}/{CAPS[overflowSize]}). Swap one
+            out for “{overflowText}”?
           </p>
           <div className="mt-2 flex flex-col gap-1.5">
             {bySize(overflowSize)
-              .filter((t) => !t.completedAt && !(overflow.kind === "promote" && t.id === overflow.task.id))
+              .filter(
+                (t) =>
+                  !t.completedAt && !(overflow.kind === "promote" && t.id === overflow.task.id),
+              )
               .map((t) => (
                 <button
                   key={t.id}
                   type="button"
                   onClick={() => resolveOverflow(t)}
-                  className="border-border bg-background rounded-md border px-2.5 py-1.5 text-left text-[12px]"
+                  className="rounded-md border border-border bg-background px-2.5 py-1.5 text-left text-[12px]"
                 >
                   swap out: {t.text}
                 </button>
@@ -234,7 +245,7 @@ export function TaskBoard({ compact = false }: { compact?: boolean }) {
       {/* Add a task (tries the week board; overflow goes through the chooser) */}
       {!compact && (
         <div className="mt-4 flex items-center gap-2">
-          <div className="border-border flex shrink-0 overflow-hidden rounded-md border">
+          <div className="flex shrink-0 overflow-hidden rounded-md border border-border">
             {SIZES.map((s) => (
               <button
                 key={s}
@@ -267,16 +278,14 @@ export function TaskBoard({ compact = false }: { compact?: boolean }) {
       {/* Someday: the task parking lot */}
       {!compact && (
         <section className="mt-4">
-          <p className="text-muted-foreground mb-1.5 flex items-center gap-1.5 text-xs">
+          <p className="mb-1.5 flex items-center gap-1.5 text-xs text-muted-foreground">
             <Inbox size={14} /> Someday · {someday.length}
           </p>
           <div className="flex flex-col gap-1.5">
             {someday.map((t) => (
               <div key={t.id} className="flex items-center gap-2.5">
-                <span className="text-muted-foreground flex-1 text-[13px]">{t.text}</span>
-                <span className="text-muted-foreground/70 text-[10px]">
-                  {SIZE_LABEL[t.size]}
-                </span>
+                <span className="flex-1 text-[13px] text-muted-foreground">{t.text}</span>
+                <span className="text-[10px] text-muted-foreground/70">{SIZE_LABEL[t.size]}</span>
                 <Button
                   type="button"
                   variant="ghost"

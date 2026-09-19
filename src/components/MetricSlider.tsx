@@ -3,7 +3,8 @@ import { cn } from "@/lib/utils"
 
 const TONE = {
   success: "[&_[data-slot=slider-range]]:bg-success/60 [&_[data-slot=slider-thumb]]:border-success",
-  danger: "[&_[data-slot=slider-range]]:bg-destructive/60 [&_[data-slot=slider-thumb]]:border-destructive",
+  danger:
+    "[&_[data-slot=slider-range]]:bg-destructive/60 [&_[data-slot=slider-thumb]]:border-destructive",
 }
 
 // No value yet: no filled range, and a faded, dashed thumb resting at the start.
