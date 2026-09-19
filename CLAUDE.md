@@ -6,7 +6,12 @@ A personal life-OS PWA: TanStack Start + React on Vite, Tailwind + shadcn/ui, Su
 bun --bun run dev     # dev server on :3000
 bun --bun run test    # vitest
 bun --bun run build   # production build
+bun run check         # format check + lint + typecheck — run before saying you're done
+bun run format        # Prettier, whole repo
+bun run lint:fix      # Oxlint auto-fixes
 ```
+
+Git hooks (Lefthook, installed by `bun install`): pre-commit lints, formats and typechecks; pre-push runs the tests. Don't bypass them with `--no-verify` or `LEFTHOOK=0` — fix what they report.
 
 ## Where planning lives
 
