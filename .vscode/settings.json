@@ -8,5 +8,5 @@
   "files.readonlyInclude": {
     "**/routeTree.gen.ts": true
   },
-  "js/ts.experimental.useTsgo": false
+  "js/ts.experimental.useTsgo": true
 }
