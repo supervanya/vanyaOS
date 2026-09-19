@@ -6,7 +6,8 @@
     "**/routeTree.gen.ts": true
   },
   "files.readonlyInclude": {
-    "**/routeTree.gen.ts": true
+    "**/routeTree.gen.ts": true,
+    "src/lib/database.types.ts": true
   },
   "js/ts.experimental.useTsgo": true,
   "editor.defaultFormatter": "esbenp.prettier-vscode",
