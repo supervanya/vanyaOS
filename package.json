@@ -6,6 +6,7 @@
     "#/*": "./src/*"
   },
   "scripts": {
+    "prepare": "lefthook install",
     "dev": "vite dev --port 3000",
     "generate-routes": "tsr generate",
     "build": "vite build",
@@ -16,6 +17,7 @@
     "format:check": "prettier --check .",
     "lint": "oxlint --report-unused-disable-directives-severity=error",
     "lint:fix": "oxlint --fix",
+    "check": "bun run format:check && bun run lint && bun run typecheck",
     "db:mirror": "bash scripts/db-mirror-prod.sh"
   },
   "dependencies": {
@@ -58,6 +60,7 @@
     "@types/react-dom": "^19.2.0",
     "@vitejs/plugin-react": "^6.0.1",
     "jsdom": "^28.1.0",
+    "lefthook": "^2.1.14",
     "oxlint": "^1.83.0",
     "oxlint-tsgolint": "^7",
     "prettier": "^3.9.8",

@@ -1,0 +1,28 @@
+# Git hooks — https://lefthook.dev
+# Installed by `bun install` (the `prepare` script). Skip once with
+# `LEFTHOOK=0 git commit …`; run by hand with `bunx lefthook run pre-commit`.
+
+pre-commit:
+  parallel: true
+  jobs:
+    # Fixers rewrite the same files, so they run one after the other; the
+    # typecheck only reads, so it runs alongside them.
+    - name: fix
+      group:
+        piped: true
+        jobs:
+          - name: lint
+            glob: "*.{js,jsx,mjs,cjs,ts,tsx}"
+            run: bunx oxlint --fix --report-unused-disable-directives-severity=error {staged_files}
+            stage_fixed: true
+          - name: format
+            run: bunx prettier --write --ignore-unknown {staged_files}
+            stage_fixed: true
+    - name: typecheck
+      glob: "*.{ts,tsx,json}"
+      run: bun run typecheck
+
+pre-push:
+  jobs:
+    - name: test
+      run: bun run test
