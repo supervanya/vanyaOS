@@ -200,6 +200,9 @@ function isDayEntry(value: unknown): value is DayEntry {
   )
 }
 
-export function clearDraft(date: string): void {
-  if (hasWindow()) localStorage.removeItem(draftKey(date))
+// Drops the draft once `saved` is in Postgres — unless a newer edit has
+// replaced it since, which still needs its own sync.
+export function clearDraft(saved: DayEntry): void {
+  if (loadDraft(saved.date)?.updatedAt === saved.updatedAt)
+    localStorage.removeItem(draftKey(saved.date))
 }
