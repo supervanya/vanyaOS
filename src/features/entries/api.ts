@@ -120,43 +120,27 @@ export async function loadOrInitDay(date: string, config: LoadedConfig): Promise
   return { entry: remote ?? (await newEntry(date, config)), unsynced: false }
 }
 
+// Saves the entry row, metric values and habit checks in one transaction
+// (the `save_day` function), so a failure never leaves a half-saved day.
 export async function saveDay(entry: DayEntry, config: LoadedConfig): Promise<void> {
-  const userId = await currentUserId()
-
-  const { data: entryRow, error } = await supabase
-    .from("entries")
-    .upsert(
-      { user_id: userId, entry_date: entry.date, theme: entry.theme, reflection: entry.reflection },
-      { onConflict: "user_id,entry_date" },
-    )
-    .select()
-    .single()
-  if (error || !entryRow) throw error ?? new Error("Failed to save entry")
-
-  const entryId = entryRow.id
-
   // Values for archived or unknown metrics have no row id and are skipped.
-  const metricRows = Object.entries(entry.metrics).flatMap(([key, value]) => {
+  const metricValues = Object.entries(entry.metrics).flatMap(([key, value]) => {
     const metricId = config.metricRowId[key]
-    return metricId ? [{ entry_id: entryId, metric_id: metricId, value }] : []
+    return metricId ? [{ metric_id: metricId, value }] : []
   })
-  if (metricRows.length) {
-    const { error: mErr } = await supabase
-      .from("entry_metric_values")
-      .upsert(metricRows, { onConflict: "entry_id,metric_id" })
-    if (mErr) throw mErr
-  }
-
-  const habitRows = Object.entries(entry.habits).flatMap(([key, done]) => {
+  const habitChecks = Object.entries(entry.habits).flatMap(([key, done]) => {
     const habitId = config.habitRowId[key]
-    return habitId ? [{ entry_id: entryId, habit_id: habitId, done }] : []
+    return habitId ? [{ habit_id: habitId, done }] : []
   })
-  if (habitRows.length) {
-    const { error: hErr } = await supabase
-      .from("entry_habits")
-      .upsert(habitRows, { onConflict: "entry_id,habit_id" })
-    if (hErr) throw hErr
-  }
+
+  const { error } = await supabase.rpc("save_day", {
+    entry_date: entry.date,
+    theme: entry.theme,
+    reflection: entry.reflection,
+    metric_values: metricValues,
+    habit_checks: habitChecks,
+  })
+  if (error) throw error
 }
 
 // --- Local draft buffer -----------------------------------------------------
@@ -200,6 +184,9 @@ function isDayEntry(value: unknown): value is DayEntry {
   )
 }
 
-export function clearDraft(date: string): void {
-  if (hasWindow()) localStorage.removeItem(draftKey(date))
+// Drops the draft once `saved` is in Postgres — unless a newer edit has
+// replaced it since, which still needs its own sync.
+export function clearDraft(saved: DayEntry): void {
+  if (loadDraft(saved.date)?.updatedAt === saved.updatedAt)
+    localStorage.removeItem(draftKey(saved.date))
 }

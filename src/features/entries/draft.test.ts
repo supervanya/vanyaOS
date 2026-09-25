@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest"
-import { loadDraft, saveDraft, type DayEntry } from "./api"
+import { clearDraft, loadDraft, saveDraft, type DayEntry } from "./api"
 
 vi.mock("@/lib/supabaseClient", () => ({ supabase: {} }))
 
@@ -36,5 +36,18 @@ describe("local drafts", () => {
     expect(loadDraft(entry.date)).toBeNull()
     localStorage.setItem(key, JSON.stringify({ date: entry.date }))
     expect(loadDraft(entry.date)).toBeNull()
+  })
+
+  it("clears the draft once the entry it holds is saved", () => {
+    saveDraft(entry)
+    clearDraft(entry)
+    expect(loadDraft(entry.date)).toBeNull()
+  })
+
+  it("keeps a draft that has moved on to a newer edit", () => {
+    const newer = { ...entry, reflection: "better day", updatedAt: "2026-09-19T21:05:00.000Z" }
+    saveDraft(newer)
+    clearDraft(entry)
+    expect(loadDraft(entry.date)).toEqual(newer)
   })
 })
