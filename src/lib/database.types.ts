@@ -423,7 +423,16 @@ export type Database = {
       }
     }
     Functions: {
-      [_ in never]: never
+      save_day: {
+        Args: {
+          entry_date: string
+          habit_checks: Json
+          metric_values: Json
+          reflection: string
+          theme: string
+        }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never
