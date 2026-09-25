@@ -47,7 +47,6 @@ jobs:
   # the gate too — failing it after `migrate` would leave prod schema ahead of
   # the app.
   check:
-    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
