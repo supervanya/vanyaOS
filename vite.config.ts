@@ -1,4 +1,4 @@
-import { defineConfig } from "vitest/config"
+import { configDefaults, defineConfig } from "vitest/config"
 import { tanstackRouter } from "@tanstack/router-plugin/vite"
 import viteReact from "@vitejs/plugin-react"
 import tailwindcss from "@tailwindcss/vite"
@@ -15,6 +15,8 @@ export default defineConfig(({ command }) => ({
     // Node 25+ has its own global localStorage (undefined without a storage
     // file) that hides jsdom's in test workers; turn Node's off.
     execArgv: ["--no-experimental-webstorage"],
+    // Agent worktrees are full checkouts nested in the repo; their tests are theirs.
+    exclude: [...configDefaults.exclude, ".claude/worktrees/**"],
     // Tests never talk to Supabase, but importing the client needs these set.
     // Fixed dummies keep tests independent of .env.local (CI has none).
     env: {

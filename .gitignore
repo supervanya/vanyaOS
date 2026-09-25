@@ -12,3 +12,6 @@ dist-ssr
 __unconfig*
 todos.json
 .idea
+
+# Claude Code agent worktrees (isolated checkouts, never committed)
+.claude/worktrees/
