@@ -34,7 +34,11 @@ export function useEntryAutosave(config: LoadedConfig, loaded: LoadedDay) {
   useEffect(() => {
     if (entry === baseline.current) return
     saveDraft(entry)
-    queryClient.setQueryData(dayQuery(entry.date).queryKey, { entry, unsynced: true })
+    // A read of this day that started before the edit would land its older
+    // snapshot on top of it; cancelling reverts it at once and drops its result.
+    const dayKey = dayQuery(entry.date).queryKey
+    void queryClient.cancelQueries({ queryKey: dayKey, exact: true })
+    queryClient.setQueryData(dayKey, { entry, unsynced: true })
     const sync = () => {
       pending.current = null
       syncDay(entry, config, queryClient)
@@ -61,10 +65,10 @@ function syncDay(entry: DayEntry, config: LoadedConfig, queryClient: QueryClient
     .then(() => {
       clearDraft(entry)
       // Other screens showing this day pick up the saved version, unless the
-      // cache has already moved on to a newer edit. Later days' "vs last"
-      // deltas and the Trends history recompute.
+      // cache already holds a newer edit. Later days' "vs last" deltas and the
+      // Trends history recompute.
       queryClient.setQueryData(dayQuery(entry.date).queryKey, (day) =>
-        day?.entry.updatedAt === entry.updatedAt ? { entry, unsynced: false } : day,
+        day && day.entry.updatedAt > entry.updatedAt ? day : { entry, unsynced: false },
       )
       void queryClient.invalidateQueries({
         predicate: (query) => query.queryKey[2] === "previous-wellness",

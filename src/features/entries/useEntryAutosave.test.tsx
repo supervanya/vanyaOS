@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { act, renderHook } from "@testing-library/react"
 import type { ReactNode } from "react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
+import { configQuery } from "@/features/config/queries"
 import { loadDraft, loadOrInitDay, saveDay, type DayEntry } from "./api"
 import { dayQuery } from "./queries"
 import { useEntryAutosave } from "./useEntryAutosave"
@@ -38,6 +39,18 @@ function holdNextSave() {
   vi.mocked(saveDay).mockReturnValueOnce(
     new Promise((resolve) => {
       finish = () => resolve()
+    }),
+  )
+  return finish
+}
+
+// Makes the next read of the day hang until the returned function is called,
+// then return the day as it was before any edit.
+function holdNextRead() {
+  let finish = () => {}
+  vi.mocked(loadOrInitDay).mockReturnValueOnce(
+    new Promise((resolve) => {
+      finish = () => resolve({ entry: day, unsynced: false })
     }),
   )
   return finish
@@ -163,5 +176,26 @@ describe("useEntryAutosave", () => {
 
     await wait(800)
     expect(cachedDay()).toEqual({ entry: edit(2), unsynced: false })
+  })
+
+  it("keeps an edit in the day cache when an older read of the day lands after it", async () => {
+    const { result } = loaded(false)
+    queryClient.setQueryData(configQuery.queryKey, config)
+    queryClient.setQueryData(dayQuery(day.date).queryKey, { entry: day, unsynced: false })
+    // A background read (e.g. on window focus) starts before the edit...
+    const finishRead = holdNextRead()
+    const read = queryClient.fetchQuery({ ...dayQuery(day.date), staleTime: 0 })
+    const finishSave = holdNextSave()
+    act(() => result.current.setEntry(edit(1)))
+    await wait(800)
+
+    // ...and returns its older snapshot while the edit's save is in flight.
+    finishRead()
+    await act(() => read)
+    expect(cachedDay()).toEqual({ entry: edit(1), unsynced: true })
+
+    finishSave()
+    await wait(0)
+    expect(cachedDay()).toEqual({ entry: edit(1), unsynced: false })
   })
 })
