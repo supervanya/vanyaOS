@@ -20,21 +20,26 @@ export type DayEntry = {
 
 export async function listDayDates(): Promise<string[]> {
   const userId = await currentUserId()
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("entries")
     .select("entry_date")
     .eq("user_id", userId)
     .order("entry_date")
-  return (data ?? []).map((r) => r.entry_date)
+  if (error) throw error
+  return data.map((r) => r.entry_date)
 }
 
+// Null only when the day has no row. A failed read throws instead: taken for
+// an empty day, it would open a blank editor whose first autosave overwrites
+// the saved entry.
 async function fetchEntryRow(userId: string, date: string) {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("entries")
     .select("*")
     .eq("user_id", userId)
     .eq("entry_date", date)
     .maybeSingle()
+  if (error) throw error
   return data
 }
 
@@ -50,10 +55,12 @@ async function hydrateEntry(
   },
   config: LoadedConfig,
 ): Promise<DayEntry> {
-  const [{ data: metricVals }, { data: habitVals }] = await Promise.all([
+  const [metricRes, habitRes] = await Promise.all([
     supabase.from("entry_metric_values").select("metric_id, value").eq("entry_id", row.id),
     supabase.from("entry_habits").select("habit_id, done").eq("entry_id", row.id),
   ])
+  if (metricRes.error) throw metricRes.error
+  if (habitRes.error) throw habitRes.error
 
   const metricKeyById = Object.fromEntries(
     Object.entries(config.metricRowId).map(([key, id]) => [id, key]),
@@ -63,12 +70,12 @@ async function hydrateEntry(
   )
 
   const metrics: Record<string, number> = {}
-  for (const v of metricVals ?? []) {
+  for (const v of metricRes.data) {
     const key = metricKeyById[v.metric_id]
     if (key) metrics[key] = v.value
   }
   const habits: Record<string, boolean> = {}
-  for (const h of habitVals ?? []) {
+  for (const h of habitRes.data) {
     const key = habitKeyById[h.habit_id]
     if (key) habits[key] = h.done
   }
