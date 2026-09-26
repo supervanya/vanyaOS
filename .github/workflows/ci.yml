@@ -91,9 +91,19 @@ jobs:
           exit $status
       - uses: supabase/setup-cli@v3
         with:
-          # Keep in step with the `supabase` devDependency and deploy.yml.
+          # Keep in step with the `supabase` devDependency, deploy.yml, and the
+          # postgres-meta tag below.
           version: 2.109.0
       - run: supabase db start
+      # `gen types` ignores SUPABASE_INTERNAL_IMAGE_REGISTRY and pulls
+      # postgres-meta from public.ecr.aws, which rate-limits; hand it the ghcr
+      # copy under the name it looks for. The tag is the one this CLI version
+      # uses — bump it with the CLI.
+      - name: postgres-meta from ghcr
+        run: |
+          image=supabase/postgres-meta:v0.96.1
+          docker pull "ghcr.io/$image"
+          docker tag "ghcr.io/$image" "public.ecr.aws/$image"
       - run: supabase gen types typescript --local --schema public > src/lib/database.types.ts
       - name: Types match the migrations
         run: git diff --exit-code -- src/lib/database.types.ts
