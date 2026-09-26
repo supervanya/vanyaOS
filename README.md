@@ -46,7 +46,7 @@ Merging to `main` runs [`.github/workflows/deploy.yml`](.github/workflows/deploy
 2. Builds the app with the production Supabase URL and publishable key (repository variables).
 3. Publishes `dist/` to GitHub Pages under `/vanyaOS/`.
 
-Migrations go first, so the schema never lags the app. A PR that touches `supabase/migrations/` gets a read-only dry run of them against production.
+Migrations go first, so the schema never lags the app. Pull requests never get production credentials: CI applies the migrations to a throwaway local Postgres instead, and fails a new migration whose timestamp sorts before one already on `main`.
 
 ## Docs
 

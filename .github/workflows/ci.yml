@@ -57,9 +57,11 @@ jobs:
         env:
           DENO_NO_PACKAGE_JSON: "1"
 
-  # The generated DB types must match the migrations: rebuild the schema in a
-  # throwaway Postgres, regenerate, and fail on any difference. Fix locally
-  # with `bun run db:types` against a stack that has the new migration applied.
+  # Validates the migrations without production credentials: new ones must sort
+  # after main's, they must apply cleanly to a throwaway Postgres (`db start`
+  # fails on the first statement that errors), and the generated DB types must
+  # match them. Fix type drift locally with `bun run db:types` against a stack
+  # that has the new migration applied.
   db-types:
     name: DB types
     runs-on: ubuntu-latest
@@ -69,6 +71,24 @@ jobs:
       SUPABASE_INTERNAL_IMAGE_REGISTRY: ghcr.io
     steps:
       - uses: actions/checkout@v7
+        with:
+          # The PR's merge commit plus its first parent, the tip of main.
+          fetch-depth: 2
+      # Production has already applied everything on main, and `supabase db push`
+      # refuses a migration that sorts before those — so it would fail only after merge.
+      - name: New migrations sort after main's
+        env:
+          LC_ALL: C
+        run: |
+          latest=$(git ls-tree --name-only HEAD^1 supabase/migrations/ | sort | tail -n 1)
+          status=0
+          for f in $(git diff --name-only --diff-filter=A HEAD^1 HEAD -- supabase/migrations/); do
+            if [[ ! "$f" > "$latest" ]]; then
+              echo "::error file=$f::Sorts before $latest, already on main. Give it a newer timestamp."
+              status=1
+            fi
+          done
+          exit $status
       - uses: supabase/setup-cli@v3
         with:
           # Keep in step with the `supabase` devDependency and deploy.yml.
