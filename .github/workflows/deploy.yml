@@ -19,9 +19,25 @@ env:
   SUPABASE_PROJECT_REF: czyzqztbpggtnwvohakd
 
 jobs:
+  # Gate: the ruleset's CI checks can be bypassed by a direct push to main, so
+  # re-run them here before anything touches the hosted project. Build is in
+  # the gate too — failing it after `migrate` would leave prod schema ahead of
+  # the app.
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      # Node and Bun at the versions pinned in mise.toml.
+      - uses: jdx/mise-action@v4
+      - run: bun install --frozen-lockfile
+      - run: bun run check
+      - run: bun run test
+      - run: bun run build
+
   # Migrations apply BEFORE the frontend builds/deploys, so schema and app move
   # together — a failed migration blocks the deploy instead of skewing it.
   migrate:
+    needs: check
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
