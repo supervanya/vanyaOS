@@ -1,3 +1,4 @@
+import { useRef } from "react"
 import { Slider } from "@/components/ui/slider"
 import { cn } from "@/lib/utils"
 
@@ -31,6 +32,9 @@ const SLIDER_KEYS = new Set([
  * `value` is undefined until the slider is first set, so an untouched metric is
  * never saved. The first tap or arrow key sets it — even to `min`, which the
  * slider alone would ignore because its position wouldn't change.
+ *
+ * A tap on a slider already set to `min` that doesn't move it clears it back to
+ * unset (`onValueChange(undefined)`), as does Backspace or Delete.
  */
 export function MetricSlider({
   value,
@@ -43,13 +47,15 @@ export function MetricSlider({
   value: number | undefined
   min?: number
   max?: number
-  onValueChange: (value: number) => void
+  onValueChange: (value: number | undefined) => void
   tone: "success" | "danger"
   className?: string
 }) {
   const unset = value === undefined
+  // Per press: whether it started on a set `min`, and whether it then moved.
+  const press = useRef({ atMin: false, moved: false })
 
-  const set = (next: number) => {
+  const set = (next: number | undefined) => {
     if (next === value) return
     if (typeof navigator !== "undefined" && "vibrate" in navigator) {
       navigator.vibrate?.(7)
@@ -66,13 +72,21 @@ export function MetricSlider({
       // Runs before the slider handles the same event, so a tap further along
       // the track still wins: min first, then the tapped value.
       onPointerDown={() => {
+        press.current = { atMin: value === min, moved: false }
         if (unset) set(min)
+      }}
+      onPointerUp={() => {
+        if (press.current.atMin && !press.current.moved) set(undefined)
+        press.current = { atMin: false, moved: false }
       }}
       onKeyDown={(e) => {
         if (unset && SLIDER_KEYS.has(e.key)) set(min)
+        if (!unset && (e.key === "Backspace" || e.key === "Delete")) set(undefined)
       }}
       onValueChange={([v]) => {
-        if (v !== undefined) set(v)
+        if (v === undefined || v === value) return
+        press.current.moved = true
+        set(v)
       }}
       className={cn(unset ? UNSET : TONE[tone], className)}
     />

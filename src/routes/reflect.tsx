@@ -95,8 +95,11 @@ function ReflectionDay({
   }))
 
   const stamp = () => new Date().toISOString()
-  const setMetric = (id: string, v: number) =>
-    setEntry((e) => ({ ...e, metrics: { ...e.metrics, [id]: v }, updatedAt: stamp() }))
+  const setMetric = (id: string, v: number | undefined) =>
+    setEntry((e) => {
+      const { [id]: _, ...rest } = e.metrics
+      return { ...e, metrics: v === undefined ? rest : { ...rest, [id]: v }, updatedAt: stamp() }
+    })
   const toggleHabit = (id: string) =>
     setEntry((e) => ({ ...e, habits: { ...e.habits, [id]: !e.habits[id] }, updatedAt: stamp() }))
   const setReflection = (text: string) =>

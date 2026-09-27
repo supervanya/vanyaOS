@@ -130,11 +130,13 @@ export async function loadOrInitDay(date: string, config: LoadedConfig): Promise
 // Saves the entry row, metric values and habit checks in one transaction
 // (the `save_day` function), so a failure never leaves a half-saved day.
 export async function saveDay(entry: DayEntry, config: LoadedConfig): Promise<void> {
-  // Values for archived or unknown metrics have no row id and are skipped.
-  const metricValues = Object.entries(entry.metrics).flatMap(([key, value]) => {
-    const metricId = config.metricRowId[key]
-    return metricId ? [{ metric_id: metricId, value }] : []
-  })
+  // Every active metric is sent: set ones with their value, unset ones as null
+  // so a slider reset to "no value" clears it. Archived or unknown metrics have
+  // no row id and are skipped, so their history is left alone.
+  const metricValues = Object.entries(config.metricRowId).map(([key, metricId]) => ({
+    metric_id: metricId,
+    value: entry.metrics[key] ?? null,
+  }))
   const habitChecks = Object.entries(entry.habits).flatMap(([key, done]) => {
     const habitId = config.habitRowId[key]
     return habitId ? [{ habit_id: habitId, done }] : []
