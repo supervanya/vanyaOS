@@ -6,8 +6,6 @@ on:
   workflow_dispatch:
 
 permissions:
-  # `actions: read` lets `migrate` look up the last successful deploy.
-  actions: read
   contents: read
   pages: write
   id-token: write
@@ -41,32 +39,27 @@ jobs:
 
   # Migrations apply BEFORE the frontend builds/deploys, so schema and app move
   # together — a failed migration blocks the deploy instead of skewing it.
-  # Skipped when nothing under supabase/ changed since the last successful
-  # deploy — not since the previous push, which would strand a migration whose
-  # run failed or deployed out of order. The job still succeeds, so the
-  # frontend still ships.
+  # Its Supabase steps skip when the push doesn't touch supabase/; the job still
+  # succeeds, so the frontend still ships. If a deploy carrying a migration
+  # fails, re-run it (or run the workflow manually) — a later push won't.
   migrate:
     needs: check
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
         with:
-          # Full history, so the last deployed commit is there to diff against.
+          # Full history, so the push's `before` commit is there to diff against.
           fetch-depth: 0
-      - name: Anything under supabase/ since the last deploy?
+      - name: Does this push touch supabase/?
         id: changes
         env:
-          GH_TOKEN: ${{ github.token }}
+          BEFORE: ${{ github.event.before }}
         run: |
-          last=$(gh run list --workflow deploy.yml --branch main --status success --limit 20 --json headSha,createdAt --jq 'sort_by(.createdAt) | last | .headSha // empty')
-          # A manual run, no previous deploy, or a commit lost to a force-push:
-          # deploy to be safe.
-          if [[ "$GITHUB_EVENT_NAME" == workflow_dispatch || -z "$last" ]] \
-            || ! git cat-file -e "$last^{commit}" 2>/dev/null \
-            || ! git diff --quiet "$last" HEAD -- supabase/; then
+          # A manual run, or a `before` we can't diff against (force-push): deploy.
+          if [[ "$GITHUB_EVENT_NAME" == workflow_dispatch ]] \
+            || ! git cat-file -e "$BEFORE^{commit}" 2>/dev/null \
+            || ! git diff --quiet "$BEFORE" HEAD -- supabase/; then
             echo "deploy=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "Nothing under supabase/ changed since $last; skipping."
           fi
       - if: steps.changes.outputs.deploy == 'true'
         uses: supabase/setup-cli@v3
