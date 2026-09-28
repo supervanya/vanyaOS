@@ -10,6 +10,7 @@ import type { Metric } from "@/lib/config"
 export type Point = { date: string; value: number } // date is YYYY-MM-DD
 
 export const TREND_WINDOWS = {
+  "1W": { days: 7 },
   "1M": { days: 30 },
   "3M": { days: 91 },
   "6M": { days: 182 },
@@ -153,9 +154,9 @@ const TWO_YEARS = 730
 const WEEK = 7
 const MONTH = 30
 
-/** Daily on 1M; weekly otherwise, until two years of data make weeks too thin to see. */
+/** Daily on 1W and 1M; weekly otherwise, until two years of data make weeks too thin to see. */
 export function bucketSize(window: TrendWindow, from: string, to: string): number {
-  if (window === "1M") return 1
+  if (window === "1W" || window === "1M") return 1
   return toDay(to) - toDay(from) + 1 > TWO_YEARS ? MONTH : WEEK
 }
 
