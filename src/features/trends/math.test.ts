@@ -169,6 +169,7 @@ describe("sortByStanding", () => {
 
 describe("windowStart", () => {
   it("covers the window's days, today included", () => {
+    expect(windowStart("1W", "2026-09-11")).toBe("2026-09-05")
     expect(windowStart("1M", "2026-09-11")).toBe("2026-08-13")
     expect(windowStart("3M", "2026-09-11")).toBe("2026-06-13")
     expect(windowStart("1Y", "2026-09-11")).toBe("2025-09-12")
@@ -180,7 +181,8 @@ describe("windowStart", () => {
 })
 
 describe("bucketSize", () => {
-  it("is daily on 1M, weekly after, monthly beyond two years", () => {
+  it("is daily on 1W and 1M, weekly after, monthly beyond two years", () => {
+    expect(bucketSize("1W", day(0), day(6))).toBe(1)
     expect(bucketSize("1M", day(0), day(29))).toBe(1)
     expect(bucketSize("3M", day(0), day(90))).toBe(7)
     expect(bucketSize("6M", day(0), day(181))).toBe(7)
