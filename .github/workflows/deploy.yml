@@ -10,9 +10,12 @@ permissions:
   pages: write
   id-token: write
 
+# Never cancel a run in flight: it may be mid `supabase db push`. A newer push
+# waits for it instead. (Queue order isn't guaranteed; if two quick pushes ever
+# deploy out of order, re-run the workflow.)
 concurrency:
   group: pages
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 env:
   # Not a secret — it's in the app's public Supabase URL already.
