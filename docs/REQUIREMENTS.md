@@ -45,9 +45,9 @@
 | Retrospectives | Per-area **living state-of-affairs markdown doc**, versioned per run. "Run retrospective" = an **interactive coaching session**: (1) intake — current doc + all new signal since last retro + anything the user adds; (2) a *prompted* structured retro; (3) a coach voice that's proficient and incredibly sharp at getting goals done and improving that area's posture; (4) the coach prompts the user with new info, proposed changes, and **new goals**. Session ends in an updated doc + change summary | The retro is a conversation with a sharp coach, not a background job; the doc is the session's product. On-demand cadence with a monthly due-nudge |
 | Retro areas | `retro_areas` DB rows seeded with Finances / Health / Exercise / Work; Settings-managed (CRUD + archive) | Same pattern as habits/metrics/goals — nothing hardcoded |
 
-**The AI loop is no longer manual-first.** M4 builds the provider-agnostic coach plumbing and its first consumer (retrospectives); M5 adds the nightly synthesis ("Finish reflection" → action items + goal-progress notes). No copy, no paste — and no provider lock-in at any point.
+**The AI loop is no longer manual-first.** M4 builds the provider-agnostic coach plumbing and its first consumer (retrospectives); M5 adds a chat coach you can ask anything about your goals, tasks, reflections, and retro docs; M6 adds the nightly synthesis ("Finish reflection" → action items + goal-progress notes). No copy, no paste — and no provider lock-in at any point.
 
-**Explicitly deferred:** chat-style coach (ask-anything over your history), history & trends views, automated SYNC (import notes/calendar/email), EXPORT integrations to other platforms, theme management, multi-user sign-up.
+**Explicitly deferred:** history & trends views, automated SYNC (import notes/calendar/email), EXPORT integrations to other platforms, theme management, multi-user sign-up.
 
 ---
 
@@ -84,7 +84,6 @@ Everything below is filled on **one screen**:
 
 ## Future backlog (post-v2, see ROADMAP.md)
 
-- **Chat coach** — ask-anything interface over your stored history, once automated synthesis (M2) is proven.
 - **History power-ups** — correlations (e.g. "back pain ↔ low movement"), weekly digests.
 - **SYNC** — calendar → todos, notes → reflection seed, email.
 - **RE / fitness-area retros** — periodic deep-dives on Financial / Health / Exercise / Work.

@@ -4,8 +4,8 @@
 
 1. **TODO** ✅ — a place to see and set current to-do lists, habits, and goals *(shipped, M2–M3)*
 2. **REF** ✅ — reflect every evening on the day / habits / wellbeing *(shipped)*
-3. **RE** — retrospectives on fitness areas of life: finances, health, exercise, work *(M4)*
-4. **SMART** — holistic AI report on everything together *(M5)*
+3. **RE** ✅ — retrospectives on fitness areas of life: finances, health, exercise, work *(shipped, M4)*
+4. **SMART** — holistic AI coach over everything together: ask it anything *(M5)*, and it synthesizes each night *(M6)*
 5. **SYNC** — bring in data from notes / calendar / email *(backlog)*
 6. **OUT** — export into other platforms *(backlog)*
 
@@ -14,6 +14,8 @@ Each milestone has a concrete Definition of Done (DoD) — don't move on until i
 > **Granular work lives in [GitHub Issues](https://github.com/supervanya/vanyaOS/issues), not here.** This file holds milestone *scope*, DoDs, and risks. Individual features, polish items, and bugs are issues, labeled by `type/` and `size/` and assigned to the matching milestone — see [CLAUDE.md](../CLAUDE.md) for the conventions.
 
 > **2026-07-17 re-scope:** before any AI reports, build out the app surface — a real dashboard, a living todo list, and in-app settings. The AI coach (previously M2) moves to M4. Decisions from this grill: todos become **one living list** (not per-day snapshots), the dashboard is **glanceable + actionable** (not just a nav hub), and settings are **full CRUD + archive** (not visibility toggles).
+
+> **2026-10-04 re-scope:** M4 closed. The **chat coach** moves up from the deferred backlog to **M5**: being able to ask the coach a question at any time is now the biggest gap. The nightly coach moves to M6 and polish to M7.
 
 ---
 
@@ -53,7 +55,7 @@ An in-app `/settings` area — the last reason to touch the Supabase dashboard o
 
 ---
 
-## M4 — BYO-AI foundation + Retrospectives  🔨 **BUILT** (2026-08-08; DoD pending a real-key session)
+## M4 — BYO-AI foundation + Retrospectives  ✅ **DONE** (closed 2026-10-04)
 RE jumps out of the backlog, and it forces the AI plumbing to ship with it: a retro is *run by the coach*. Two halves, one milestone:
 
 **(a) Bring-your-own AI provider** — no provider lock-in, no app-held API keys:
@@ -73,20 +75,35 @@ RE jumps out of the backlog, and it forces the AI plumbing to ship with it: a re
 
 **DoD:** paste the real financial-fitness markdown into the Finances area, run a retrospective with your own API key against your chosen provider, and have an actual back-and-forth where the coach surfaces changes and proposes next goals — ending with an updated doc that reflects the session (or correctly concluded nothing changed) — plus the due-nudge appearing a month out.
 
-> **Build status:** everything is implemented and verified locally up to the provider boundary (session start with a fake key produced a clean provider 401 through the full chain: client → JWT-verified Edge Function → RLS-read ai_settings → Anthropic adapter). The DoD's real coaching session needs Vanya's actual API key — first real retro closes this milestone.
+**✅ Met:** real coaching sessions run with Vanya's own key through the full chain (client → JWT-verified Edge Function → RLS-read `ai_settings` → provider), tool use included. The due-nudge check (#15) carries over to polish.
 
 ---
 
-## M5 — Nightly AI coach  *(SMART v1 — rides on M4's plumbing)*
+## M5 — Chat coach  *(SMART v1 — rides on M4's plumbing)*
+A conversation with the coach you can open any time, about anything in the system: goals, the task board, past reflections, and retro docs. It moves up from the deferred backlog because this is what gets wanted most, and M4 already proved the plumbing (real key, tool use).
+
+- **The coach looks things up instead of getting everything at once.** Every question starts with a small fixed brief: today's date, goals with progress and notes, the weekly board, the active project, and each retro area with its last-run date. Everything else comes through **read-only tools** the model calls as needed: reflections by date range, full-text search over reflections, tasks (including completion history), retro docs (any version), and metric/habit trends.
+- **Tools run on the server, inside `ai-coach`**, through the client scoped to the signed-in user, so RLS still limits every read. No service role. Answers stream in.
+- **No vector store yet.** Use Postgres full-text search plus date ranges first. Add embeddings only if search clearly misses things that mean the same but use different words. Similarity search also can't find what *stopped* being mentioned, which is exactly the "what slipped?" case.
+- **Read-only.** The coach can suggest changes but can't add, complete, or edit anything. Tools that write come later, each behind a confirm tap.
+- **Conversations are saved** as threads, archived and never deleted, so you can come back to one.
+- It lives in its own section. The dashboard gets at most a one-tap entry point, not a chat box.
+
+**DoD:** ask "what are my most important to-dos this week?" and get an answer that weighs goals against the board and points out something from past reflections that slipped, with the dates it came from. Then ask a follow-up in the same thread, and find the thread again the next day.
+
+---
+
+## M6 — Nightly AI coach  *(SMART v2)*
 Automates the loop validated by hand in M0, now provider-agnostic for free:
 - Explicit **"Finish reflection"** action (separate from silent autosave) → the same `ai-coach` Edge Function, task `synthesize-entry` → action items + goal-progress notes into `ai_reports`.
 - **Realtime** subscription on `ai_reports` → output appears without a refresh.
+- **Feeds the chat coach.** Each night's synthesis also pulls out the commitments made in the reflection ("open loops"), so the chat coach can answer "what slipped?" with a query instead of re-reading weeks of journal.
 
 **DoD:** tap "Finish reflection" on a real entry and see AI-generated action items appear in the same session, without touching another app.
 
 ---
 
-## M6 — Polish & daily-use hardening
+## M7 — Polish & daily-use hardening
 Whatever two weeks of real use across dashboard + reflection + retros + settings demands.
 
 **DoD:** you've used it daily for two weeks and stopped noticing the tool.
@@ -95,11 +112,10 @@ Whatever two weeks of real use across dashboard + reflection + retros + settings
 
 ## Deferred backlog (value order)
 1. **History & trends** — past-day browser, habit streaks, wellness sparklines (plain SQL now). The dashboard is its natural home.
-2. **Chat coach** — ask-anything over your history, once M4/M5's coach plumbing is proven.
-3. **SYNC** — notes / calendar / email in (value-prop #5). Hardest, most fragile — stays last-ish.
-4. **OUT** — export to other platforms (value-prop #6).
-5. **Offline support** — the app works disconnected, with strict validation on anything captured offline and the last few months readable without a connection. A real architectural commitment (local store, sync reconciliation, conflict rules), not a polish item — needs a design pass before any code. Distinct from M1's local draft buffer, which only protects a single in-flight entry.
-6. **Multi-user** — explicitly out of scope; RLS already isolates by `user_id`, nothing else planned. (BYO keys already assume per-user AI config, so this wouldn't touch the AI layer.)
+2. **SYNC** — notes / calendar / email in (value-prop #5). Hardest, most fragile — stays last-ish.
+3. **OUT** — export to other platforms (value-prop #6).
+4. **Offline support** — the app works disconnected, with strict validation on anything captured offline and the last few months readable without a connection. A real architectural commitment (local store, sync reconciliation, conflict rules), not a polish item — needs a design pass before any code. Distinct from M1's local draft buffer, which only protects a single in-flight entry.
+5. **Multi-user** — explicitly out of scope; RLS already isolates by `user_id`, nothing else planned. (BYO keys already assume per-user AI config, so this wouldn't touch the AI layer.)
 
 ---
 
@@ -110,4 +126,6 @@ Whatever two weeks of real use across dashboard + reflection + retros + settings
 - **Settings CRUD invites deletes.** Archive-only in the UI — a hard delete would orphan historical entry values.
 - **API keys at rest.** BYO keys live in an RLS-protected Postgres row — fine for the current threat model, but consider Supabase Vault encryption before any multi-user future. Never log keys in the Edge Function.
 - **Retro doc drift.** The coach rewrites a document the owner also hand-edits — every run must version, never overwrite silently, and the summary must say what it changed.
-- **AI coach slippage.** SMART is the north star. M4 deliberately builds its plumbing (provider adapters, Edge Function) so M5 is a thin milestone — if M4 drags, cut retro polish, not the AI foundation.
+- **The chat coach's brief turns into a data dump.** The fixed context is for what almost every question needs. Everything else stays a tool call, or cost and answer quality both get worse as history grows.
+- **Journal text in transit.** Tool arguments and results carry reflections. The "never log" rule in `ai-coach` covers them as much as it covers keys.
+- **AI coach slippage.** SMART is the north star. Keep M5 read-only and narrow. If it drags, cut chat UI polish, not the tool loop.

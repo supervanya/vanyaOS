@@ -20,7 +20,7 @@ If the dump is empty, ask the user to paste their notes and stop.
 **3. Classify each item** per the conventions in @CLAUDE.md:
 - one `type/` label — `type/bug`, `type/polish`, `type/feature`, or `type/chore`
 - one `size/` label — `size/xs` (<30min), `size/s` (~1h), `size/m` (a session), `size/l` (multiple sessions)
-- a milestone — `M4`, `M5`, `M6`, or `Backlog`, matching @docs/ROADMAP.md
+- a milestone — `M5`, `M6`, `M7`, or `Backlog`, matching @docs/ROADMAP.md
 
 Size is your estimate of effort. Look at the actual code before guessing — a "just move the button" is sometimes `size/m`. If an item is `size/l`, propose splitting it.
 

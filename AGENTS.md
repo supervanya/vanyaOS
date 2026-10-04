@@ -52,7 +52,7 @@ Every issue gets exactly one `type/` label and one `size/` label, plus a milesto
 - **`type/`**: `type/bug` (broken behavior) · `type/polish` (works, but feels wrong — the biggest bucket) · `type/feature` (new capability) · `type/chore` (deps, config, refactor, docs)
 - **`size/`** — estimated _effort_, never importance: `size/xs` (< 30 min) · `size/s` (~1 hour) · `size/m` (a session) · `size/l` (multiple sessions). A `size/l` is a smell: split it into sub-issues before starting.
 - **`priority/high`** — optional, only for issues that should jump the queue within their milestone (e.g. a bug that corrupts data). No label means normal priority.
-- **Milestone** — `M4`, `M5`, `M6`, or `Backlog`, matching ROADMAP.md. Not the current milestone and not urgent → `Backlog`.
+- **Milestone** — `M5`, `M6`, `M7`, or `Backlog`, matching ROADMAP.md. Not the current milestone and not urgent → `Backlog`.
 - **Dependencies** — write `Blocked by #12` in the body. Add the `blocked` label only while it is _actually_ blocked. For a parent/child breakdown, use GitHub sub-issues.
 
 ### Working an issue
