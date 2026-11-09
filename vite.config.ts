@@ -35,6 +35,9 @@ export default defineConfig(({ command }) => ({
     tailwindcss(),
     VitePWA({
       registerType: "autoUpdate",
+      // Serve the manifest and service worker in dev too, so the app added to
+      // a phone's Home Screen from the LAN preview opens standalone.
+      devOptions: { enabled: true },
       includeAssets: ["favicon.ico", "logo192.png", "logo512.png"],
       manifest: {
         name: "VanyaOS — Evening reflection",
