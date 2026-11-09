@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient, type QueryKey } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { errorMessage } from "./errors"
+import { trackSave } from "./saveStatus"
 
 type ListChange<T> = {
   /** Applies the change to the cached list, for the screen to show at once. */
@@ -23,7 +24,7 @@ export function useOptimisticList<T>(
 ) {
   const queryClient = useQueryClient()
   const { mutate } = useMutation({
-    mutationFn: ({ write }: ListChange<T>) => write(),
+    mutationFn: ({ write }: ListChange<T>) => trackSave(write()),
     onMutate: async ({ change }) => {
       // An in-flight refetch would overwrite the optimistic list when it lands.
       await queryClient.cancelQueries({ queryKey })

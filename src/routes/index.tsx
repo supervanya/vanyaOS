@@ -12,6 +12,7 @@ import {
 } from "lucide-react"
 
 import { HabitChip } from "@/components/HabitChip"
+import { TopBar } from "@/components/TopBar"
 import { Skeleton } from "@/components/ui/skeleton"
 import type { LoadedConfig } from "@/features/config/api"
 import { configQuery } from "@/features/config/queries"
@@ -78,13 +79,13 @@ function Tasks() {
 
 function Header() {
   return (
-    <div className="flex items-center justify-between">
+    <TopBar>
       <span className="flex items-center gap-2 text-[15px] font-semibold tracking-tight">
         <Layers size={17} className={ACCENT} />
         Command center
       </span>
       <span className="text-xs text-muted-foreground tabular-nums">{dateStamp()}</span>
-    </div>
+    </TopBar>
   )
 }
 

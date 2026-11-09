@@ -2,6 +2,7 @@ import { FunctionsHttpError } from "@supabase/supabase-js"
 import { currentUserId } from "@/lib/auth"
 import { errorMessage } from "@/lib/errors"
 import { isRecord, oneOf } from "@/lib/parse"
+import { trackSave } from "@/lib/saveStatus"
 import { supabase } from "@/lib/supabaseClient"
 
 // Each account brings its own provider + key; the app holds no AI secrets.
@@ -76,11 +77,15 @@ export async function getAiSettings(): Promise<AiSettings | null> {
   }
 }
 
-export async function saveAiSettings(
+export function saveAiSettings(
   provider: AiProvider,
   model: string,
   apiKey?: string, // omit to keep the stored key
 ): Promise<void> {
+  return trackSave(writeAiSettings(provider, model, apiKey))
+}
+
+async function writeAiSettings(provider: AiProvider, model: string, apiKey?: string) {
   const userId = await currentUserId()
   if (apiKey) {
     const { error } = await supabase.from("ai_settings").upsert({

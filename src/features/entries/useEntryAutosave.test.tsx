@@ -1,10 +1,11 @@
 // @vitest-environment jsdom
 import type { LoadedConfig } from "@/features/config/api"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
-import { act, renderHook } from "@testing-library/react"
+import { act, cleanup, renderHook } from "@testing-library/react"
 import type { ReactNode } from "react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { configQuery } from "@/features/config/queries"
+import { getSaveState } from "@/lib/saveStatus"
 import { loadDraft, loadOrInitDay, saveDay, type DayEntry } from "./api"
 import { dayQuery } from "./queries"
 import { useEntryAutosave } from "./useEntryAutosave"
@@ -68,7 +69,11 @@ beforeEach(() => {
   vi.useFakeTimers()
 })
 
-afterEach(() => {
+afterEach(async () => {
+  // Unmounting sends any sync still on the debounce; let it land so it doesn't
+  // leave the app-wide save state "saving" for the next test.
+  cleanup()
+  await wait(0)
   vi.useRealTimers()
   vi.clearAllMocks()
   localStorage.clear()
@@ -197,5 +202,25 @@ describe("useEntryAutosave", () => {
     finishSave()
     await wait(0)
     expect(cachedDay()).toEqual({ entry: edit(1), unsynced: false })
+  })
+
+  it("shows the edit as saving from the first keystroke until its sync lands", async () => {
+    const finishSave = holdNextSave()
+    const { result } = loaded(false)
+    act(() => result.current.setEntry(edit(1)))
+    expect(getSaveState()).toBe("saving")
+    await wait(800)
+    expect(getSaveState()).toBe("saving")
+    finishSave()
+    await wait(0)
+    expect(getSaveState()).toBe("saved")
+  })
+
+  it("shows the edit as not synced when its sync fails", async () => {
+    vi.mocked(saveDay).mockRejectedValueOnce(new Error("offline"))
+    const { result } = loaded(false)
+    act(() => result.current.setEntry(edit(1)))
+    await wait(800)
+    expect(getSaveState()).toBe("failed")
   })
 })

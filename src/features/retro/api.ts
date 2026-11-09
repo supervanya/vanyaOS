@@ -1,4 +1,5 @@
 import { currentUserId } from "@/lib/auth"
+import { trackSave } from "@/lib/saveStatus"
 import { supabase } from "@/lib/supabaseClient"
 
 export type RetroArea = {
@@ -123,10 +124,13 @@ export async function saveRetroVersion(
   aiSummary: string | null,
   model: string | null,
 ): Promise<void> {
-  const { error } = await supabase
-    .from("retros")
-    .insert({ area_id: areaId, doc_md: docMd, ai_summary: aiSummary, model })
-  if (error) throw error
+  const insert = async () => {
+    const { error } = await supabase
+      .from("retros")
+      .insert({ area_id: areaId, doc_md: docMd, ai_summary: aiSummary, model })
+    if (error) throw error
+  }
+  return trackSave(insert())
 }
 
 // Intake for a retro session: EVERYTHING the journal captured in the window —
