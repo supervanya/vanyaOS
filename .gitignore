@@ -13,3 +13,6 @@ dev-dist
 __unconfig*
 todos.json
 .idea
+
+# Claude Code subagent worktrees (each is its own checkout)
+.claude/worktrees/
