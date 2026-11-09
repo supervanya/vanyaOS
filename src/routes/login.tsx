@@ -26,6 +26,41 @@ function extractTokenHash(pasted: string): string | null {
   return null
 }
 
+// Dev server only: deleting a Home Screen app wipes its storage, so every
+// re-add means a fresh magic link. `import.meta.env.DEV` is a build-time
+// `false` in production, so this folds to null and the credentials are never
+// bundled.
+const devLogin =
+  import.meta.env.DEV &&
+  import.meta.env.VITE_DEV_LOGIN_EMAIL &&
+  import.meta.env.VITE_DEV_LOGIN_PASSWORD
+    ? {
+        email: import.meta.env.VITE_DEV_LOGIN_EMAIL,
+        password: import.meta.env.VITE_DEV_LOGIN_PASSWORD,
+      }
+    : null
+
+function DevSignIn({ email, password }: { email: string; password: string }) {
+  const [loading, setLoading] = useState(false)
+  const signIn = async () => {
+    setLoading(true)
+    try {
+      const { error } = await supabase.auth.signInWithPassword({ email, password })
+      if (error) toast.error(error.message)
+      // Success → the router's auth check leaves /login.
+    } catch (err) {
+      toast.error(errorMessage(err))
+    } finally {
+      setLoading(false)
+    }
+  }
+  return (
+    <Button variant="outline" className="w-full" onClick={() => void signIn()} disabled={loading}>
+      {loading ? "Signing in…" : `Dev sign-in as ${email}`}
+    </Button>
+  )
+}
+
 function Login() {
   const [email, setEmail] = useState("")
   const [pastedLink, setPastedLink] = useState("")
@@ -124,6 +159,7 @@ function Login() {
         <Button className="w-full" onClick={() => void sendLink()} disabled={loading || !email}>
           {loading ? "Sending…" : "Send magic link"}
         </Button>
+        {devLogin && <DevSignIn {...devLogin} />}
       </div>
     </div>
   )
