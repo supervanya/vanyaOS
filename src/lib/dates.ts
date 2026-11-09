@@ -32,11 +32,18 @@ export function todayISO(): string {
 export function shiftISO(dateISO: string, deltaDays: number): string {
   const d = new Date(dateISO + "T12:00:00")
   d.setDate(d.getDate() + deltaDays)
+  return isoFromDate(d)
+}
+
+// A Date's local calendar day as YYYY-MM-DD, and back (local midnight).
+export function isoFromDate(d: Date): string {
   const y = d.getFullYear()
   const m = String(d.getMonth() + 1).padStart(2, "0")
   const day = String(d.getDate()).padStart(2, "0")
   return `${y}-${m}-${day}`
 }
+
+export const dateFromISO = (dateISO: string): Date => new Date(dateISO + "T00:00:00")
 
 // An evening reflection done in the early hours after midnight is really about
 // the previous day, so before `cutoffHour` (local) we default to yesterday.

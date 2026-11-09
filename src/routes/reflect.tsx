@@ -17,7 +17,9 @@ import { configQuery } from "@/features/config/queries"
 import type { LoadedDay } from "@/features/entries/api"
 import { dayQuery, previousWellnessQuery } from "@/features/entries/queries"
 import { useEntryAutosave } from "@/features/entries/useEntryAutosave"
-import { wellness } from "@/features/entries/wellness"
+import { ReflectDatePicker } from "@/features/entries/ReflectDatePicker"
+import { wellness, wellnessTone, type WellnessTone } from "@/features/entries/wellness"
+import { trendSeriesQuery } from "@/features/trends/queries"
 import { TaskBoard } from "@/features/tasks/TaskBoard"
 import { groupMetrics } from "@/lib/config"
 import { defaultEntryDate, shiftISO, todayISO } from "@/lib/dates"
@@ -30,6 +32,12 @@ import { GoalBar } from "@/components/GoalBar"
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/
 
+const SCORE_COLOR = {
+  good: "text-success",
+  ok: "text-warning",
+  bad: "text-destructive",
+} satisfies Record<WellnessTone, string>
+
 export const Route = createFileRoute("/reflect")({
   // The day being edited lives in the URL (?date=YYYY-MM-DD), so the loader can
   // fetch it and back/forward step through days. No date = the default day.
@@ -38,6 +46,7 @@ export const Route = createFileRoute("/reflect")({
   loaderDeps: ({ search }) => ({ date: search.date ?? defaultEntryDate() }),
   loader: async ({ context: { queryClient }, deps: { date } }) => {
     void queryClient.prefetchQuery(previousWellnessQuery(date))
+    void queryClient.prefetchQuery(trendSeriesQuery) // the date picker's heatmap
     await Promise.all([
       queryClient.ensureQueryData(configQuery),
       queryClient.ensureQueryData(dayQuery(date)),
@@ -114,14 +123,7 @@ function ReflectionDay({
   })
 
   // Color-code wellness on the 0-5 scale; there's no score until a slider is set.
-  const scoreColor =
-    score === null
-      ? "text-muted-foreground"
-      : score >= 3.75
-        ? "text-success"
-        : score >= 2.5
-          ? "text-warning"
-          : "text-destructive"
+  const scoreColor = score === null ? "text-muted-foreground" : SCORE_COLOR[wellnessTone(score)]
   const delta = score === null || prevScore === null ? null : score - prevScore
 
   return (
@@ -137,7 +139,12 @@ function ReflectionDay({
           >
             <ChevronLeft size={16} />
           </button>
-          <span className="min-w-[88px] text-center tabular-nums">{prettyDate}</span>
+          <ReflectDatePicker
+            date={selectedDate}
+            maxDate={actualToday}
+            label={prettyDate}
+            onSelect={goTo}
+          />
           <button
             type="button"
             aria-label="Next day"
@@ -174,7 +181,7 @@ function ReflectionDay({
           {showDateInfo && (
             <p className="mt-1 px-1 text-[11px] text-muted-foreground">
               It's the early hours after midnight, so the reflection defaults to the previous day.
-              Use the ‹ › arrows to pick another date.
+              Tap the date or use the ‹ › arrows to pick another.
             </p>
           )}
         </div>
