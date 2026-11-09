@@ -7,6 +7,7 @@ import { toast } from "sonner"
 import { askCoach, getAiSettings, type CoachMsg } from "@/features/ai/api"
 import { latestCoachRunAt, saveRetroVersion } from "@/features/retro/api"
 import { buildIntakeSignal } from "@/features/retro/intake"
+import { isUnchanged, summarizeManualEdit } from "@/features/retro/summarize"
 import { latestRetroQuery, retroAreasQuery } from "@/features/retro/queries"
 import { Button } from "@/components/ui/button"
 import { Markdown } from "@/components/Markdown"
@@ -79,6 +80,7 @@ function RetroAreaScreen({ areaId }: { areaId: string }) {
   const [chatDraft, setChatDraft] = useState("")
   const [preSessionContext, setPreSessionContext] = useState("")
   const [busy, setBusy] = useState(false)
+  const [saving, setSaving] = useState<"summarizing" | "saving" | null>(null)
   const chatEndRef = useRef<HTMLDivElement>(null)
   const contextRef = useAutoGrow(preSessionContext)
   const editRef = useAutoGrow(editText)
@@ -103,16 +105,35 @@ function RetroAreaScreen({ areaId }: { areaId: string }) {
   // "due" badge; wait for the refetch so the screen shows the new version.
   const refreshRetro = () => queryClient.invalidateQueries({ queryKey: ["retro"] })
 
-  const saveManual = () => {
+  // A manual version keeps model = null (that's how the due clock and the
+  // intake cutoff tell it from a coach run) but gets a "what changed" summary
+  // when the coach can write one. Seeding has nothing to compare against.
+  const saveManual = async () => {
     const doc = editText.trim()
-    if (!doc) return
-    saveRetroVersion(areaId, doc, null, null)
-      .then(refreshRetro)
-      .then(() => {
-        setMode("view")
-        toast.success(version ? "Doc updated (manual version)" : "Doc seeded")
-      })
-      .catch((err) => toast.error(`Didn't save: ${errorMessage(err)}`))
+    if (!doc || saving) return
+    if (version && isUnchanged(version.docMd, doc)) {
+      setMode("view")
+      toast("No changes — nothing to save")
+      return
+    }
+    try {
+      let summary: string | null = null
+      if (version) {
+        setSaving("summarizing")
+        const result = await summarizeManualEdit(area.label, version.docMd, doc)
+        summary = result.summary
+        if (result.summary === null) toast(`Saved without a change summary (${result.reason})`)
+      }
+      setSaving("saving")
+      await saveRetroVersion(areaId, doc, summary, null)
+      await refreshRetro()
+      setMode("view")
+      toast.success(version ? "Doc updated (manual version)" : "Doc seeded")
+    } catch (err) {
+      toast.error(`Didn't save: ${errorMessage(err)}`)
+    } finally {
+      setSaving(null)
+    }
   }
 
   const startSession = async () => {
@@ -217,7 +238,9 @@ function RetroAreaScreen({ areaId }: { areaId: string }) {
 
           {version.aiSummary && (
             <div className="mt-2 rounded-md border border-info/40 bg-info/10 px-3 py-2 text-[12px]">
-              <p className="mb-0.5 font-medium text-info">Last retro summary</p>
+              <p className="mb-0.5 font-medium text-info">
+                {version.model ? "Last retro summary" : "What changed (manual edit)"}
+              </p>
               <Markdown>{version.aiSummary}</Markdown>
             </div>
           )}
@@ -274,11 +297,26 @@ function RetroAreaScreen({ areaId }: { areaId: string }) {
             className="mt-3 w-full resize-none overflow-hidden rounded-lg border border-input bg-input/30 p-3 font-mono text-[12px] leading-relaxed outline-none focus-visible:border-ring"
           />
           <div className="mt-2 flex gap-2">
-            <Button type="button" size="sm" onClick={saveManual} disabled={!editText.trim()}>
-              Save {version ? "as new version" : "doc"}
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => void saveManual()}
+              disabled={!editText.trim() || saving !== null}
+            >
+              {saving === "summarizing"
+                ? "Summarizing…"
+                : saving === "saving"
+                  ? "Saving…"
+                  : `Save ${version ? "as new version" : "doc"}`}
             </Button>
             {version ? (
-              <Button type="button" variant="ghost" size="sm" onClick={() => setMode("view")}>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setMode("view")}
+                disabled={saving !== null}
+              >
                 Cancel
               </Button>
             ) : (
