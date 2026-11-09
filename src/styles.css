@@ -40,6 +40,16 @@ body,
   --success: #15803d; /* green-700 */
   --warning: #d97706; /* amber-600 */
   --info: #405898; /* blue-700 */
+  /* day-score tones (Reflect's calendar): tile fill, text on it, solid swatch */
+  --score-good: #cfebe6;
+  --score-good-foreground: #0e5e57;
+  --score-good-solid: #3a9e8f;
+  --score-ok: #f6ebd3;
+  --score-ok-foreground: #7a5a12;
+  --score-ok-solid: #d9a441;
+  --score-rough: #f9d9d2;
+  --score-rough-foreground: #a3341b;
+  --score-rough-solid: #e06a4e;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -68,6 +78,12 @@ body,
     --success: var(--color-green-400);
     --warning: var(--color-amber-600);
     --info: var(--color-slate-500);
+    --score-good: #1f3d39;
+    --score-good-foreground: #8fd6ca;
+    --score-ok: #3d3420;
+    --score-ok-foreground: #e8c677;
+    --score-rough: #45261f;
+    --score-rough-foreground: #f2a08c;
   }
 }
 
@@ -94,6 +110,15 @@ body,
   --color-success: var(--success);
   --color-warning: var(--warning);
   --color-info: var(--info);
+  --color-score-good: var(--score-good);
+  --color-score-good-foreground: var(--score-good-foreground);
+  --color-score-good-solid: var(--score-good-solid);
+  --color-score-ok: var(--score-ok);
+  --color-score-ok-foreground: var(--score-ok-foreground);
+  --color-score-ok-solid: var(--score-ok-solid);
+  --color-score-rough: var(--score-rough);
+  --color-score-rough-foreground: var(--score-rough-foreground);
+  --color-score-rough-solid: var(--score-rough-solid);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
