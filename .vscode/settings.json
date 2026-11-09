@@ -11,5 +11,6 @@
   },
   "js/ts.experimental.useTsgo": true,
   "editor.defaultFormatter": "esbenp.prettier-vscode",
-  "editor.formatOnSave": true
+  "editor.formatOnSave": true,
+  "js/ts.tsdk.path": "node_modules/typescript"
 }
