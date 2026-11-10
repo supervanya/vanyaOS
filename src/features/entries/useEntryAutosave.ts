@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react"
 import { toast } from "sonner"
 import type { LoadedConfig } from "@/features/config/api"
 import { errorMessage } from "@/lib/errors"
+import { beginSave, type SettleSave } from "@/lib/saveStatus"
 import { clearDraft, saveDay, saveDraft, type DayEntry, type LoadedDay } from "./api"
 import { trendSeriesQuery } from "@/features/trends/queries"
 import { dayQuery } from "./queries"
@@ -30,6 +31,9 @@ export function useEntryAutosave(config: LoadedConfig, loaded: LoadedDay) {
   const baseline = useRef<DayEntry | null>(loaded.unsynced ? null : loaded.entry)
   // The sync waiting on the debounce, if any.
   const pending = useRef<(() => void) | null>(null)
+  // Marks the entry unsaved in the top bar from the first edit until the sync
+  // that carries it lands — the debounce window counts as unsaved.
+  const unsaved = useRef<SettleSave | null>(null)
 
   useEffect(() => {
     if (entry === baseline.current) return
@@ -39,9 +43,12 @@ export function useEntryAutosave(config: LoadedConfig, loaded: LoadedDay) {
     const dayKey = dayQuery(entry.date).queryKey
     void queryClient.cancelQueries({ queryKey: dayKey, exact: true })
     queryClient.setQueryData(dayKey, { entry, unsynced: true })
+    unsaved.current ??= beginSave()
     const sync = () => {
       pending.current = null
-      syncDay(entry, config, queryClient)
+      const settle = unsaved.current
+      unsaved.current = null
+      syncDay(entry, config, queryClient, settle)
     }
     pending.current = sync
     const timer = setTimeout(sync, SYNC_DEBOUNCE_MS)
@@ -59,7 +66,12 @@ export function useEntryAutosave(config: LoadedConfig, loaded: LoadedDay) {
 // shared by every editor, so one that unmounts mid-save still goes first.
 let syncing = Promise.resolve()
 
-function syncDay(entry: DayEntry, config: LoadedConfig, queryClient: QueryClient) {
+function syncDay(
+  entry: DayEntry,
+  config: LoadedConfig,
+  queryClient: QueryClient,
+  settle: SettleSave | null,
+) {
   syncing = syncing
     .then(() => saveDay(entry, config))
     .then(() => {
@@ -74,8 +86,10 @@ function syncDay(entry: DayEntry, config: LoadedConfig, queryClient: QueryClient
         predicate: (query) => query.queryKey[2] === "previous-wellness",
       })
       void queryClient.invalidateQueries({ queryKey: trendSeriesQuery.queryKey })
+      settle?.("saved")
     })
     .catch((err: unknown) => {
+      settle?.("failed")
       toast.error(`Sync failed, kept locally: ${errorMessage(err)}`)
     })
 }

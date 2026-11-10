@@ -2,10 +2,12 @@ import { Link, type LinkProps } from "@tanstack/react-router"
 import { ArrowLeft, LayoutDashboard } from "lucide-react"
 import type { ReactNode } from "react"
 
+import { TopBar } from "./TopBar"
+
 /**
- * The top row of every screen except the dashboard: the way back on the left
- * (the dashboard unless `back` says otherwise), and on the right either the
- * screen's `label` or its own controls as `children`.
+ * The sticky top bar of every screen except the dashboard: the way back on the
+ * left (the dashboard unless `back` says otherwise), then either the screen's
+ * `label` or its own controls as `children`, then the cloud-save indicator.
  */
 export function PageHeader({
   back,
@@ -17,7 +19,7 @@ export function PageHeader({
   children?: ReactNode
 }) {
   return (
-    <div className="flex items-center justify-between">
+    <TopBar>
       <Link
         to={back?.to ?? "/"}
         className="flex items-center gap-1.5 text-sm font-semibold tracking-tight text-muted-foreground hover:text-foreground"
@@ -27,6 +29,6 @@ export function PageHeader({
       </Link>
       {label && <span className="text-xs text-muted-foreground">{label}</span>}
       {children}
-    </div>
+    </TopBar>
   )
 }
