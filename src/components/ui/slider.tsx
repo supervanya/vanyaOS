@@ -21,29 +21,37 @@ function Slider({
       min={min}
       max={max}
       className={cn(
-        "relative flex w-full touch-none items-center select-none data-[disabled]:opacity-50 data-[orientation=vertical]:h-full data-[orientation=vertical]:min-h-44 data-[orientation=vertical]:w-auto data-[orientation=vertical]:flex-col",
+        "relative flex w-full touch-none items-center select-none data-disabled:opacity-50",
+        // making the slider's hit area easier to hit on touchscreens:
+        // "pointer-coarse:my--11 pointer-coarse:h-11 pointer-coarse:before:absolute pointer-coarse:before:-inset-y-10",
+
+        // Touch target: 64px tall, extends past the slider without changing layout.
+        "before:absolute before:inset-x-0 before:-inset-y-4",
+        // DEBUG: use to check the hit area visually.
+        // "before:bg-pink-500/40",
+
         className,
       )}
       {...props}
     >
       <SliderPrimitive.Track
         data-slot="slider-track"
-        className={cn(
-          "relative grow overflow-hidden rounded-full bg-muted data-[orientation=horizontal]:h-1.5 data-[orientation=horizontal]:w-full data-[orientation=vertical]:h-full data-[orientation=vertical]:w-1.5",
-        )}
+        className="relative h-1.5 w-full grow overflow-hidden rounded-full bg-muted"
       >
-        <SliderPrimitive.Range
-          data-slot="slider-range"
-          className={cn(
-            "absolute bg-primary data-[orientation=horizontal]:h-full data-[orientation=vertical]:w-full",
-          )}
-        />
+        <SliderPrimitive.Range data-slot="slider-range" className="absolute h-full bg-primary" />
       </SliderPrimitive.Track>
       {Array.from({ length: _values.length }, (_, index) => (
         <SliderPrimitive.Thumb
           data-slot="slider-thumb"
           key={index}
-          className="block size-4 shrink-0 rounded-full border border-primary bg-white shadow-sm ring-ring/50 transition-[color,box-shadow] hover:ring-4 focus-visible:ring-4 focus-visible:outline-hidden disabled:pointer-events-none disabled:opacity-50"
+          className={cn(
+            "block h-4 w-7 shrink-0 rounded-sm border-2 border-primary bg-white shadow-md",
+            // Interaction states
+            "ring-ring/50 transition-[color,box-shadow] hover:ring-4 focus-visible:ring-4 focus-visible:outline-hidden",
+            "disabled:pointer-events-none disabled:opacity-50",
+            // Touch devices
+            "pointer-coarse:border-1.5 rounded-lg pointer-coarse:h-4 pointer-coarse:w-8",
+          )}
         />
       ))}
     </SliderPrimitive.Root>

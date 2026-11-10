@@ -248,7 +248,7 @@ function ReflectionDay({
                     tone={inverted ? "danger" : "success"}
                     onValueChange={(v) => setMetric(m.id, v)}
                   />
-                  <div className="mt-1 flex justify-between px-1 text-[9px] text-muted-foreground tabular-nums">
+                  <div className="mt-1.5 flex justify-between px-4 text-[7px] text-muted-foreground tabular-nums select-none">
                     {Array.from({ length: m.scale + 1 }, (_, i) => (
                       <span key={i}>{i}</span>
                     ))}
