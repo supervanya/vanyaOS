@@ -47,7 +47,10 @@ const STATES: Record<SaveState, { icon: ReactNode; label: string; className: str
 
 /**
  * A fixed-size icon, so state changes never shift the header's controls. The
- * words for anything worth reading hang just below the bar, on the right.
+ * words for anything worth reading sit just left of it, over the bar, while
+ * there is something to say. They stay inside the bar's box on purpose: drawn
+ * outside a sticky header (hanging below it), Chrome left a stale "Saved"
+ * frame on screen after the DOM had already gone idle.
  */
 function SaveIndicator() {
   const state = useSaveState()
@@ -58,16 +61,17 @@ function SaveIndicator() {
       <span className={cn("flex size-4 items-center justify-center transition-colors", className)}>
         {icon}
       </span>
-      <span
-        aria-hidden
-        className={cn(
-          "pointer-events-none absolute top-full right-0 mt-1.5 rounded-full border bg-background px-2 py-0.5 text-[11px] whitespace-nowrap shadow-sm transition-opacity duration-500",
-          className,
-          state === "idle" ? "opacity-0" : "opacity-100",
-        )}
-      >
-        {short}
-      </span>
+      {state !== "idle" && (
+        <span
+          aria-hidden
+          className={cn(
+            "pointer-events-none absolute top-1/2 right-full mr-1.5 -translate-y-1/2 rounded-full border bg-background px-2 py-0.5 text-[11px] whitespace-nowrap",
+            className,
+          )}
+        >
+          {short}
+        </span>
+      )}
     </output>
   )
 }
