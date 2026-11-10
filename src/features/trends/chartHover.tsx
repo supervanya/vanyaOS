@@ -4,8 +4,7 @@ import { cn } from "@/lib/utils"
 
 /**
  * Which of `count` marks the pointer is over, for charts that label a mark on
- * hover — or while a finger drags sideways (pair the element with
- * `touch-pan-y` so vertical scrolling still works). `toIndex` maps the
+ * hover — or while a finger drags sideways. `toIndex` maps the
  * pointer's position across the element (0..1) to a mark.
  */
 export function useHoverIndex(count: number, toIndex: (ratio: number) => number) {

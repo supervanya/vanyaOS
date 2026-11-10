@@ -38,7 +38,7 @@ export function Sparkline({
   const hovered = index === null ? null : buckets[index]
 
   return (
-    <div className={cn("relative touch-pan-y", className)} {...handlers}>
+    <div className={cn("relative touch-none", className)} {...handlers}>
       <svg
         viewBox={`0 0 ${W} ${H}`}
         preserveAspectRatio="none"

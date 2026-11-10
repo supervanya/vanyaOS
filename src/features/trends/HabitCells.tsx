@@ -25,7 +25,7 @@ export function HabitCells({
 
   return (
     <div
-      className={cn("relative flex h-6 touch-pan-y items-center gap-px", className)}
+      className={cn("relative flex h-6 touch-none items-center gap-px", className)}
       {...handlers}
     >
       {buckets.map((bucket, i) => (

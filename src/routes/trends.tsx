@@ -37,6 +37,7 @@ import { PageHeader } from "@/components/PageHeader"
 export const Route = createFileRoute("/trends")({
   loader: ({ context: { queryClient } }) =>
     Promise.all([
+      // @deprecated — Use queryClient.query({ ...options, staleTime: 'static' }) instead. This method will be removed in the next major version.
       queryClient.ensureQueryData(configQuery),
       queryClient.ensureQueryData(trendSeriesQuery),
     ]),
@@ -54,7 +55,7 @@ function Trends() {
   const { data: history } = useSuspenseQuery(trendSeriesQuery)
 
   return (
-    <>
+    <div className="pointer-coarse:select-none">
       <PageHeader>
         <WindowPicker value={trendWindow} onChange={setTrendWindow} />
       </PageHeader>
@@ -73,7 +74,7 @@ function Trends() {
         sortOrder={sortOrder}
         history={history}
       />
-    </>
+    </div>
   )
 }
 
