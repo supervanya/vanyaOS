@@ -366,12 +366,15 @@ function RetroAreaScreen({ areaId }: { areaId: string }) {
                 ref={chatRef}
                 value={chatDraft}
                 onChange={(e) => setChatDraft(e.target.value)}
+                // Plain Enter is a newline: replies here are long-form, and a
+                // phone keyboard has no Shift+Enter. ⌘/Ctrl+Enter sends.
                 onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
+                  if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
                     e.preventDefault()
                     void sendChat()
                   }
                 }}
+                enterKeyHint="send"
                 rows={2}
                 placeholder="Reply to your coach…"
                 // Capped: this bar is sticky, so an uncapped reply would push
