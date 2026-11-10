@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils"
 /**
  * A habit chip that throws confetti from its center when completed — satisfying
  * and with no layout shift. Haptics come from an invisible native <input switch>
- * overlay (iOS Taptic Engine on tap) + navigator.vibrate (Android).
+ * toggled through its label (iOS Taptic Engine) + navigator.vibrate (Android).
  */
 export function HabitChip({
   label,
@@ -17,7 +17,7 @@ export function HabitChip({
   on: boolean
   onToggle: () => void
 }) {
-  const ref = useRef<HTMLSpanElement>(null)
+  const ref = useRef<HTMLLabelElement>(null)
 
   const handleChange = () => {
     const willComplete = !on
@@ -42,10 +42,13 @@ export function HabitChip({
   }
 
   return (
-    <span
+    // The <label> is the touch target, not the switch. A native switch tracks
+    // the finger itself and toggles on touchend even when the touch became a
+    // scroll; a label only gets a click, which the browser withholds on scroll.
+    <label
       ref={ref}
       className={cn(
-        "relative inline-flex items-center justify-center rounded-full border px-3.5 py-2 text-[13px] transition-colors",
+        "relative inline-flex cursor-pointer touch-manipulation items-center justify-center rounded-full border px-3.5 py-2 text-[13px] transition-colors select-none has-focus-visible:ring-2 has-focus-visible:ring-ring",
         on ? "border-success/85 bg-success/15 text-success" : "border-border text-muted-foreground",
       )}
     >
@@ -54,10 +57,9 @@ export function HabitChip({
         type="checkbox"
         {...{ switch: "" }}
         checked={on}
-        aria-label={label}
         onChange={handleChange}
-        className="absolute inset-0 m-0 size-full cursor-pointer opacity-0 [clip-path:inset(0)]"
+        className="pointer-events-none absolute inset-0 m-0 size-full opacity-0 [clip-path:inset(0)]"
       />
-    </span>
+    </label>
   )
 }

@@ -374,7 +374,6 @@ function RetroAreaScreen({ areaId }: { areaId: string }) {
                     void sendChat()
                   }
                 }}
-                enterKeyHint="send"
                 rows={2}
                 placeholder="Reply to your coach…"
                 // Capped: this bar is sticky, so an uncapped reply would push
