@@ -28,7 +28,7 @@ function summaryRequest(previousDoc: string, nextDoc: string): string {
   return (
     `<previous_doc>\n${previousDoc.trim()}\n</previous_doc>\n\n` +
     `<new_doc>\n${nextDoc.trim()}\n</new_doc>\n\n` +
-    `What changed? Respond with ONLY <summary>a short change summary as markdown bullets</summary>.`
+    `What changed? Respond with ONLY <summary>a short change summary as markdown bullets, a short change summary — what changed, new decisions, new goals, new actions, accomplished items</summary>.`
   )
 }
 
