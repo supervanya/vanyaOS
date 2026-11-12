@@ -1,6 +1,6 @@
 import type { LoadedConfig } from "@/features/config/api"
 import { afterEach, describe, expect, it, vi } from "vitest"
-import { listDayDates, loadOrInitDay } from "./api"
+import { listDayDates, loadOrInitDay, saveDay, type DayEntry } from "./api"
 
 // What each table's next read returns, as Supabase shapes it: rows or an error.
 type Result = { data: unknown; error: { message: string } | null }
@@ -25,7 +25,13 @@ function query(table: string): Query {
   return builder
 }
 
-vi.mock("@/lib/supabaseClient", () => ({ supabase: { from: query } }))
+// Saves go through `rpc`; vi.mock is hoisted above this file, so it is too.
+const { rpc } = vi.hoisted(() => ({
+  rpc: vi.fn<(fn: string, args: Record<string, unknown>) => Promise<Result>>(() =>
+    Promise.resolve({ data: null, error: null }),
+  ),
+}))
+vi.mock("@/lib/supabaseClient", () => ({ supabase: { from: query, rpc } }))
 vi.mock("@/lib/auth", () => ({ currentUserId: () => Promise.resolve("user-1") }))
 
 // Hydration only reads the slug -> row-id maps; a fresh day lists `habits`.
@@ -45,6 +51,7 @@ const savedRow = {
   entry_date: date,
   theme: "recovery",
   reflection: "long day",
+  intention_lived: "partly",
   updated_at: "2026-09-24T21:00:00.000Z",
 }
 const failure = { data: null, error: { message: "JWT expired" } }
@@ -62,6 +69,7 @@ describe("loadOrInitDay", () => {
     const { entry } = await loadOrInitDay(date, config)
     expect(entry).toMatchObject({
       reflection: "long day",
+      intentionLived: "partly",
       metrics: { mood: 4 },
       habits: { steps: true },
     })
@@ -71,7 +79,24 @@ describe("loadOrInitDay", () => {
     results.entries = { data: null, error: null }
 
     const { entry } = await loadOrInitDay(date, config)
-    expect(entry).toMatchObject({ reflection: "", metrics: {}, habits: { steps: false } })
+    expect(entry).toMatchObject({
+      reflection: "",
+      intentionLived: null,
+      metrics: {},
+      habits: { steps: false },
+    })
+  })
+
+  it("reads an unrated day as not rated", async () => {
+    results.entries = { data: { ...savedRow, intention_lived: null }, error: null }
+
+    const { entry } = await loadOrInitDay(date, config)
+    expect(entry.intentionLived).toBeNull()
+  })
+
+  it("rejects a lived rating the app doesn't know", async () => {
+    results.entries = { data: { ...savedRow, intention_lived: "mostly" }, error: null }
+    await expect(loadOrInitDay(date, config)).rejects.toThrow("entries.intention_lived")
   })
 
   it("throws when the entry read fails, instead of opening an empty day", async () => {
@@ -87,6 +112,38 @@ describe("loadOrInitDay", () => {
       await expect(loadOrInitDay(date, config)).rejects.toEqual(failure.error)
     },
   )
+})
+
+describe("saveDay", () => {
+  const entry: DayEntry = {
+    date,
+    theme: "recovery",
+    metrics: {},
+    habits: { steps: true },
+    reflection: "long day",
+    intentionLived: "yes",
+    updatedAt: "2026-09-24T21:00:00.000Z",
+  }
+
+  it("sends the lived rating with the evening half", async () => {
+    await saveDay(entry, config)
+    expect(rpc).toHaveBeenLastCalledWith("save_day", {
+      entry_date: date,
+      theme: "recovery",
+      reflection: "long day",
+      intention_lived: "yes",
+      metric_values: [{ metric_id: "metric-mood", value: null }],
+      habit_checks: [{ habit_id: "habit-steps", done: true }],
+    })
+  })
+
+  it("sends an unrated day as an empty rating", async () => {
+    await saveDay({ ...entry, intentionLived: null }, config)
+    expect(rpc).toHaveBeenLastCalledWith(
+      "save_day",
+      expect.objectContaining({ intention_lived: "" }),
+    )
+  })
 })
 
 describe("listDayDates", () => {

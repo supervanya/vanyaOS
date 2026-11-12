@@ -10,6 +10,7 @@ const entry: DayEntry = {
   metrics: { mood: 4 },
   habits: { steps: true },
   reflection: "ok day",
+  intentionLived: "partly",
   updatedAt: "2026-09-19T21:00:00.000Z",
 }
 const key = `vanyaos:draft:${entry.date}`
@@ -35,6 +36,17 @@ describe("local drafts", () => {
     localStorage.setItem(key, JSON.stringify({ ...entry, metrics: { mood: "4" } }))
     expect(loadDraft(entry.date)).toBeNull()
     localStorage.setItem(key, JSON.stringify({ date: entry.date }))
+    expect(loadDraft(entry.date)).toBeNull()
+  })
+
+  it("reads a draft saved before intentions existed as not rated", () => {
+    const { intentionLived: _, ...older } = entry
+    localStorage.setItem(key, JSON.stringify(older))
+    expect(loadDraft(entry.date)).toEqual({ ...entry, intentionLived: null })
+  })
+
+  it("ignores a draft with an unknown lived rating", () => {
+    localStorage.setItem(key, JSON.stringify({ ...entry, intentionLived: "mostly" }))
     expect(loadDraft(entry.date)).toBeNull()
   })
 

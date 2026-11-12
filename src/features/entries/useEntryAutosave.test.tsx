@@ -25,6 +25,7 @@ const day: DayEntry = {
   metrics: {},
   habits: { steps: false },
   reflection: "",
+  intentionLived: null,
   updatedAt: "2026-09-12T08:00:00.000Z",
 }
 // The day after its nth edit, stamped n minutes later.

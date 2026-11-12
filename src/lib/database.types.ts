@@ -80,6 +80,8 @@ export type Database = {
           created_at: string
           entry_date: string
           id: string
+          intention: string
+          intention_lived: string | null
           reflection: string
           theme: string | null
           updated_at: string
@@ -89,6 +91,8 @@ export type Database = {
           created_at?: string
           entry_date: string
           id?: string
+          intention?: string
+          intention_lived?: string | null
           reflection?: string
           theme?: string | null
           updated_at?: string
@@ -98,6 +102,8 @@ export type Database = {
           created_at?: string
           entry_date?: string
           id?: string
+          intention?: string
+          intention_lived?: string | null
           reflection?: string
           theme?: string | null
           updated_at?: string
@@ -255,6 +261,7 @@ export type Database = {
           label: string
           scale: number
           sort_order: number
+          timing: string
           user_id: string
         }
         Insert: {
@@ -266,6 +273,7 @@ export type Database = {
           label: string
           scale?: number
           sort_order?: number
+          timing?: string
           user_id?: string
         }
         Update: {
@@ -277,6 +285,7 @@ export type Database = {
           label?: string
           scale?: number
           sort_order?: number
+          timing?: string
           user_id?: string
         }
         Relationships: []
@@ -427,8 +436,18 @@ export type Database = {
         Args: {
           entry_date: string
           habit_checks: Json
+          intention_lived: string
           metric_values: Json
           reflection: string
+          theme: string
+        }
+        Returns: undefined
+      }
+      save_morning: {
+        Args: {
+          entry_date: string
+          intention: string
+          metric_values: Json
           theme: string
         }
         Returns: undefined

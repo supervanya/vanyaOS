@@ -6,8 +6,13 @@
 
 import type { LoadedConfig } from "@/features/config/api"
 import { currentUserId } from "@/lib/auth"
-import { isRecord } from "@/lib/parse"
+import { isOneOf, isRecord, oneOf } from "@/lib/parse"
 import { supabase } from "@/lib/supabaseClient"
+
+// The evening's answer to "did I live this morning's intention?" — pinned by a
+// CHECK constraint on `entries.intention_lived`. Null until it's tapped.
+const INTENTION_LIVED = ["no", "partly", "yes"] as const
+type IntentionLived = (typeof INTENTION_LIVED)[number]
 
 export type DayEntry = {
   date: string // YYYY-MM-DD
@@ -15,6 +20,7 @@ export type DayEntry = {
   metrics: Record<string, number> // only sliders you've set; untouched ones are absent
   habits: Record<string, boolean>
   reflection: string
+  intentionLived: IntentionLived | null
   updatedAt: string
 }
 
@@ -51,6 +57,7 @@ async function hydrateEntry(
     entry_date: string
     theme: string | null
     reflection: string | null
+    intention_lived: string | null
     updated_at: string
   },
   config: LoadedConfig,
@@ -86,6 +93,10 @@ async function hydrateEntry(
     metrics,
     habits,
     reflection: row.reflection ?? "",
+    intentionLived:
+      row.intention_lived === null
+        ? null
+        : oneOf(INTENTION_LIVED, row.intention_lived, "entries.intention_lived"),
     updatedAt: row.updated_at,
   }
 }
@@ -107,6 +118,7 @@ async function newEntry(date: string, config: LoadedConfig): Promise<DayEntry> {
     metrics: {},
     habits: Object.fromEntries(config.habits.map((h) => [h.id, false])),
     reflection: "",
+    intentionLived: null,
     updatedAt: new Date().toISOString(),
   }
 }
@@ -127,8 +139,11 @@ export async function loadOrInitDay(date: string, config: LoadedConfig): Promise
   return { entry: remote ?? (await newEntry(date, config)), unsynced: false }
 }
 
-// Saves the entry row, metric values and habit checks in one transaction
-// (the `save_day` function), so a failure never leaves a half-saved day.
+// Saves the evening half — the entry row, evening metric values and habit
+// checks — in one transaction (the `save_day` function), so a failure never
+// leaves a half-saved day. `save_day` itself drops morning-timed metrics from
+// `metric_values` and never touches `intention`, so this can't clobber the
+// morning half.
 export async function saveDay(entry: DayEntry, config: LoadedConfig): Promise<void> {
   // Every active metric is sent: set ones with their value, unset ones as null
   // so a slider reset to "no value" clears it. Archived or unknown metrics have
@@ -146,6 +161,8 @@ export async function saveDay(entry: DayEntry, config: LoadedConfig): Promise<vo
     entry_date: entry.date,
     theme: entry.theme,
     reflection: entry.reflection,
+    // "" means "not rated": the generated types make every argument non-null.
+    intention_lived: entry.intentionLived ?? "",
     metric_values: metricValues,
     habit_checks: habitChecks,
   })
@@ -171,15 +188,21 @@ export function loadDraft(date: string): DayEntry | null {
   if (!raw) return null
   try {
     const parsed: unknown = JSON.parse(raw)
-    return isDayEntry(parsed) ? parsed : null
+    return isStoredDraft(parsed)
+      ? { ...parsed, intentionLived: parsed.intentionLived ?? null }
+      : null
   } catch {
     return null
   }
 }
 
+// A draft as it may sit in localStorage: written before M5, it has no
+// `intentionLived` at all.
+type StoredDraft = Omit<DayEntry, "intentionLived"> & { intentionLived?: IntentionLived | null }
+
 // Drafts come back from localStorage, which may hold an older shape — check
 // before trusting it, and fall back to the remote entry if it doesn't match.
-function isDayEntry(value: unknown): value is DayEntry {
+function isStoredDraft(value: unknown): value is StoredDraft {
   return (
     isRecord(value) &&
     typeof value.date === "string" &&
@@ -189,7 +212,10 @@ function isDayEntry(value: unknown): value is DayEntry {
     isRecord(value.metrics) &&
     Object.values(value.metrics).every((x) => typeof x === "number") &&
     isRecord(value.habits) &&
-    Object.values(value.habits).every((x) => typeof x === "boolean")
+    Object.values(value.habits).every((x) => typeof x === "boolean") &&
+    (value.intentionLived === undefined ||
+      value.intentionLived === null ||
+      (typeof value.intentionLived === "string" && isOneOf(INTENTION_LIVED, value.intentionLived)))
   )
 }
 
