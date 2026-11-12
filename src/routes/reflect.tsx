@@ -1,29 +1,19 @@
 import { useQuery, useSuspenseQuery } from "@tanstack/react-query"
 import { createFileRoute } from "@tanstack/react-router"
 import { useState } from "react"
-import {
-  Moon,
-  Activity,
-  Flag,
-  Repeat,
-  Lightbulb,
-  Target,
-  ChevronLeft,
-  ChevronRight,
-  Info,
-} from "lucide-react"
+import { Moon, Flag, Repeat, Info } from "lucide-react"
 import type { LoadedConfig } from "@/features/config/api"
 import { configQuery } from "@/features/config/queries"
 import type { LoadedDay } from "@/features/entries/api"
 import { dayQuery, previousWellnessQuery } from "@/features/entries/queries"
 import { useEntryAutosave } from "@/features/entries/useEntryAutosave"
-import { ReflectDatePicker } from "@/features/entries/ReflectDatePicker"
+import { DayNavigator } from "@/features/entries/DayNavigator"
+import { MetricGroups } from "@/features/entries/MetricGroups"
 import { wellness, wellnessTone, type WellnessTone } from "@/features/entries/wellness"
 import { trendSeriesQuery } from "@/features/trends/queries"
 import { TaskBoard } from "@/features/tasks/TaskBoard"
-import { groupMetrics, metricsAt } from "@/lib/config"
-import { defaultEntryDate, shiftISO, todayISO } from "@/lib/dates"
-import { MetricSlider } from "@/features/entries/MetricSlider"
+import { metricsAt } from "@/lib/config"
+import { defaultEntryDate, todayISO } from "@/lib/dates"
 import { HabitChip } from "@/components/HabitChip"
 import { useAutoGrow } from "@/hooks/useAutoGrow"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -98,13 +88,6 @@ function ReflectionDay({
   // so it doesn't hold up the page — the delta appears once it's loaded.
   const prevScore = useQuery(previousWellnessQuery(entry.date)).data ?? null
 
-  // Only the evening half's sliders; morning-timed metrics are asked on
-  // /morning. `wellness` above still averages every value the day has.
-  const groups = groupMetrics(metricsAt(config.metrics, "evening")).map((g) => ({
-    ...g,
-    inverted: g.metrics.every((m) => !m.higherIsBetter),
-  }))
-
   const stamp = () => new Date().toISOString()
   const setMetric = (id: string, v: number | undefined) =>
     setEntry((e) => {
@@ -132,31 +115,12 @@ function ReflectionDay({
     <>
       {/* Back to dashboard + date navigator */}
       <PageHeader>
-        <div className="flex items-center gap-0.5 text-xs text-muted-foreground">
-          <button
-            type="button"
-            aria-label="Previous day"
-            onClick={() => goTo(shiftISO(selectedDate, -1))}
-            className="rounded p-1 hover:text-foreground"
-          >
-            <ChevronLeft size={16} />
-          </button>
-          <ReflectDatePicker
-            date={selectedDate}
-            maxDate={actualToday}
-            label={prettyDate}
-            onSelect={goTo}
-          />
-          <button
-            type="button"
-            aria-label="Next day"
-            disabled={selectedDate >= actualToday}
-            onClick={() => goTo(shiftISO(selectedDate, 1))}
-            className="rounded p-1 hover:text-foreground disabled:opacity-30"
-          >
-            <ChevronRight size={16} />
-          </button>
-        </div>
+        <DayNavigator
+          date={selectedDate}
+          maxDate={actualToday}
+          label={prettyDate}
+          onSelect={goTo}
+        />
       </PageHeader>
 
       {/* Past-date warning (e.g. auto-set to yesterday after midnight) */}
@@ -219,53 +183,14 @@ function ReflectionDay({
         symptoms inverted · theme: {entry.theme}
       </p>
 
-      {/* Metric groups */}
-      {groups.map(({ group, metrics, inverted }) => (
-        <section key={group} className="mt-5">
-          <p
-            className={`mb-3 flex items-center gap-1.5 text-xs ${inverted ? "text-destructive" : "text-muted-foreground"}`}
-          >
-            {inverted ? (
-              <Activity size={14} />
-            ) : group === "Stimulation" ? (
-              <Lightbulb size={14} />
-            ) : group === "Recovery" ? (
-              <Moon size={14} />
-            ) : (
-              <Target size={14} />
-            )}
-            {group}
-            {inverted ? " · 0 is best" : ""}
-          </p>
-          {metrics.map((m) => {
-            const val = entry.metrics[m.id] // undefined until you set it
-            return (
-              <div key={m.id} className="mb-4 flex items-center gap-3">
-                <span className="w-24 shrink-0 text-[13px] text-foreground/85">{m.label}</span>
-                <div className="flex-1">
-                  <MetricSlider
-                    value={val}
-                    min={0}
-                    max={m.scale}
-                    tone={inverted ? "danger" : "success"}
-                    onValueChange={(v) => setMetric(m.id, v)}
-                  />
-                  <div className="mt-1.5 flex justify-between px-4 text-[7px] text-muted-foreground tabular-nums select-none">
-                    {Array.from({ length: m.scale + 1 }, (_, i) => (
-                      <span key={i}>{i}</span>
-                    ))}
-                  </div>
-                </div>
-                <span
-                  className={`w-6 text-right text-[15px] font-semibold tabular-nums ${val === undefined ? "text-muted-foreground" : ""}`}
-                >
-                  {val ?? "–"}
-                </span>
-              </div>
-            )
-          })}
-        </section>
-      ))}
+      {/* Metric groups: only the evening half's sliders; morning-timed metrics
+          are asked on /morning. `wellness` above still averages every value
+          the day has. */}
+      <MetricGroups
+        metrics={metricsAt(config.metrics, "evening")}
+        values={entry.metrics}
+        onChange={setMetric}
+      />
 
       {/* Goals */}
       <section className="mt-5">

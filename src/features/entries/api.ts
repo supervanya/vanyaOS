@@ -6,6 +6,7 @@
 
 import type { LoadedConfig } from "@/features/config/api"
 import { currentUserId } from "@/lib/auth"
+import { metricsAt } from "@/lib/config"
 import { isOneOf, isRecord, oneOf } from "@/lib/parse"
 import { supabase } from "@/lib/supabaseClient"
 
@@ -20,7 +21,20 @@ export type DayEntry = {
   metrics: Record<string, number> // only sliders you've set; untouched ones are absent
   habits: Record<string, boolean>
   reflection: string
+  intention: string // the morning half's text; written only by saveMorning
   intentionLived: IntentionLived | null
+  updatedAt: string
+}
+
+// The morning half of a day (ARCHITECTURE.md "One day, two halves"): what
+// /morning edits and `save_morning` writes. `metrics` holds only morning-timed
+// values. It lives on the same `entries` row as the evening, so `updatedAt` is
+// that row's.
+export type MorningEntry = {
+  date: string // YYYY-MM-DD
+  theme: string // only used when the morning creates the day's row
+  intention: string
+  metrics: Record<string, number>
   updatedAt: string
 }
 
@@ -57,6 +71,7 @@ async function hydrateEntry(
     entry_date: string
     theme: string | null
     reflection: string | null
+    intention: string
     intention_lived: string | null
     updated_at: string
   },
@@ -93,6 +108,7 @@ async function hydrateEntry(
     metrics,
     habits,
     reflection: row.reflection ?? "",
+    intention: row.intention,
     intentionLived:
       row.intention_lived === null
         ? null
@@ -118,6 +134,7 @@ async function newEntry(date: string, config: LoadedConfig): Promise<DayEntry> {
     metrics: {},
     habits: Object.fromEntries(config.habits.map((h) => [h.id, false])),
     reflection: "",
+    intention: "",
     intentionLived: null,
     updatedAt: new Date().toISOString(),
   }
@@ -129,14 +146,79 @@ export type LoadedDay = { entry: DayEntry; unsynced: boolean }
 
 // Reconciles the remote entry with any local draft, preferring whichever is
 // freshest by `updatedAt` — protects an in-progress edit from a dropped sync.
+// An evening draft only speaks for the evening half: its morning half is a
+// copy from when it was written, so the saved morning replaces it.
 export async function loadOrInitDay(date: string, config: LoadedConfig): Promise<LoadedDay> {
   const [remote, draft] = await Promise.all([
     loadDay(date, config),
     Promise.resolve(loadDraft(date)),
   ])
   if (draft && (!remote || draft.updatedAt > remote.updatedAt))
-    return { entry: draft, unsynced: true }
+    return { entry: withMorning(draft, remote ?? EMPTY_MORNING, config), unsynced: true }
   return { entry: remote ?? (await newEntry(date, config)), unsynced: false }
+}
+
+const EMPTY_MORNING = { intention: "", metrics: {} }
+
+const morningIds = (config: LoadedConfig) =>
+  new Set(metricsAt(config.metrics, "morning").map((m) => m.id))
+
+/**
+ * `day` with its morning half — the intention and every morning-timed metric
+ * value — taken from `morning`. Each half owns its own fields of the shared
+ * day, so whoever writes one half into it keeps the other half as it found it.
+ */
+export function withMorning(
+  day: DayEntry,
+  morning: Pick<MorningEntry, "intention" | "metrics">,
+  config: LoadedConfig,
+): DayEntry {
+  const ids = morningIds(config)
+  const metrics = Object.fromEntries([
+    ...Object.entries(day.metrics).filter(([id]) => !ids.has(id)),
+    ...Object.entries(morning.metrics).filter(([id]) => ids.has(id)),
+  ])
+  return { ...day, intention: morning.intention, metrics }
+}
+
+// The morning half of a loaded day.
+function morningOf(day: DayEntry, config: LoadedConfig): MorningEntry {
+  const ids = morningIds(config)
+  return {
+    date: day.date,
+    theme: day.theme,
+    intention: day.intention,
+    metrics: Object.fromEntries(Object.entries(day.metrics).filter(([id]) => ids.has(id))),
+    updatedAt: day.updatedAt,
+  }
+}
+
+// A morning as /morning should show it. `unsynced`: from a local draft that
+// never reached Postgres.
+export type LoadedMorning = { entry: MorningEntry; unsynced: boolean }
+
+// The morning's counterpart of loadOrInitDay: the saved morning half, a newer
+// unsynced morning draft, or a blank morning.
+export async function loadOrInitMorning(
+  date: string,
+  config: LoadedConfig,
+): Promise<LoadedMorning> {
+  const [remote, draft] = await Promise.all([
+    loadDay(date, config),
+    Promise.resolve(loadMorningDraft(date)),
+  ])
+  if (draft && (!remote || draft.updatedAt > remote.updatedAt))
+    return { entry: draft, unsynced: true }
+  const entry: MorningEntry = remote
+    ? morningOf(remote, config)
+    : {
+        date,
+        theme: config.activeTheme,
+        intention: "",
+        metrics: {},
+        updatedAt: new Date().toISOString(),
+      }
+  return { entry, unsynced: false }
 }
 
 // Saves the evening half — the entry row, evening metric values and habit
@@ -169,6 +251,29 @@ export async function saveDay(entry: DayEntry, config: LoadedConfig): Promise<vo
   if (error) throw error
 }
 
+// Saves the morning half — the intention and morning-timed metric values — in
+// one transaction (the `save_morning` function). Only morning metrics are sent,
+// unset ones as null to clear them; `save_morning` filters by timing again in
+// SQL. Once the day's evening is started the function refuses (see
+// isMorningLocked) and nothing is saved.
+export async function saveMorning(entry: MorningEntry, config: LoadedConfig): Promise<void> {
+  const metricValues = metricsAt(config.metrics, "morning").flatMap((m) => {
+    const metricId = config.metricRowId[m.id]
+    return metricId ? [{ metric_id: metricId, value: entry.metrics[m.id] ?? null }] : []
+  })
+  const { error } = await supabase.rpc("save_morning", {
+    entry_date: entry.date,
+    theme: entry.theme,
+    intention: entry.intention,
+    metric_values: metricValues,
+  })
+  if (error) throw error
+}
+
+// `save_morning`'s refusal once the day's evening is started: SQLSTATE MLOCK,
+// which PostgREST passes on as the error's `code`. Saving again can't help.
+export const isMorningLocked = (err: unknown): boolean => isRecord(err) && err.code === "MLOCK"
+
 // --- Local draft buffer -----------------------------------------------------
 // Write-ahead cache only: instant on every keystroke, cleared once a Postgres
 // sync succeeds. Never read as a source of truth on its own — only used to
@@ -189,7 +294,11 @@ export function loadDraft(date: string): DayEntry | null {
   try {
     const parsed: unknown = JSON.parse(raw)
     return isStoredDraft(parsed)
-      ? { ...parsed, intentionLived: parsed.intentionLived ?? null }
+      ? {
+          ...parsed,
+          intention: parsed.intention ?? "",
+          intentionLived: parsed.intentionLived ?? null,
+        }
       : null
   } catch {
     return null
@@ -197,8 +306,12 @@ export function loadDraft(date: string): DayEntry | null {
 }
 
 // A draft as it may sit in localStorage: written before M5, it has no
-// `intentionLived` at all.
-type StoredDraft = Omit<DayEntry, "intentionLived"> & { intentionLived?: IntentionLived | null }
+// `intention` or `intentionLived` at all. (Its intention is only a copy:
+// loadOrInitDay replaces it with the saved morning.)
+type StoredDraft = Omit<DayEntry, "intention" | "intentionLived"> & {
+  intention?: string
+  intentionLived?: IntentionLived | null
+}
 
 // Drafts come back from localStorage, which may hold an older shape — check
 // before trusting it, and fall back to the remote entry if it doesn't match.
@@ -213,6 +326,7 @@ function isStoredDraft(value: unknown): value is StoredDraft {
     Object.values(value.metrics).every((x) => typeof x === "number") &&
     isRecord(value.habits) &&
     Object.values(value.habits).every((x) => typeof x === "boolean") &&
+    (value.intention === undefined || typeof value.intention === "string") &&
     (value.intentionLived === undefined ||
       value.intentionLived === null ||
       (typeof value.intentionLived === "string" && isOneOf(INTENTION_LIVED, value.intentionLived)))
@@ -224,4 +338,57 @@ function isStoredDraft(value: unknown): value is StoredDraft {
 export function clearDraft(saved: DayEntry): void {
   if (loadDraft(saved.date)?.updatedAt === saved.updatedAt)
     localStorage.removeItem(draftKey(saved.date))
+}
+
+// --- Morning drafts ---------------------------------------------------------
+// The same write-ahead buffer for the morning half, under its own key so an
+// unsynced morning edit and an unsynced evening edit can never overwrite each
+// other. The evening reads only its exact key (`vanyaos:draft:<date>`), never
+// by prefix, so it can't pick these up.
+
+const morningDraftKey = (date: string) => `${DRAFT_PREFIX}morning:${date}`
+
+export function saveMorningDraft(entry: MorningEntry): void {
+  if (!hasWindow()) return
+  const stored: StoredMorningDraft = { half: "morning", ...entry }
+  localStorage.setItem(morningDraftKey(entry.date), JSON.stringify(stored))
+}
+
+export function loadMorningDraft(date: string): MorningEntry | null {
+  if (!hasWindow()) return null
+  const raw = localStorage.getItem(morningDraftKey(date))
+  if (!raw) return null
+  try {
+    const parsed: unknown = JSON.parse(raw)
+    if (!isStoredMorningDraft(parsed) || parsed.date !== date) return null
+    // Only the morning's own fields, whatever else the record carries.
+    const { theme, intention, metrics, updatedAt } = parsed
+    return { date, theme, intention, metrics, updatedAt }
+  } catch {
+    return null
+  }
+}
+
+// Tagged with its half, so an evening-shaped record (or anything older) is
+// never taken for a morning.
+type StoredMorningDraft = MorningEntry & { half: "morning" }
+
+function isStoredMorningDraft(value: unknown): value is StoredMorningDraft {
+  return (
+    isRecord(value) &&
+    value.half === "morning" &&
+    typeof value.date === "string" &&
+    typeof value.theme === "string" &&
+    typeof value.intention === "string" &&
+    typeof value.updatedAt === "string" &&
+    isRecord(value.metrics) &&
+    Object.values(value.metrics).every((x) => typeof x === "number")
+  )
+}
+
+// Drops the morning draft once `saved` is in Postgres, unless a newer edit
+// has replaced it since.
+export function clearMorningDraft(saved: MorningEntry): void {
+  if (loadMorningDraft(saved.date)?.updatedAt === saved.updatedAt)
+    localStorage.removeItem(morningDraftKey(saved.date))
 }

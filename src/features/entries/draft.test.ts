@@ -1,6 +1,15 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest"
-import { clearDraft, loadDraft, saveDraft, type DayEntry } from "./api"
+import {
+  clearDraft,
+  clearMorningDraft,
+  loadDraft,
+  loadMorningDraft,
+  saveDraft,
+  saveMorningDraft,
+  type DayEntry,
+  type MorningEntry,
+} from "./api"
 
 vi.mock("@/lib/supabaseClient", () => ({ supabase: {} }))
 
@@ -10,6 +19,7 @@ const entry: DayEntry = {
   metrics: { mood: 4 },
   habits: { steps: true },
   reflection: "ok day",
+  intention: "be patient",
   intentionLived: "partly",
   updatedAt: "2026-09-19T21:00:00.000Z",
 }
@@ -40,9 +50,19 @@ describe("local drafts", () => {
   })
 
   it("reads a draft saved before intentions existed as not rated", () => {
-    const { intentionLived: _, ...older } = entry
+    const { intention: _, intentionLived: __, ...older } = entry
     localStorage.setItem(key, JSON.stringify(older))
-    expect(loadDraft(entry.date)).toEqual({ ...entry, intentionLived: null })
+    expect(loadDraft(entry.date)).toEqual({ ...entry, intention: "", intentionLived: null })
+  })
+
+  it("ignores a draft whose intention isn't text", () => {
+    localStorage.setItem(key, JSON.stringify({ ...entry, intention: 3 }))
+    expect(loadDraft(entry.date)).toBeNull()
+  })
+
+  it("never reads the morning draft of the same day", () => {
+    saveMorningDraft(morning)
+    expect(loadDraft(entry.date)).toBeNull()
   })
 
   it("ignores a draft with an unknown lived rating", () => {
@@ -61,5 +81,86 @@ describe("local drafts", () => {
     saveDraft(newer)
     clearDraft(entry)
     expect(loadDraft(entry.date)).toEqual(newer)
+  })
+})
+
+const morning: MorningEntry = {
+  date: entry.date,
+  theme: "recovery",
+  intention: "be patient",
+  metrics: { sleep: 3 },
+  updatedAt: "2026-09-19T07:00:00.000Z",
+}
+const morningKey = `vanyaos:draft:morning:${morning.date}`
+
+describe("local morning drafts", () => {
+  it("round-trips a morning under its own key", () => {
+    saveMorningDraft(morning)
+    expect(localStorage.getItem(morningKey)).not.toBeNull()
+    expect(loadMorningDraft(morning.date)).toEqual(morning)
+  })
+
+  it("keeps the morning and evening drafts of one day apart", () => {
+    saveDraft(entry)
+    saveMorningDraft(morning)
+    expect(loadDraft(entry.date)).toEqual(entry)
+    expect(loadMorningDraft(morning.date)).toEqual(morning)
+    clearDraft(entry)
+    expect(loadMorningDraft(morning.date)).toEqual(morning)
+  })
+
+  it("returns null when there is no morning draft", () => {
+    saveDraft(entry)
+    expect(loadMorningDraft(morning.date)).toBeNull()
+  })
+
+  it("ignores a morning draft that isn't valid JSON", () => {
+    localStorage.setItem(morningKey, "{not json")
+    expect(loadMorningDraft(morning.date)).toBeNull()
+  })
+
+  it("rejects an evening-shaped record under the morning key", () => {
+    localStorage.setItem(morningKey, JSON.stringify(entry))
+    expect(loadMorningDraft(morning.date)).toBeNull()
+  })
+
+  it("rejects an untagged morning (an older shape)", () => {
+    localStorage.setItem(morningKey, JSON.stringify(morning))
+    expect(loadMorningDraft(morning.date)).toBeNull()
+  })
+
+  it("rejects a morning draft with the wrong shape", () => {
+    const tagged = { half: "morning", ...morning }
+    localStorage.setItem(morningKey, JSON.stringify({ ...tagged, metrics: { sleep: "3" } }))
+    expect(loadMorningDraft(morning.date)).toBeNull()
+    localStorage.setItem(morningKey, JSON.stringify({ ...tagged, intention: null }))
+    expect(loadMorningDraft(morning.date)).toBeNull()
+  })
+
+  it("rejects a morning draft filed under another date", () => {
+    localStorage.setItem(
+      morningKey,
+      JSON.stringify({ half: "morning", ...morning, date: "2026-09-18" }),
+    )
+    expect(loadMorningDraft(morning.date)).toBeNull()
+  })
+
+  it("keeps only the morning's own fields", () => {
+    localStorage.setItem(
+      morningKey,
+      JSON.stringify({ half: "morning", ...morning, reflection: "stray" }),
+    )
+    expect(loadMorningDraft(morning.date)).toEqual(morning)
+  })
+
+  it("clears the morning draft once it is saved, but not a newer edit", () => {
+    saveMorningDraft(morning)
+    clearMorningDraft(morning)
+    expect(loadMorningDraft(morning.date)).toBeNull()
+
+    const newer = { ...morning, intention: "be kind", updatedAt: "2026-09-19T07:05:00.000Z" }
+    saveMorningDraft(newer)
+    clearMorningDraft(morning)
+    expect(loadMorningDraft(morning.date)).toEqual(newer)
   })
 })
