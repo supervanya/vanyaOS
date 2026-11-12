@@ -97,12 +97,12 @@ describe("MorningRecap", () => {
   it("shows morning values alone, without asking whether it was lived", () => {
     renderRecap({ ...day, metrics: { sleep: 2 } })
     expect(screen.getByRole("region", { name: "This morning" })).toBeDefined()
-    expect(screen.queryByRole("group", { name: "Did I live it?" })).toBeNull()
+    expect(screen.queryByRole("group", { name: "Did you live your morning intention?" })).toBeNull()
   })
 
   it("asks whether the intention was lived, with the rating checked", () => {
     renderRecap({ ...day, intention: "stay calm" }, "partly")
-    const group = screen.getByRole("group", { name: "Did I live it?" })
+    const group = screen.getByRole("group", { name: "Did you live your morning intention?" })
     expect(group).toBeDefined()
     const checks = ["No", "Partly", "Yes"].map(
       (name) => screen.getByRole<HTMLInputElement>("checkbox", { name }).checked,
@@ -136,7 +136,9 @@ describe("MorningRecap", () => {
     const card = await screen.findByRole("region", { name: "This morning" })
     expect(card.textContent).toContain("walk")
     expect(screen.getByText("sleep").nextSibling?.textContent).toBe("4/5")
-    expect(screen.getByRole("group", { name: "Did I live it?" })).toBeDefined()
+    expect(
+      screen.getByRole("group", { name: "Did you live your morning intention?" }),
+    ).toBeDefined()
   })
 })
 

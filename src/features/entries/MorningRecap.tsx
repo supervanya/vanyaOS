@@ -9,7 +9,7 @@ import { dayQuery } from "./queries"
 /**
  * On /reflect, right above the reflection box: the day's morning half,
  * read-only, to check the day against while writing. Renders nothing for a day
- * with no morning. "Did I live it?" comes after the reflection (LivedRating).
+ * with no morning. "Did you live your morning intention?" comes after the reflection (LivedRating).
  *
  * The morning comes from the day's query cache, not the evening editor's
  * state: that is seeded once, while a morning saved after it opened (the sync
