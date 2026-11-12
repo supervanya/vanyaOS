@@ -12,8 +12,8 @@ import { supabase } from "@/lib/supabaseClient"
 
 // The evening's answer to "did I live this morning's intention?" — pinned by a
 // CHECK constraint on `entries.intention_lived`. Null until it's tapped.
-const INTENTION_LIVED = ["no", "partly", "yes"] as const
-type IntentionLived = (typeof INTENTION_LIVED)[number]
+export const INTENTION_LIVED = ["no", "partly", "yes"] as const
+export type IntentionLived = (typeof INTENTION_LIVED)[number]
 
 export type DayEntry = {
   date: string // YYYY-MM-DD

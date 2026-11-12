@@ -4,11 +4,12 @@ import { useState } from "react"
 import { Moon, Flag, Repeat, Info } from "lucide-react"
 import type { LoadedConfig } from "@/features/config/api"
 import { configQuery } from "@/features/config/queries"
-import type { LoadedDay } from "@/features/entries/api"
+import { withMorning, type IntentionLived, type LoadedDay } from "@/features/entries/api"
 import { dayQuery, previousWellnessQuery } from "@/features/entries/queries"
 import { useEntryAutosave } from "@/features/entries/useEntryAutosave"
 import { DayNavigator } from "@/features/entries/DayNavigator"
 import { MetricGroups } from "@/features/entries/MetricGroups"
+import { MorningRecap } from "@/features/entries/MorningRecap"
 import { wellness, wellnessTone, type WellnessTone } from "@/features/entries/wellness"
 import { trendSeriesQuery } from "@/features/trends/queries"
 import { TaskBoard } from "@/features/tasks/TaskBoard"
@@ -77,12 +78,18 @@ function ReflectionDay({
   goTo: (date: string) => void
 }) {
   const { entry, setEntry } = useEntryAutosave(config, loaded)
+  // The day as the cache holds it now. `entry` is the evening's draft, seeded
+  // once; the morning half can land in the cache after that (a morning sync
+  // finishing as you arrive from /morning), so it's read from here instead.
+  const { data: cached } = useSuspenseQuery(dayQuery(selectedDate))
   const [showDateInfo, setShowDateInfo] = useState(false)
 
   // Auto-grow the reflection textarea to fit its content (no drag handle).
   const reflectionRef = useAutoGrow(entry.reflection)
 
-  const score = wellness(entry, config)
+  // Both halves count, as in `entry_wellness_scores`: the evening's edits from
+  // the editor, the morning's values from the cache.
+  const score = wellness(withMorning(entry, cached.entry, config), config)
 
   // Wellness of the most recent prior day, for the "vs last" delta. Optional,
   // so it doesn't hold up the page — the delta appears once it's loaded.
@@ -98,6 +105,8 @@ function ReflectionDay({
     setEntry((e) => ({ ...e, habits: { ...e.habits, [id]: !e.habits[id] }, updatedAt: stamp() }))
   const setReflection = (text: string) =>
     setEntry((e) => ({ ...e, reflection: text, updatedAt: stamp() }))
+  const setLived = (value: IntentionLived | null) =>
+    setEntry((e) => ({ ...e, intentionLived: value, updatedAt: stamp() }))
 
   const actualToday = todayISO()
   const isPast = selectedDate < actualToday
@@ -182,6 +191,15 @@ function ReflectionDay({
       <p className="mt-0.5 text-[11px] text-muted-foreground">
         symptoms inverted · theme: {entry.theme}
       </p>
+
+      {/* This morning, read-only, and "did I live it?" — nothing on a day
+          without a morning. */}
+      <MorningRecap
+        date={selectedDate}
+        config={config}
+        lived={entry.intentionLived}
+        onLivedChange={setLived}
+      />
 
       {/* Metric groups: only the evening half's sliders; morning-timed metrics
           are asked on /morning. `wellness` above still averages every value
