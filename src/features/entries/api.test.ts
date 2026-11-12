@@ -6,6 +6,7 @@ import {
   isMorningLocked,
   listDayDates,
   loadOrInitDay,
+  loadMorningDraft,
   loadOrInitMorning,
   saveDay,
   saveDraft,
@@ -204,8 +205,12 @@ describe("loadOrInitMorning", () => {
     expect(entry).toMatchObject({ date, theme: "recovery", intention: "", metrics: {} })
   })
 
-  it("prefers a newer unsynced morning draft", async () => {
-    savedBothHalves()
+  it("prefers an unsynced morning draft over the saved morning", async () => {
+    results.entries = {
+      data: { ...savedRow, reflection: "", intention_lived: null },
+      error: null,
+    }
+    results.entry_metric_values = { data: [{ metric_id: "metric-sleep", value: 2 }], error: null }
     const draft: MorningEntry = {
       date,
       theme: "recovery",
@@ -217,18 +222,45 @@ describe("loadOrInitMorning", () => {
     expect(await loadOrInitMorning(date, split)).toEqual({ entry: draft, unsynced: true })
   })
 
-  it("prefers the saved morning over an older draft", async () => {
-    savedBothHalves()
+  it("keeps an unsynced draft when a habit tap has since bumped the day row", async () => {
+    // 07:00 the intention is typed offline; 09:00 a habit tap on the dashboard
+    // saves the evening half, which bumps the row's updated_at. Nothing in the
+    // evening is started, so the morning isn't locked.
+    results.entries = {
+      data: {
+        ...savedRow,
+        reflection: "",
+        intention: "",
+        intention_lived: null,
+        updated_at: "2026-09-24T09:00:00.000Z",
+      },
+      error: null,
+    }
+    results.entry_habits = { data: [{ habit_id: "habit-steps", done: true }], error: null }
+    const draft: MorningEntry = {
+      date,
+      theme: "recovery",
+      intention: "typed offline",
+      metrics: {},
+      updatedAt: "2026-09-24T07:00:00.000Z",
+    }
+    saveMorningDraft(draft)
+    expect(await loadOrInitMorning(date, split)).toEqual({ entry: draft, unsynced: true })
+  })
+
+  it("drops a draft once the day's evening is started", async () => {
+    savedBothHalves() // has a reflection: the morning is locked
     saveMorningDraft({
       date,
       theme: "recovery",
-      intention: "stale",
+      intention: "too late",
       metrics: {},
-      updatedAt: "2026-09-24T06:00:00.000Z",
+      updatedAt: "2026-09-24T22:00:00.000Z",
     })
     const { entry, unsynced } = await loadOrInitMorning(date, split)
     expect(unsynced).toBe(false)
     expect(entry.intention).toBe("stay calm")
+    expect(loadMorningDraft(date)).toBeNull()
   })
 
   it("never takes an evening draft for a morning", async () => {

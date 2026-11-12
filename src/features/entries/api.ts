@@ -9,6 +9,7 @@ import { currentUserId } from "@/lib/auth"
 import { metricsAt } from "@/lib/config"
 import { isOneOf, isRecord, oneOf } from "@/lib/parse"
 import { supabase } from "@/lib/supabaseClient"
+import { eveningStarted } from "./lock"
 
 // The evening's answer to "did I live this morning's intention?" — pinned by a
 // CHECK constraint on `entries.intention_lived`. Null until it's tapped.
@@ -197,8 +198,15 @@ function morningOf(day: DayEntry, config: LoadedConfig): MorningEntry {
 // never reached Postgres.
 export type LoadedMorning = { entry: MorningEntry; unsynced: boolean }
 
-// The morning's counterpart of loadOrInitDay: the saved morning half, a newer
-// unsynced morning draft, or a blank morning.
+// The morning's counterpart of loadOrInitDay: an unsynced morning draft, else
+// the saved morning half, else a blank morning.
+//
+// Unlike the evening, a morning draft isn't weighed against the row's
+// `updatedAt`: every evening save bumps that, habit taps on the dashboard
+// included, so an unsynced intention would lose to a habit tapped after it. A
+// morning draft only exists while it's unsynced (a save clears it), so it wins
+// — unless the day's evening is started: `save_morning` would refuse it, so
+// it's dropped and the saved morning shown.
 export async function loadOrInitMorning(
   date: string,
   config: LoadedConfig,
@@ -207,8 +215,9 @@ export async function loadOrInitMorning(
     loadDay(date, config),
     Promise.resolve(loadMorningDraft(date)),
   ])
-  if (draft && (!remote || draft.updatedAt > remote.updatedAt))
-    return { entry: draft, unsynced: true }
+  const locked = remote !== null && eveningStarted(remote, config.metrics)
+  if (draft && locked) discardMorningDraft(date)
+  else if (draft) return { entry: draft, unsynced: true }
   const entry: MorningEntry = remote
     ? morningOf(remote, config)
     : {
@@ -389,6 +398,11 @@ function isStoredMorningDraft(value: unknown): value is StoredMorningDraft {
 // Drops the morning draft once `saved` is in Postgres, unless a newer edit
 // has replaced it since.
 export function clearMorningDraft(saved: MorningEntry): void {
-  if (loadMorningDraft(saved.date)?.updatedAt === saved.updatedAt)
-    localStorage.removeItem(morningDraftKey(saved.date))
+  if (loadMorningDraft(saved.date)?.updatedAt === saved.updatedAt) discardMorningDraft(saved.date)
+}
+
+// Drops the day's morning draft outright: it can never be saved, because the
+// day's evening is started.
+function discardMorningDraft(date: string): void {
+  if (hasWindow()) localStorage.removeItem(morningDraftKey(date))
 }
