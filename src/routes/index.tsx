@@ -1,5 +1,5 @@
 import { useQuery, useSuspenseQuery } from "@tanstack/react-query"
-import { createFileRoute, Link, type LinkProps } from "@tanstack/react-router"
+import { createFileRoute, Link, redirect, type LinkProps } from "@tanstack/react-router"
 import type { ReactNode } from "react"
 import {
   BookOpen,
@@ -17,6 +17,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import type { LoadedConfig } from "@/features/config/api"
 import { configQuery } from "@/features/config/queries"
 import type { LoadedDay } from "@/features/entries/api"
+import { opensOnMorning } from "@/features/entries/landing"
 import { dayQuery } from "@/features/entries/queries"
 import { useEntryAutosave } from "@/features/entries/useEntryAutosave"
 import { ProjectsCard } from "@/features/projects/ProjectsCard"
@@ -29,6 +30,11 @@ import { dayOfYear, defaultEntryDate, isoWeek } from "@/lib/dates"
 import { GoalBar } from "@/components/GoalBar"
 
 export const Route = createFileRoute("/")({
+  // Before noon the app opens on /morning until today's morning is set or
+  // skipped. Only `/` does this; deep links to other pages are left alone.
+  beforeLoad: async ({ context: { queryClient } }) => {
+    if (await opensOnMorning(queryClient)) throw redirect({ to: "/morning", replace: true })
+  },
   loader: async ({ context: { queryClient } }) => {
     // The retro "due" badge isn't worth waiting for; it fills in when ready.
     void queryClient.prefetchQuery(retroAreasQuery)

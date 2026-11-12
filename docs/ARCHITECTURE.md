@@ -203,7 +203,7 @@ A day is still one `entries` row. The morning half is `intention` plus the value
 - **The morning locks once the evening is started.** "Started" means `reflection` is non-empty, or any evening-timed metric value exists, or `intention_lived` is set. `save_morning` raises when the day is locked — the UI going read-only is a courtesy, the function is the rule. Habit checks don't count: the dashboard writes them all day.
 - **Changing a metric's `timing`** in Settings moves where it is asked from then on. Existing values are untouched; a past day keeps whatever was recorded.
 - **Drafts.** Each half has its own localStorage draft (`vanyaos:draft:morning:<date>` beside the existing evening key), so an unsynced morning edit and an unsynced evening edit can't overwrite each other.
-- **Landing.** Before 12:00 local time, `/` redirects to `/morning` when today has no intention text and no morning metric value, unless "Skip today" was tapped (a per-date localStorage flag — device-local on purpose).
+- **Landing.** Before 12:00 local time, `/` redirects to `/morning` when today has no intention text and no morning metric value, unless "Skip today" was tapped (a per-date localStorage flag — device-local on purpose) or the day is locked. Not before 04:00, while the app's day (`defaultEntryDate`) is still yesterday's. The check runs in the index route's `beforeLoad` (`features/entries/landing.ts`); if today's morning can't be loaded it lets the dashboard open.
 
 ### Tasks: one list, three surfaces
 

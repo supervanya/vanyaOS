@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query"
-import { Link } from "@tanstack/react-router"
+import { Link, useNavigate } from "@tanstack/react-router"
 import { Info, Lock, Sun } from "lucide-react"
 import { PageHeader } from "@/components/PageHeader"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -10,6 +10,7 @@ import { metricsAt } from "@/lib/config"
 import { todayISO } from "@/lib/dates"
 import type { LoadedMorning } from "./api"
 import { DayNavigator } from "./DayNavigator"
+import { inMorningWindow, morningIsSet, skipMorning } from "./landing"
 import { eveningStarted } from "./lock"
 import { MetricGroups } from "./MetricGroups"
 import { MorningCard } from "./MorningRecap"
@@ -93,7 +94,7 @@ export function MorningDay({
           }
         />
       ) : (
-        <MorningEditor config={config} loaded={loaded} />
+        <MorningEditor config={config} loaded={loaded} isToday={selectedDate === actualToday} />
       )}
 
       {/* The same living list as the dashboard and /reflect: pull today's
@@ -110,8 +111,17 @@ export function MorningDay({
 
 // The intention and morning sliders, saving themselves. Mounted only while the
 // morning is unlocked, so a locked day never drafts or syncs.
-function MorningEditor({ config, loaded }: { config: LoadedConfig; loaded: LoadedMorning }) {
+function MorningEditor({
+  config,
+  loaded,
+  isToday,
+}: {
+  config: LoadedConfig
+  loaded: LoadedMorning
+  isToday: boolean
+}) {
   const { entry, setEntry } = useMorningAutosave(config, loaded)
+  const navigate = useNavigate()
   const intentionRef = useAutoGrow(entry.intention)
   const morningMetrics = metricsAt(config.metrics, "morning")
 
@@ -148,6 +158,22 @@ function MorningEditor({ config, loaded }: { config: LoadedConfig; loaded: Loade
           </Link>{" "}
           to ask it here.
         </p>
+      )}
+
+      {/* Only while it would matter: the app opens here until this is set. */}
+      {isToday && inMorningWindow(new Date()) && !morningIsSet(entry, config.metrics) && (
+        <div className="mt-4 flex justify-end">
+          <button
+            type="button"
+            onClick={() => {
+              skipMorning(loaded.entry.date)
+              void navigate({ to: "/" })
+            }}
+            className="text-[13px] text-muted-foreground underline hover:text-foreground"
+          >
+            Skip today
+          </button>
+        </div>
       )}
     </>
   )

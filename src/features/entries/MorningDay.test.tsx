@@ -15,6 +15,7 @@ import {
   type LoadedMorning,
   type MorningEntry,
 } from "./api"
+import { morningSkipped } from "./landing"
 import { MorningDay } from "./MorningDay"
 import { dayQuery, morningQuery } from "./queries"
 
@@ -24,6 +25,11 @@ vi.mock("./api", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./api")>()),
   saveMorning: vi.fn<typeof saveMorning>(() => Promise.resolve()),
   loadOrInitMorning: vi.fn<typeof loadOrInitMorning>(),
+}))
+const navigate = vi.fn<(to: unknown) => Promise<void>>(() => Promise.resolve())
+vi.mock("@tanstack/react-router", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@tanstack/react-router")>()),
+  useNavigate: () => navigate,
 }))
 vi.mock("sonner", () => ({ toast: { error: vi.fn<(message: string) => void>() } }))
 // The top bar needs a router; the task board has its own tests.
@@ -192,5 +198,49 @@ describe("MorningDay", () => {
     // Nothing retries.
     await wait(5000)
     expect(saveMorning).toHaveBeenCalledTimes(1)
+  })
+
+  describe("Skip today", () => {
+    const skip = () => screen.queryByRole("button", { name: "Skip today" })
+    const blank = {
+      entry: { ...morning, intention: "", metrics: {} },
+      unsynced: false,
+      locked: false,
+    }
+
+    it("is offered on today's blank morning before noon, and skips to the dashboard", () => {
+      vi.setSystemTime(new Date(2026, 8, 12, 9, 0))
+      renderPage(blank)
+      const button = skip()
+      if (!button) throw new Error("no Skip today")
+      fireEvent.click(button)
+      expect(morningSkipped(date)).toBe(true)
+      expect(navigate).toHaveBeenCalledWith({ to: "/" })
+    })
+
+    it("goes away once the intention has text", () => {
+      vi.setSystemTime(new Date(2026, 8, 12, 9, 0))
+      renderPage(blank)
+      const box = intention()
+      if (!box) throw new Error("no intention box")
+      fireEvent.change(box, { target: { value: "ship it" } })
+      expect(skip()).toBeNull()
+    })
+
+    it("isn't offered on a set morning, after noon, or on another day", () => {
+      vi.setSystemTime(new Date(2026, 8, 12, 9, 0))
+      renderPage({ entry: morning, unsynced: false, locked: false })
+      expect(skip()).toBeNull()
+      cleanup()
+
+      vi.setSystemTime(new Date(2026, 8, 12, 12, 0))
+      renderPage(blank)
+      expect(skip()).toBeNull()
+      cleanup()
+
+      vi.setSystemTime(new Date(2026, 8, 13, 9, 0))
+      renderPage(blank)
+      expect(skip()).toBeNull()
+    })
   })
 })
