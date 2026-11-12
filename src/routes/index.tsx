@@ -8,6 +8,7 @@ import {
   Moon,
   Repeat,
   Settings as SettingsIcon,
+  Sun,
   TrendingUp,
 } from "lucide-react"
 
@@ -17,6 +18,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import type { LoadedConfig } from "@/features/config/api"
 import { configQuery } from "@/features/config/queries"
 import type { LoadedDay } from "@/features/entries/api"
+import { IntentionGlance } from "@/features/entries/IntentionGlance"
 import { opensOnMorning } from "@/features/entries/landing"
 import { dayQuery } from "@/features/entries/queries"
 import { useEntryAutosave } from "@/features/entries/useEntryAutosave"
@@ -59,6 +61,7 @@ function Dashboard() {
   return (
     <div className="flex flex-col gap-6">
       <Header />
+      <IntentionGlance date={defaultEntryDate()} />
       <Navigation />
       <Tasks />
       <HabitsToday />
@@ -98,6 +101,11 @@ function Header() {
 function Navigation() {
   return (
     <div className="flex flex-col gap-2">
+      <NavCard
+        to="/morning"
+        icon={<Sun size={16} className={ACCENT} />}
+        label="Morning intention"
+      />
       <NavCard
         to="/reflect"
         icon={<Moon size={16} className={ACCENT} />}
@@ -228,7 +236,7 @@ function DashboardSkeleton() {
         <Skeleton className="h-4 w-28" />
       </div>
       <div className="flex flex-col gap-2">
-        {Array.from({ length: 4 }, (_, i) => (
+        {Array.from({ length: 5 }, (_, i) => (
           <Skeleton key={i} className="h-12 w-full rounded-lg" />
         ))}
       </div>
