@@ -50,6 +50,9 @@ create table metrics (
   higher_is_better boolean not null default true,
   scale int not null default 5,
   sort_order int not null default 0,
+  -- M5: when the slider is asked. The ONLY difference between a morning and an
+  -- evening metric — values, scale, Trends and wellness treat them the same.
+  timing text not null default 'evening' check (timing in ('morning', 'evening')),
   unique (user_id, key)
 );
 
@@ -73,13 +76,16 @@ create table goals (
   unique (user_id, key)
 );
 
--- One row per day, the entry "header."
+-- One row per day, the entry "header" — both halves of the day (M5). The
+-- morning creates the row; the evening fills in the rest.
 create table entries (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users,
   entry_date date not null,
   theme text,                        -- active_theme stamped at creation
-  reflection text not null default '',
+  intention text not null default '',  -- morning half (M5)
+  intention_lived text check (intention_lived in ('no', 'partly', 'yes')),  -- set in the evening; null = not rated
+  reflection text not null default '', -- evening half
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   unique (user_id, entry_date)
@@ -189,19 +195,30 @@ join metrics m on m.id = v.metric_id
 group by e.id;
 ```
 
-### Tasks: one list, two surfaces
+### One day, two halves (M5)
 
-The dashboard (`/`) and the reflection screen (`/reflect`) both read/write the same `tasks` rows — there is exactly one todo state in the system. Completing a task sets `completed_at` (kept, giving completion history for the future SMART report); "rescheduling" is just changing `scope`. The old roll-forward mechanism is gone: nothing is copied between days because tasks don't belong to days.
+A day is still one `entries` row. The morning half is `intention` plus the values of metrics whose `timing` is `morning`; the evening half is `reflection`, `intention_lived`, the evening metric values and the habit checks. There are no morning tables: every reader (Trends, `entry_wellness_scores`, the retro intake, the coach's tools) keeps reading one place, and a morning slider counts toward wellness exactly like an evening one. The cost is that a morning-only day has a wellness score built from a few values.
+
+- **Two save functions, one per half.** `save_morning(entry_date, theme, intention, metric_values)` upserts the day row and writes only `intention` and morning-timed metric values. `save_day` gains `intention_lived` and writes only `reflection`, evening-timed metric values and habit checks. Each filters `metric_values` by `metrics.timing` in SQL, so a stale client can't make one half clear the other's sliders (`save_day` deletes a metric value sent as null).
+- **The morning locks once the evening is started.** "Started" means `reflection` is non-empty, or any evening-timed metric value exists, or `intention_lived` is set. `save_morning` raises when the day is locked — the UI going read-only is a courtesy, the function is the rule. Habit checks don't count: the dashboard writes them all day.
+- **Changing a metric's `timing`** in Settings moves where it is asked from then on. Existing values are untouched; a past day keeps whatever was recorded.
+- **Drafts.** Each half has its own localStorage draft (`vanyaos:draft:morning:<date>` beside the existing evening key), so an unsynced morning edit and an unsynced evening edit can't overwrite each other.
+- **Landing.** Before 12:00 local time, `/` redirects to `/morning` when today has no intention text and no morning metric value, unless "Skip today" was tapped (a per-date localStorage flag — device-local on purpose).
+
+### Tasks: one list, three surfaces
+
+The dashboard (`/`), the morning page (`/morning`) and the reflection screen (`/reflect`) all read/write the same `tasks` rows — there is exactly one todo state in the system. Completing a task sets `completed_at` (kept, giving completion history for the future SMART report); "rescheduling" is just changing `scope`. The old roll-forward mechanism is gone: nothing is copied between days because tasks don't belong to days.
 
 **The 1-3-5 rule** (`CAPS` in `src/lib/storage.ts`): the weekly board = tasks in scope `today`+`week`, hard-capped at 1 big / 3 medium / 5 small per size — completed items still count (done work occupied its slot). Adding or promoting past a cap opens a swap chooser (evict a board item to `someday`, or park the incoming one); there is no silent overflow.
 
-### App surfaces (M2–M3)
+### App surfaces
 
 | Route | Purpose |
 |---|---|
-| `/` | **Command center** — the 1-3-5 board (hard caps + swap), habit chips (writes today's entry), goal glance, projects card (WIP-1, tap-to-swap), nav to Reflect |
-| `/reflect` | The evening reflection (moved from `/`); embeds the same task list |
-| `/settings` | M3: CRUD + archive for metrics/habits/goals, goal progress editing |
+| `/` | **Command center** — the 1-3-5 board (hard caps + swap), habit chips (writes today's entry), goal glance, projects card (WIP-1, tap-to-swap), today's intention (read-only, M5), links to Morning and Reflect |
+| `/morning` | M5: the morning intention — textarea, morning sliders, the same task list. Read-only once the evening is started |
+| `/reflect` | The evening reflection (moved from `/`); shows the morning half read-only, asks "did I live it?", embeds the same task list |
+| `/settings` | M3: CRUD + archive for metrics/habits/goals, goal progress editing. M5: morning/evening toggle per metric |
 | `/login` | Magic link + paste-the-link sign-in |
 
 ## Save flow
@@ -210,10 +227,10 @@ The nightly ritual has two distinct actions now, not one — this matters for co
 
 0. **AI setup (once).** Settings → AI: pick provider + model, paste your API key → `ai_settings` row. The `ai-coach` Edge Function verifies the caller's JWT, reads *their* row, and dispatches to the matching provider adapter — it never sees an app-level key because there isn't one.
 
-0b. **Retro flow (interactive).** An area's current doc is its latest `retros` row (seeded by pasting existing markdown). "Run retrospective" opens a coaching **session**, not a one-shot call: the client sends `ai-coach` (task `retro`) the current doc + entries since the area's last retro + any user-added context, and the coach — prompted as a sharp, goal-driven expert for that area — works through a structured retrospective *with* the user: multiple turns, the coach prompting with new information, proposed doc changes, and new goals. The session's conclusion (updated doc + change summary) is written as a NEW `retros` row (never overwriting — the doc is also hand-editable between runs, which writes a manual version). Session turns are stateless server-side: the client resends the running transcript each turn; only the final doc version persists. Areas show a due-nudge one month after their last run.
+0b. **Retro flow (interactive).** An area's current doc is its latest `retros` row (seeded by pasting existing markdown). "Run retrospective" opens a coaching **session**, not a one-shot call: the client sends `ai-coach` (task `retro`) the current doc + entries since the area's last retro (reflections, and from M5 each day's morning intention and lived rating) + any user-added context, and the coach — prompted as a sharp, goal-driven expert for that area — works through a structured retrospective *with* the user: multiple turns, the coach prompting with new information, proposed doc changes, and new goals. The session's conclusion (updated doc + change summary) is written as a NEW `retros` row (never overwriting — the doc is also hand-editable between runs, which writes a manual version). Session turns are stateless server-side: the client resends the running transcript each turn; only the final doc version persists. Areas show a due-nudge one month after their last run.
 
-1. **Continuous autosave (silent, no AI call).** As you edit sliders/habits/reflection/todos, changes write to a **local draft buffer in localStorage first** (instant, survives a dropped connection), then sync to the corresponding Postgres rows in the background (debounced). This is the same UX as today's autosave — just backed by Postgres instead of being the only copy.
-2. **Explicit "Finish reflection" (triggers the AI coach, M6).** A single tap invokes `ai-coach` with task `synthesize-entry` and the entry's id. The function reads the entry + recent history, calls the user's provider, and writes one row to `ai_reports`.
+1. **Continuous autosave (silent, no AI call).** Morning and evening each autosave their own half the same way (see "One day, two halves"). As you edit sliders/habits/reflection/todos, changes write to a **local draft buffer in localStorage first** (instant, survives a dropped connection), then sync to the corresponding Postgres rows in the background (debounced). This is the same UX as today's autosave — just backed by Postgres instead of being the only copy.
+2. **Explicit "Finish reflection" (triggers the AI coach, M7).** A single tap invokes `ai-coach` with task `synthesize-entry` and the entry's id. The function reads the entry + recent history, calls the user's provider, and writes one row to `ai_reports`.
 3. The client is subscribed to `ai_reports` inserts for that entry via **Supabase Realtime** — the coaching output appears automatically, no refresh, no polling.
 4. On load, the app reads `entries` + child rows for the selected date (and the open `tasks` list) directly via the Supabase client, gated by RLS to the logged-in user.
 
