@@ -53,7 +53,7 @@ const SUN = {
 const MOUNTAINS = {
   none: "translate-y-full",
   no: "translate-y-full",
-  partly: "translate-y-[55%] [--far:#D9573A] [--near:#B8432A]",
+  partly: "translate-y-[46%] [--far:#D9573A] [--near:#B8432A]",
   yes: "translate-y-0 [--far:#6FA3C7] [--near:#3F7A6B]",
 } satisfies Record<Scene, string>
 
@@ -144,29 +144,36 @@ export function LivedRating({
             )}
           >
             <svg
-              viewBox="0 0 60 28"
+              viewBox="0 0 58 28"
               fill="white"
               className={cn("lived-drift motion-reduce:animate-none", cloud.size)}
             >
-              <path d="M14 27a10 10 0 0 1 0-20 15 15 0 0 1 28 1 9.5 9.5 0 0 1 3 19z" />
+              {/* Three puffs over a base, so every edge is round. */}
+              <circle cx="15" cy="18" r="9" />
+              <circle cx="29" cy="12" r="11" />
+              <circle cx="43" cy="17" r="10" />
+              <rect x="15" y="17" width="28" height="10" />
             </svg>
           </div>
         ))}
+        {/* The range reaches 12px down behind the ground, so the bounce at the
+            top of its rise never lifts its foot into view. */}
         <svg
-          viewBox="0 0 320 64"
+          viewBox="0 0 320 76"
           preserveAspectRatio="none"
           className={cn(
-            "absolute inset-x-0 bottom-12 h-16 w-full transition-[translate] duration-700 ease-[cubic-bezier(.3,1.4,.5,1)] motion-reduce:transition-none",
+            "absolute inset-x-0 bottom-9 h-19 w-full transition-[translate] duration-700 ease-[cubic-bezier(.3,1.4,.5,1)] motion-reduce:transition-none",
             MOUNTAINS[scene],
           )}
         >
           <path
-            d="M0 64 50 14 95 50 120 36 150 64ZM170 64 205 40 235 54 275 10 320 56V64Z"
+            d="M0 64 50 14 95 50 120 36 150 64V76H0ZM170 64 205 40 235 54 275 10 320 56V76H170Z"
             fill="var(--far)"
           />
-          <path d="M0 64 28 38 70 64ZM236 64 300 30 320 48V64Z" fill="var(--near)" />
+          <path d="M0 64 28 38 70 64V76H0ZM236 64 300 30 320 48V76H236Z" fill="var(--near)" />
+          {/* Each cap's outer edges run along its peak's own slopes. */}
           <path
-            d="M50 14 41 24 47 22 51 27 56 21 60 24ZM275 10 266 21 272 19 276 24 281 18 286 22Z"
+            d="M50 14 39 25 44.5 22.5 49 27 54 22.5 58.5 26 63.75 25ZM275 10 265 21 270 18.5 274.5 23 279 18.5 283 22 285.76 21Z"
             fill="white"
             className={cn(
               "transition-opacity duration-500",
