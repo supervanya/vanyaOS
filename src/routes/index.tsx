@@ -1,5 +1,5 @@
 import { useQuery, useSuspenseQuery } from "@tanstack/react-query"
-import { createFileRoute, Link, type LinkProps } from "@tanstack/react-router"
+import { createFileRoute, Link, redirect, type LinkProps } from "@tanstack/react-router"
 import type { ReactNode } from "react"
 import {
   BookOpen,
@@ -8,6 +8,7 @@ import {
   Moon,
   Repeat,
   Settings as SettingsIcon,
+  Sun,
   TrendingUp,
 } from "lucide-react"
 
@@ -17,6 +18,8 @@ import { Skeleton } from "@/components/ui/skeleton"
 import type { LoadedConfig } from "@/features/config/api"
 import { configQuery } from "@/features/config/queries"
 import type { LoadedDay } from "@/features/entries/api"
+import { IntentionGlance } from "@/features/entries/IntentionGlance"
+import { opensOnMorning } from "@/features/entries/landing"
 import { dayQuery } from "@/features/entries/queries"
 import { useEntryAutosave } from "@/features/entries/useEntryAutosave"
 import { ProjectsCard } from "@/features/projects/ProjectsCard"
@@ -29,6 +32,11 @@ import { dayOfYear, defaultEntryDate, isoWeek } from "@/lib/dates"
 import { GoalBar } from "@/components/GoalBar"
 
 export const Route = createFileRoute("/")({
+  // Before noon the app opens on /morning until today's morning is set or
+  // skipped. Only `/` does this; deep links to other pages are left alone.
+  beforeLoad: async ({ context: { queryClient } }) => {
+    if (await opensOnMorning(queryClient)) throw redirect({ to: "/morning", replace: true })
+  },
   loader: async ({ context: { queryClient } }) => {
     // The retro "due" badge isn't worth waiting for; it fills in when ready.
     void queryClient.prefetchQuery(retroAreasQuery)
@@ -53,6 +61,7 @@ function Dashboard() {
   return (
     <div className="flex flex-col gap-6">
       <Header />
+      <IntentionGlance date={defaultEntryDate()} />
       <Navigation />
       <Tasks />
       <HabitsToday />
@@ -92,6 +101,11 @@ function Header() {
 function Navigation() {
   return (
     <div className="flex flex-col gap-2">
+      <NavCard
+        to="/morning"
+        icon={<Sun size={16} className={ACCENT} />}
+        label="Morning intention"
+      />
       <NavCard
         to="/reflect"
         icon={<Moon size={16} className={ACCENT} />}
@@ -222,7 +236,7 @@ function DashboardSkeleton() {
         <Skeleton className="h-4 w-28" />
       </div>
       <div className="flex flex-col gap-2">
-        {Array.from({ length: 4 }, (_, i) => (
+        {Array.from({ length: 5 }, (_, i) => (
           <Skeleton key={i} className="h-12 w-full rounded-lg" />
         ))}
       </div>

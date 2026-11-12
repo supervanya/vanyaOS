@@ -152,3 +152,46 @@ body {
     font-size: 16px !important;
   }
 }
+
+/* The clouds in the "did you live it?" scene (LivedRating) sway a little. */
+@keyframes lived-drift {
+  from {
+    translate: -4px 0;
+  }
+  to {
+    translate: 6px 0;
+  }
+}
+.lived-drift {
+  animation: lived-drift 5s ease-in-out infinite alternate;
+}
+
+/* The rings spreading from the risen sun in the same scene. Each grows from
+   the sun's edge and fades; LivedScene offsets three of them. */
+@keyframes lived-ring {
+  from {
+    scale: 0.4;
+    opacity: 0.5;
+  }
+  to {
+    scale: 1.15;
+    opacity: 0;
+  }
+}
+.lived-ring {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: lived-ring 3.6s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .lived-ring {
+    animation: none;
+    opacity: 0.16;
+  }
+  .lived-ring:nth-of-type(3) {
+    scale: 0.78;
+  }
+  .lived-ring:nth-of-type(4) {
+    scale: 0.56;
+  }
+}

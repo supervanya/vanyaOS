@@ -5,8 +5,14 @@ import { retroAreasQuery } from "@/features/retro/queries"
 import { GoalsSection } from "@/features/settings/GoalsSection"
 import { HabitsSection } from "@/features/settings/HabitsSection"
 import { MetricsSection } from "@/features/settings/MetricsSection"
+import { MorningSection } from "@/features/settings/MorningSection"
 import { RetroAreasSection } from "@/features/settings/RetroAreasSection"
-import { goalRowsQuery, habitRowsQuery, metricRowsQuery } from "@/features/settings/queries"
+import {
+  goalRowsQuery,
+  habitRowsQuery,
+  metricRowsQuery,
+  morningPrefsQuery,
+} from "@/features/settings/queries"
 import { PageHeader } from "@/components/PageHeader"
 
 export const Route = createFileRoute("/settings")({
@@ -15,6 +21,7 @@ export const Route = createFileRoute("/settings")({
       queryClient.ensureQueryData(metricRowsQuery),
       queryClient.ensureQueryData(habitRowsQuery),
       queryClient.ensureQueryData(goalRowsQuery),
+      queryClient.ensureQueryData(morningPrefsQuery),
       queryClient.ensureQueryData(retroAreasQuery),
       queryClient.ensureQueryData(aiSettingsQuery),
     ]),
@@ -34,6 +41,7 @@ function Settings() {
       <MetricsSection />
       <HabitsSection />
       <GoalsSection />
+      <MorningSection />
       <RetroAreasSection />
       <AiSettingsSection />
     </>

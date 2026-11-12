@@ -11,7 +11,10 @@ vi.mock("@/lib/supabaseClient", () => ({ supabase: {} }))
 afterEach(cleanup)
 
 const config = {
-  metrics: [{ id: "mood", label: "Mood", group: "Stimulation", higherIsBetter: true, scale: 5 }],
+  metrics: [
+    { id: "mood", label: "Mood", group: "G", higherIsBetter: true, scale: 5, timing: "evening" },
+    { id: "sleep", label: "Sleep", group: "G", higherIsBetter: true, scale: 5, timing: "morning" },
+  ],
 } as LoadedConfig
 
 function renderPicker(onSelect: (date: string) => void) {
@@ -25,8 +28,11 @@ function renderPicker(onSelect: (date: string) => void) {
         { date: "2026-11-03", value: 3 },
         { date: "2026-11-04", value: 1 },
       ],
+      sleep: [{ date: "2026-11-06", value: 5 }], // a morning, no evening
     },
     habits: { walk: [{ date: "2026-11-05", value: 1 }] },
+    intentionDates: ["2026-11-07"],
+    writtenEveningDates: [],
   })
   render(
     <QueryClientProvider client={client}>
@@ -57,12 +63,25 @@ describe("ReflectDatePicker", () => {
     expect(dayButton("2026-11-03").dataset.tone).toBe("ok")
     expect(dayButton("2026-11-04").dataset.tone).toBe("bad")
     expect(dayButton("2026-11-05").dataset.tone).toBe("logged")
-    expect(dayButton("2026-11-06").dataset.tone).toBeUndefined()
+    expect(dayButton("2026-11-08").dataset.tone).toBeUndefined()
+  })
+
+  it("keeps a morning-only day's tone and marks it as morning only", () => {
+    renderPicker(() => {})
+    expect(dayButton("2026-11-06").dataset.tone).toBe("good")
+    expect(dayButton("2026-11-06").dataset.morningOnly).toBe("true")
+    expect(dayButton("2026-11-06").getAttribute("aria-label")).toMatch(/, morning only$/)
+    // An intention with nothing else is a logged day, also morning only.
+    expect(dayButton("2026-11-07").dataset.tone).toBe("logged")
+    expect(dayButton("2026-11-07").dataset.morningOnly).toBe("true")
+    expect(dayButton("2026-11-02").dataset.morningOnly).toBeUndefined()
+    expect(dayButton("2026-11-02").getAttribute("aria-label")).not.toMatch(/morning/)
   })
 
   it("tallies the shown month", () => {
     renderPicker(() => {})
-    expect(screen.getByText(/days logged/).textContent).toBe("4 of 30 days logged")
+    expect(screen.getByText(/days logged/).textContent).toBe("6 of 30 days logged")
+    expect(screen.getByText(/morning only/).textContent).toBe(" · 2 morning only")
   })
 
   it("disables days after the max date", () => {

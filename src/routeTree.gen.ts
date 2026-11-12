@@ -13,6 +13,7 @@ import { Route as TrendsRouteImport } from './routes/trends'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as ReflectRouteImport } from './routes/reflect'
 import { Route as PlaygroundRouteImport } from './routes/playground'
+import { Route as MorningRouteImport } from './routes/morning'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as RetroIndexRouteImport } from './routes/retro.index'
@@ -36,6 +37,11 @@ const ReflectRoute = ReflectRouteImport.update({
 const PlaygroundRoute = PlaygroundRouteImport.update({
   id: '/playground',
   path: '/playground',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MorningRoute = MorningRouteImport.update({
+  id: '/morning',
+  path: '/morning',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -62,6 +68,7 @@ const RetroAreaIdRoute = RetroAreaIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/morning': typeof MorningRoute
   '/playground': typeof PlaygroundRoute
   '/reflect': typeof ReflectRoute
   '/settings': typeof SettingsRoute
@@ -72,6 +79,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/morning': typeof MorningRoute
   '/playground': typeof PlaygroundRoute
   '/reflect': typeof ReflectRoute
   '/settings': typeof SettingsRoute
@@ -83,6 +91,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/morning': typeof MorningRoute
   '/playground': typeof PlaygroundRoute
   '/reflect': typeof ReflectRoute
   '/settings': typeof SettingsRoute
@@ -95,6 +104,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/login'
+    | '/morning'
     | '/playground'
     | '/reflect'
     | '/settings'
@@ -105,6 +115,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/login'
+    | '/morning'
     | '/playground'
     | '/reflect'
     | '/settings'
@@ -115,6 +126,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/login'
+    | '/morning'
     | '/playground'
     | '/reflect'
     | '/settings'
@@ -126,6 +138,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   LoginRoute: typeof LoginRoute
+  MorningRoute: typeof MorningRoute
   PlaygroundRoute: typeof PlaygroundRoute
   ReflectRoute: typeof ReflectRoute
   SettingsRoute: typeof SettingsRoute
@@ -164,6 +177,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PlaygroundRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/morning': {
+      id: '/morning'
+      path: '/morning'
+      fullPath: '/morning'
+      preLoaderRoute: typeof MorningRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/login': {
       id: '/login'
       path: '/login'
@@ -198,6 +218,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   LoginRoute: LoginRoute,
+  MorningRoute: MorningRoute,
   PlaygroundRoute: PlaygroundRoute,
   ReflectRoute: ReflectRoute,
   SettingsRoute: SettingsRoute,

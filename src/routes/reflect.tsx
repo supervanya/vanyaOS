@@ -1,29 +1,21 @@
 import { useQuery, useSuspenseQuery } from "@tanstack/react-query"
 import { createFileRoute } from "@tanstack/react-router"
 import { useState } from "react"
-import {
-  Moon,
-  Activity,
-  Flag,
-  Repeat,
-  Lightbulb,
-  Target,
-  ChevronLeft,
-  ChevronRight,
-  Info,
-} from "lucide-react"
+import { Moon, Flag, Repeat, Info } from "lucide-react"
 import type { LoadedConfig } from "@/features/config/api"
 import { configQuery } from "@/features/config/queries"
-import type { LoadedDay } from "@/features/entries/api"
+import { withMorning, type IntentionLived, type LoadedDay } from "@/features/entries/api"
 import { dayQuery, previousWellnessQuery } from "@/features/entries/queries"
 import { useEntryAutosave } from "@/features/entries/useEntryAutosave"
-import { ReflectDatePicker } from "@/features/entries/ReflectDatePicker"
+import { DayNavigator } from "@/features/entries/DayNavigator"
+import { MetricGroups } from "@/features/entries/MetricGroups"
+import { LivedRating } from "@/features/entries/LivedRating"
+import { MorningRecap } from "@/features/entries/MorningRecap"
 import { wellness, wellnessTone, type WellnessTone } from "@/features/entries/wellness"
 import { trendSeriesQuery } from "@/features/trends/queries"
 import { TaskBoard } from "@/features/tasks/TaskBoard"
-import { groupMetrics } from "@/lib/config"
-import { defaultEntryDate, shiftISO, todayISO } from "@/lib/dates"
-import { MetricSlider } from "@/features/entries/MetricSlider"
+import { metricsAt } from "@/lib/config"
+import { defaultEntryDate, todayISO } from "@/lib/dates"
 import { HabitChip } from "@/components/HabitChip"
 import { useAutoGrow } from "@/hooks/useAutoGrow"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -87,21 +79,22 @@ function ReflectionDay({
   goTo: (date: string) => void
 }) {
   const { entry, setEntry } = useEntryAutosave(config, loaded)
+  // The day as the cache holds it now. `entry` is the evening's draft, seeded
+  // once; the morning half can land in the cache after that (a morning sync
+  // finishing as you arrive from /morning), so it's read from here instead.
+  const { data: cached } = useSuspenseQuery(dayQuery(selectedDate))
   const [showDateInfo, setShowDateInfo] = useState(false)
 
   // Auto-grow the reflection textarea to fit its content (no drag handle).
   const reflectionRef = useAutoGrow(entry.reflection)
 
-  const score = wellness(entry, config)
+  // Both halves count, as in `entry_wellness_scores`: the evening's edits from
+  // the editor, the morning's values from the cache.
+  const score = wellness(withMorning(entry, cached.entry, config), config)
 
   // Wellness of the most recent prior day, for the "vs last" delta. Optional,
   // so it doesn't hold up the page — the delta appears once it's loaded.
   const prevScore = useQuery(previousWellnessQuery(entry.date)).data ?? null
-
-  const groups = groupMetrics(config.metrics).map((g) => ({
-    ...g,
-    inverted: g.metrics.every((m) => !m.higherIsBetter),
-  }))
 
   const stamp = () => new Date().toISOString()
   const setMetric = (id: string, v: number | undefined) =>
@@ -113,6 +106,8 @@ function ReflectionDay({
     setEntry((e) => ({ ...e, habits: { ...e.habits, [id]: !e.habits[id] }, updatedAt: stamp() }))
   const setReflection = (text: string) =>
     setEntry((e) => ({ ...e, reflection: text, updatedAt: stamp() }))
+  const setLived = (value: IntentionLived | null) =>
+    setEntry((e) => ({ ...e, intentionLived: value, updatedAt: stamp() }))
 
   const actualToday = todayISO()
   const isPast = selectedDate < actualToday
@@ -130,31 +125,12 @@ function ReflectionDay({
     <>
       {/* Back to dashboard + date navigator */}
       <PageHeader>
-        <div className="flex items-center gap-0.5 text-xs text-muted-foreground">
-          <button
-            type="button"
-            aria-label="Previous day"
-            onClick={() => goTo(shiftISO(selectedDate, -1))}
-            className="rounded p-1 hover:text-foreground"
-          >
-            <ChevronLeft size={16} />
-          </button>
-          <ReflectDatePicker
-            date={selectedDate}
-            maxDate={actualToday}
-            label={prettyDate}
-            onSelect={goTo}
-          />
-          <button
-            type="button"
-            aria-label="Next day"
-            disabled={selectedDate >= actualToday}
-            onClick={() => goTo(shiftISO(selectedDate, 1))}
-            className="rounded p-1 hover:text-foreground disabled:opacity-30"
-          >
-            <ChevronRight size={16} />
-          </button>
-        </div>
+        <DayNavigator
+          date={selectedDate}
+          maxDate={actualToday}
+          label={prettyDate}
+          onSelect={goTo}
+        />
       </PageHeader>
 
       {/* Past-date warning (e.g. auto-set to yesterday after midnight) */}
@@ -217,53 +193,14 @@ function ReflectionDay({
         symptoms inverted · theme: {entry.theme}
       </p>
 
-      {/* Metric groups */}
-      {groups.map(({ group, metrics, inverted }) => (
-        <section key={group} className="mt-5">
-          <p
-            className={`mb-3 flex items-center gap-1.5 text-xs ${inverted ? "text-destructive" : "text-muted-foreground"}`}
-          >
-            {inverted ? (
-              <Activity size={14} />
-            ) : group === "Stimulation" ? (
-              <Lightbulb size={14} />
-            ) : group === "Recovery" ? (
-              <Moon size={14} />
-            ) : (
-              <Target size={14} />
-            )}
-            {group}
-            {inverted ? " · 0 is best" : ""}
-          </p>
-          {metrics.map((m) => {
-            const val = entry.metrics[m.id] // undefined until you set it
-            return (
-              <div key={m.id} className="mb-4 flex items-center gap-3">
-                <span className="w-24 shrink-0 text-[13px] text-foreground/85">{m.label}</span>
-                <div className="flex-1">
-                  <MetricSlider
-                    value={val}
-                    min={0}
-                    max={m.scale}
-                    tone={inverted ? "danger" : "success"}
-                    onValueChange={(v) => setMetric(m.id, v)}
-                  />
-                  <div className="mt-1.5 flex justify-between px-4 text-[7px] text-muted-foreground tabular-nums select-none">
-                    {Array.from({ length: m.scale + 1 }, (_, i) => (
-                      <span key={i}>{i}</span>
-                    ))}
-                  </div>
-                </div>
-                <span
-                  className={`w-6 text-right text-[15px] font-semibold tabular-nums ${val === undefined ? "text-muted-foreground" : ""}`}
-                >
-                  {val ?? "–"}
-                </span>
-              </div>
-            )
-          })}
-        </section>
-      ))}
+      {/* Metric groups: only the evening half's sliders; morning-timed metrics
+          are asked on /morning. `wellness` above still averages every value
+          the day has. */}
+      <MetricGroups
+        metrics={metricsAt(config.metrics, "evening")}
+        values={entry.metrics}
+        onChange={setMetric}
+      />
 
       {/* Goals */}
       <section className="mt-5">
@@ -299,8 +236,10 @@ function ReflectionDay({
         <TaskBoard compact />
       </section>
 
-      {/* Reflection */}
-      <section className="mt-5">
+      {/* Reflection, with this morning's intention right above it to check
+          the day against — nothing on a day without a morning. */}
+      <section className="mt-5 flex flex-col gap-2 [&>section]:mt-0">
+        <MorningRecap date={selectedDate} config={config} />
         <textarea
           ref={reflectionRef}
           rows={3}
@@ -310,6 +249,9 @@ function ReflectionDay({
           className="w-full resize-none overflow-hidden rounded-lg border border-input bg-input/30 p-3 text-base outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
         />
       </section>
+
+      {/* The last step of the ritual, once the day is written down. */}
+      <LivedRating date={selectedDate} value={entry.intentionLived} onChange={setLived} />
 
       <p className="mt-3 text-center text-[11px] text-muted-foreground">
         Synced to your account · theme: {entry.theme}

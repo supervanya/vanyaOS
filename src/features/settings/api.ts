@@ -1,4 +1,8 @@
+import { currentUserId } from "@/lib/auth"
+import { METRIC_TIMINGS, type MetricTiming } from "@/lib/config"
 import type { TablesUpdate } from "@/lib/database.types"
+import { oneOf } from "@/lib/parse"
+import { trackSave } from "@/lib/saveStatus"
 import { supabase } from "@/lib/supabaseClient"
 
 // Settings CRUD (M3): full config rows (uuid, archived, sort_order) for the
@@ -14,6 +18,7 @@ export type MetricRow = {
   groupName: string
   higherIsBetter: boolean
   scale: number
+  timing: MetricTiming
   sortOrder: number
   archived: boolean
 }
@@ -53,6 +58,7 @@ export async function listMetricRows(): Promise<MetricRow[]> {
     groupName: r.group_name,
     higherIsBetter: r.higher_is_better,
     scale: r.scale,
+    timing: oneOf(METRIC_TIMINGS, r.timing, "metrics.timing"),
     sortOrder: r.sort_order,
     archived: r.archived,
   }))
@@ -109,11 +115,14 @@ export async function updateConfigRow(
 
 export async function updateMetric(
   id: string,
-  patch: ConfigPatch & Partial<{ groupName: string; higherIsBetter: boolean }>,
+  patch: ConfigPatch &
+    Partial<{ groupName: string; higherIsBetter: boolean; timing: MetricTiming }>,
 ): Promise<void> {
   const row: TablesUpdate<"metrics"> = commonColumns(patch)
   if (patch.groupName !== undefined) row.group_name = patch.groupName
   if (patch.higherIsBetter !== undefined) row.higher_is_better = patch.higherIsBetter
+  // Moves where the slider is asked from now on; recorded values stay put.
+  if (patch.timing !== undefined) row.timing = patch.timing
   const { error } = await supabase.from("metrics").update(row).eq("id", id)
   if (error) throw error
 }
@@ -148,6 +157,7 @@ export async function addMetricRow(input: {
     group_name: input.groupName,
     higher_is_better: input.higherIsBetter,
     scale: 5,
+    timing: "evening", // new metrics start in the evening; flip it in the row
     sort_order: input.sortOrder,
   })
   if (error) throw error
@@ -171,5 +181,44 @@ export async function addRetroAreaRow(label: string, sortOrder: number): Promise
   const { error } = await supabase
     .from("retro_areas")
     .insert({ key: slugify(label), label, sort_order: sortOrder })
+  if (error) throw error
+}
+
+// --- Morning preferences ------------------------------------------------------
+// One `user_settings` row per account, written on the first change. No row
+// means the defaults: the app opens on /morning until noon.
+
+export type MorningPrefs = {
+  /** Whether `/` opens on /morning until today's morning is set. */
+  redirect: boolean
+  /** When the morning closes, in minutes after local midnight. */
+  closesAt: number
+}
+
+export const DEFAULT_MORNING_PREFS: MorningPrefs = { redirect: true, closesAt: 12 * 60 }
+
+export async function loadMorningPrefs(): Promise<MorningPrefs> {
+  const { data, error } = await supabase
+    .from("user_settings")
+    .select("morning_redirect, morning_closes_at")
+    .maybeSingle()
+  if (error) throw error
+  if (!data) return DEFAULT_MORNING_PREFS
+  return { redirect: data.morning_redirect, closesAt: data.morning_closes_at }
+}
+
+export function saveMorningPrefs(prefs: MorningPrefs): Promise<void> {
+  return trackSave(writeMorningPrefs(prefs))
+}
+
+async function writeMorningPrefs(prefs: MorningPrefs) {
+  // user_id defaults to auth.uid(), and RLS only shows this account's row, so
+  // the upsert finds or creates exactly that one.
+  const userId = await currentUserId()
+  const { error } = await supabase.from("user_settings").upsert({
+    user_id: userId,
+    morning_redirect: prefs.redirect,
+    morning_closes_at: prefs.closesAt,
+  })
   if (error) throw error
 }

@@ -1,12 +1,13 @@
 import { describe, expect, it } from "vitest"
-import { groupMetrics, type Metric } from "./config"
+import { DEFAULT_CONFIG, groupMetrics, metricsAt, type Metric, type MetricTiming } from "./config"
 
-const metric = (id: string, group: string): Metric => ({
+const metric = (id: string, group: string, timing: MetricTiming = "evening"): Metric => ({
   id,
   label: id,
   group,
   higherIsBetter: true,
   scale: 5,
+  timing,
 })
 
 describe("groupMetrics", () => {
@@ -20,5 +21,21 @@ describe("groupMetrics", () => {
       { group: "Discipline", metrics: [eating, movement] },
       { group: "Growth", metrics: [reading] },
     ])
+  })
+})
+
+describe("metricsAt", () => {
+  it("keeps one half's metrics, in order", () => {
+    const [sleep, eating, energy] = [
+      metric("sleep", "Recovery", "morning"),
+      metric("eating", "Discipline"),
+      metric("energy", "Recovery", "morning"),
+    ]
+    expect(metricsAt([sleep, eating, energy], "morning")).toEqual([sleep, energy])
+    expect(metricsAt([sleep, eating, energy], "evening")).toEqual([eating])
+  })
+
+  it("asks every default metric in the evening", () => {
+    expect(metricsAt(DEFAULT_CONFIG.metrics, "evening")).toEqual(DEFAULT_CONFIG.metrics)
   })
 })

@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label"
 import { addMetricRow, updateMetric } from "./api"
 import { metricRowsQuery } from "./queries"
 import { ArchivedList, LabelInput, RowShell, useRowEditing } from "./rows"
+import { TimingToggle } from "./TimingToggle"
 
 type MetricPatch = Parameters<typeof updateMetric>[1]
 
@@ -53,7 +54,7 @@ export function MetricsSection() {
             <LabelInput
               value={m.groupName}
               onSave={(v) => patch(m.id, { groupName: v })}
-              className="w-24 shrink-0"
+              className="w-20 shrink-0 sm:w-24"
             />
             <Label
               className="shrink-0 gap-1 text-[10px] text-muted-foreground"
@@ -64,8 +65,14 @@ export function MetricsSection() {
                 onCheckedChange={(v) => patch(m.id, { higherIsBetter: v !== true })}
                 className="size-3.5"
               />
-              Symptom
+              {/* The word is dropped on a phone so the label keeps its width. */}
+              <span className="max-sm:sr-only">Symptom</span>
             </Label>
+            <TimingToggle
+              value={m.timing}
+              metricLabel={m.label}
+              onChange={(timing) => patch(m.id, { timing })}
+            />
           </RowShell>
         )}
       </SortableList>

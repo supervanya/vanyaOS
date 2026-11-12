@@ -1,14 +1,14 @@
 import { useQuery, useSuspenseQuery } from "@tanstack/react-query"
-import { ChevronLeft, ChevronRight } from "lucide-react"
+import { ChevronLeft, ChevronRight, Sun } from "lucide-react"
 import { useEffect, useRef, useState, type ComponentProps } from "react"
-import type { DayButton } from "react-day-picker"
+import { labelDayButton, type DayButton } from "react-day-picker"
 import { configQuery } from "@/features/config/queries"
 import { trendSeriesQuery } from "@/features/trends/queries"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { dateFromISO, isoFromDate } from "@/lib/dates"
 import { cn } from "@/lib/utils"
-import { wellnessByDate, wellnessTone, type WellnessTone } from "./wellness"
+import { morningOnlyDates, wellnessByDate, wellnessTone, type WellnessTone } from "./wellness"
 
 type DayTone = WellnessTone | "logged" // "logged": saved without any slider
 
@@ -44,7 +44,8 @@ const TONE = {
 } satisfies Record<DayTone, { label: string; tile: string; ring: string; solid: string }>
 
 // A day tile. Its tone travels on the day's modifiers, so this stays a stable
-// component rather than a closure over the scores.
+// component rather than a closure over the scores. A day with only its morning
+// keeps its tone and gets a small sun: its score rests on the morning sliders.
 function ScoreDayButton({
   day,
   modifiers,
@@ -65,6 +66,7 @@ function ScoreDayButton({
       type="button"
       data-day={day.date.toLocaleDateString()}
       data-tone={tone}
+      data-morning-only={modifiers.morningOnly || undefined}
       className={cn(
         "relative flex h-11 w-full items-center justify-center rounded-xl text-sm font-medium tabular-nums transition-[background-color,box-shadow,filter] outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-default disabled:text-muted-foreground/40",
         tone ? TONE[tone].tile : "text-foreground/80",
@@ -79,6 +81,14 @@ function ScoreDayButton({
       {...props}
     >
       {children}
+      {modifiers.morningOnly && (
+        <Sun
+          aria-hidden="true"
+          size={9}
+          strokeWidth={2.5}
+          className="absolute top-1 right-1 opacity-60"
+        />
+      )}
       {modifiers.today && (
         <span
           aria-hidden="true"
@@ -114,6 +124,7 @@ export function ReflectDatePicker({
   // Optional: the calendar opens at once and the colors fill in when loaded.
   const series = useQuery(trendSeriesQuery).data
   const scores = series ? wellnessByDate(series, config) : new Map<string, number | null>()
+  const morningOnly = series ? morningOnlyDates(series, config.metrics) : new Set<string>()
 
   const toneOf = (iso: string): DayTone | null => {
     if (!scores.has(iso)) return null
@@ -130,6 +141,7 @@ export function ReflectDatePicker({
     if (tone) counts[tone]++
   }
   const logged = TONES.reduce((n, t) => n + counts[t], 0)
+  const morningOnlyCount = [...morningOnly].filter((iso) => iso.startsWith(monthKey(month))).length
   const daysInMonth = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate()
   const monthName = month.toLocaleDateString(undefined, { month: "long" })
 
@@ -229,6 +241,11 @@ export function ReflectDatePicker({
             ok: (d) => toneOf(isoFromDate(d)) === "ok",
             bad: (d) => toneOf(isoFromDate(d)) === "bad",
             logged: (d) => toneOf(isoFromDate(d)) === "logged",
+            morningOnly: (d) => morningOnly.has(isoFromDate(d)),
+          }}
+          labels={{
+            labelDayButton: (d, modifiers, options, dateLib) =>
+              `${labelDayButton(d, modifiers, options, dateLib)}${modifiers.morningOnly ? ", morning only" : ""}`,
           }}
           components={{ DayButton: ScoreDayButton }}
         />
@@ -236,9 +253,21 @@ export function ReflectDatePicker({
         <div className="flex flex-col gap-3 border-t pt-4 text-xs text-muted-foreground">
           {logged > 0 ? (
             <>
-              <span>
-                <span className="font-semibold text-foreground tabular-nums">{logged}</span> of{" "}
-                {daysInMonth} days logged
+              <span className="flex items-center gap-1">
+                <span>
+                  <span className="font-semibold text-foreground tabular-nums">{logged}</span> of{" "}
+                  {daysInMonth} days logged
+                </span>
+                {morningOnlyCount > 0 && (
+                  <span className="flex items-center gap-1">
+                    {" · "}
+                    <Sun aria-hidden="true" size={11} strokeWidth={2.5} />
+                    <span className="font-semibold text-foreground tabular-nums">
+                      {morningOnlyCount}
+                    </span>{" "}
+                    morning only
+                  </span>
+                )}
               </span>
               <div className="flex h-1.5 gap-0.5" aria-hidden="true">
                 {TONES.filter((t) => counts[t] > 0).map((t) => (

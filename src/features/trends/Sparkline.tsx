@@ -17,16 +17,22 @@ type Segment = [index: number, value: number][]
  * instead of dropping to zero. Colour comes from the text colour (pass a tone
  * class), so the chart matches its readout. Hovering — or dragging a finger
  * sideways — shows the nearest bucket's dates and value, rendered by `format`.
+ *
+ * `partialDates` are logged days whose value is only partial (a day with just
+ * its morning): a one-day bucket on one gets a hollow ring, and the hover text
+ * says so. The value itself is drawn as is.
  */
 export function Sparkline({
   buckets,
   max,
   format,
+  partialDates = NONE,
   className,
 }: {
   buckets: Bucket[]
   max: number
   format: (value: number) => string
+  partialDates?: ReadonlySet<string> | undefined
   className?: string
 }) {
   const { index, handlers } = useHoverIndex(buckets.length, (ratio) =>
@@ -36,6 +42,8 @@ export function Sparkline({
   const x = (i: number) => (buckets.length > 1 ? (i / (buckets.length - 1)) * W : W / 2)
   const y = (value: number) => PAD + (1 - value / max) * (BASELINE - PAD)
   const hovered = index === null ? null : buckets[index]
+  const partialIn = (bucket: Bucket) =>
+    [...partialDates].filter((d) => d >= bucket.start && d <= bucket.end).length
 
   return (
     <div className={cn("relative touch-none", className)} {...handlers}>
@@ -84,11 +92,23 @@ export function Sparkline({
         })}
       </svg>
 
+      {buckets.map((b, i) =>
+        b.mean !== null && b.start === b.end && partialDates.has(b.start) ? (
+          <span
+            key={b.start}
+            data-partial={b.start}
+            aria-hidden="true"
+            className="pointer-events-none absolute size-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full border border-current bg-background"
+            style={{ left: `${(x(i) / W) * 100}%`, top: `${(y(b.mean) / H) * 100}%` }}
+          />
+        ) : null,
+      )}
+
       {index !== null && hovered && (
         <HoverMarker
           left={`${(x(index) / W) * 100}%`}
           top={hovered.mean === null ? null : `${(y(hovered.mean) / H) * 100}%`}
-          label={describe(hovered, format)}
+          label={describeBucket(hovered, format, partialIn(hovered))}
         />
       )}
     </div>
@@ -110,14 +130,21 @@ function HoverMarker({ left, top, label }: { left: string; top: string | null; l
   )
 }
 
-// "Tue, Aug 12 · 3.0" for a day; "Aug 4 – Aug 10 · avg 2.4 over 5 days" for a longer bucket.
-function describe(bucket: Bucket, format: (value: number) => string): string {
+const NONE: ReadonlySet<string> = new Set()
+
+// "Tue, Aug 12 · 3.0" for a day; "Aug 4 – Aug 10 · avg 2.4 over 5 days" for a
+// longer bucket. Partial days are named: "· morning only", "(1 morning only)".
+export function describeBucket(
+  bucket: Bucket,
+  format: (value: number) => string,
+  partial = 0,
+): string {
   const dates = bucketDates(bucket)
   const oneDay = bucket.start === bucket.end
   if (bucket.mean === null) return `${dates} · ${oneDay ? "no entry" : "no entries"}`
-  if (oneDay) return `${dates} · ${format(bucket.mean)}`
+  if (oneDay) return `${dates} · ${format(bucket.mean)}${partial ? " · morning only" : ""}`
   const days = `${bucket.count} day${bucket.count === 1 ? "" : "s"}`
-  return `${dates} · avg ${format(bucket.mean)} over ${days}`
+  return `${dates} · avg ${format(bucket.mean)} over ${days}${partial ? ` (${partial} morning only)` : ""}`
 }
 
 // Consecutive buckets with data, split wherever nothing was logged.

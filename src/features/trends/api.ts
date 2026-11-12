@@ -8,23 +8,45 @@ export type TrendSeries = {
   firstDate: string | null // earliest entry returned; where "All" starts
   metrics: Record<string, Point[]>
   habits: Record<string, Point[]>
+  // The halves of the day that aren't sliders: days with a morning intention,
+  // and days whose evening wrote a reflection or a lived rating. Sorted.
+  intentionDates: string[]
+  writtenEveningDates: string[]
 }
 
 // Every logged value, oldest first. Child rows are embedded under their entry,
 // so it's one request however long the history — and PostgREST's row cap
 // counts entries (one per day), not the far more numerous per-metric child rows.
 export async function loadTrendSeries(config: LoadedConfig): Promise<TrendSeries> {
-  const { data, error } = await supabase
-    .from("entries")
-    .select("entry_date, entry_metric_values(metric_id, value), entry_habits(habit_id, done)")
-    .order("entry_date")
+  // Reflections are only checked for being written: their text is fetched by
+  // neither request, which keeps the whole-history read small.
+  const [{ data, error }, reflected] = await Promise.all([
+    supabase
+      .from("entries")
+      .select(
+        "entry_date, intention, intention_lived, entry_metric_values(metric_id, value), entry_habits(habit_id, done)",
+      )
+      .order("entry_date"),
+    supabase.from("entries").select("entry_date").neq("reflection", "").order("entry_date"),
+  ])
   if (error) throw error
+  if (reflected.error) throw reflected.error
 
   const metricKeyById = invert(config.metricRowId)
   const habitKeyById = invert(config.habitRowId)
-  const series: TrendSeries = { firstDate: data?.[0]?.entry_date ?? null, metrics: {}, habits: {} }
-  for (const entry of data ?? []) {
+  const reflectedDates = new Set(reflected.data.map((r) => r.entry_date))
+  const series: TrendSeries = {
+    firstDate: data[0]?.entry_date ?? null,
+    metrics: {},
+    habits: {},
+    intentionDates: [],
+    writtenEveningDates: [],
+  }
+  for (const entry of data) {
     const date = entry.entry_date
+    if (entry.intention.trim()) series.intentionDates.push(date)
+    if (entry.intention_lived !== null || reflectedDates.has(date))
+      series.writtenEveningDates.push(date)
     for (const v of entry.entry_metric_values) {
       append(series.metrics, metricKeyById[v.metric_id], { date, value: v.value })
     }

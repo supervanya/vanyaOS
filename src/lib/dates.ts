@@ -47,6 +47,8 @@ export const dateFromISO = (dateISO: string): Date => new Date(dateISO + "T00:00
 
 // An evening reflection done in the early hours after midnight is really about
 // the previous day, so before `cutoffHour` (local) we default to yesterday.
-export function defaultEntryDate(cutoffHour = 4): string {
+export const DAY_CUTOFF_HOUR = 4
+
+export function defaultEntryDate(cutoffHour = DAY_CUTOFF_HOUR): string {
   return new Date().getHours() < cutoffHour ? shiftISO(todayISO(), -1) : todayISO()
 }
