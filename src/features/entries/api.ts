@@ -195,8 +195,9 @@ function morningOf(day: DayEntry, config: LoadedConfig): MorningEntry {
 }
 
 // A morning as /morning should show it. `unsynced`: from a local draft that
-// never reached Postgres.
-export type LoadedMorning = { entry: MorningEntry; unsynced: boolean }
+// never reached Postgres. `locked`: the day's evening was started when it was
+// read, so `save_morning` refuses it and /morning shows it read-only.
+export type LoadedMorning = { entry: MorningEntry; unsynced: boolean; locked: boolean }
 
 // The morning's counterpart of loadOrInitDay: an unsynced morning draft, else
 // the saved morning half, else a blank morning.
@@ -217,7 +218,7 @@ export async function loadOrInitMorning(
   ])
   const locked = remote !== null && eveningStarted(remote, config.metrics)
   if (draft && locked) discardMorningDraft(date)
-  else if (draft) return { entry: draft, unsynced: true }
+  else if (draft) return { entry: draft, unsynced: true, locked: false }
   const entry: MorningEntry = remote
     ? morningOf(remote, config)
     : {
@@ -227,7 +228,7 @@ export async function loadOrInitMorning(
         metrics: {},
         updatedAt: new Date().toISOString(),
       }
-  return { entry, unsynced: false }
+  return { entry, unsynced: false, locked }
 }
 
 // Saves the evening half — the entry row, evening metric values and habit
@@ -403,6 +404,6 @@ export function clearMorningDraft(saved: MorningEntry): void {
 
 // Drops the day's morning draft outright: it can never be saved, because the
 // day's evening is started.
-function discardMorningDraft(date: string): void {
+export function discardMorningDraft(date: string): void {
   if (hasWindow()) localStorage.removeItem(morningDraftKey(date))
 }

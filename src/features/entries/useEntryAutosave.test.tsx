@@ -299,7 +299,9 @@ function loadedMorning(unsynced: boolean) {
   const wrapper = ({ children }: { children: ReactNode }) => (
     <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
   )
-  return renderHook(() => useMorningAutosave(config, { entry: morning, unsynced }), { wrapper })
+  return renderHook(() => useMorningAutosave(config, { entry: morning, unsynced, locked: false }), {
+    wrapper,
+  })
 }
 
 const cachedMorning = () => queryClient.getQueryData(morningQuery(day.date).queryKey)
@@ -317,13 +319,13 @@ describe("useMorningAutosave", () => {
     act(() => result.current.setEntry(morningEdit(1)))
     expect(loadMorningDraft(day.date)).toEqual(morningEdit(1))
     expect(loadDraft(day.date)).toBeNull()
-    expect(cachedMorning()).toEqual({ entry: morningEdit(1), unsynced: true })
+    expect(cachedMorning()).toEqual({ entry: morningEdit(1), unsynced: true, locked: false })
 
     await wait(800)
     expect(saveMorning).toHaveBeenCalledWith(morningEdit(1), config)
     expect(saveDay).not.toHaveBeenCalled()
     expect(loadMorningDraft(day.date)).toBeNull()
-    expect(cachedMorning()).toEqual({ entry: morningEdit(1), unsynced: false })
+    expect(cachedMorning()).toEqual({ entry: morningEdit(1), unsynced: false, locked: false })
   })
 
   it("syncs a leftover morning draft as soon as it loads", async () => {
@@ -365,22 +367,28 @@ describe("useMorningAutosave", () => {
     expect(loadMorningDraft(day.date)).toBeNull()
   })
 
-  it("stops syncing once the morning is locked, with one toast", async () => {
+  it("on a locked morning: one toast, the draft dropped, the morning locked and refetched", async () => {
     vi.mocked(saveMorning).mockRejectedValueOnce(locked)
     const { result } = loadedMorning(false)
+    const invalidate = vi.spyOn(queryClient, "invalidateQueries")
     act(() => result.current.setEntry(morningEdit(1)))
     await wait(800)
     expect(getSaveState()).toBe("failed")
+    expect(toast.error).toHaveBeenCalledTimes(1)
+    expect(vi.mocked(toast.error).mock.calls[0]?.[0]).toMatch(/read-only/)
+    expect(loadMorningDraft(day.date)).toBeNull()
+    expect(cachedMorning()?.locked).toBe(true)
+    expect(invalidate).toHaveBeenCalledWith({
+      queryKey: morningQuery(day.date).queryKey,
+      exact: true,
+    })
 
-    // Further edits still reach the draft, but nothing is sent again.
+    // Nothing is drafted or sent again, and a reload can't retry it.
     act(() => result.current.setEntry(morningEdit(2)))
-    await wait(800)
-    act(() => result.current.setEntry(morningEdit(3)))
     await wait(800)
     expect(saveMorning).toHaveBeenCalledTimes(1)
     expect(toast.error).toHaveBeenCalledTimes(1)
-    expect(vi.mocked(toast.error).mock.calls[0]?.[0]).toMatch(/read-only/)
-    expect(loadMorningDraft(day.date)).toEqual(morningEdit(3))
+    expect(loadMorningDraft(day.date)).toBeNull()
   })
 
   it("drops a save queued behind the one that found the morning locked", async () => {
@@ -400,5 +408,7 @@ describe("useMorningAutosave", () => {
     await wait(0)
     expect(saveMorning).toHaveBeenCalledTimes(1)
     expect(toast.error).toHaveBeenCalledTimes(1)
+    // The newer edit's draft goes too: it would only be refused.
+    expect(loadMorningDraft(day.date)).toBeNull()
   })
 })

@@ -1,5 +1,6 @@
+import { useQuery } from "@tanstack/react-query"
 import { Link } from "@tanstack/react-router"
-import { Info, Sun } from "lucide-react"
+import { Info, Lock, Sun } from "lucide-react"
 import { PageHeader } from "@/components/PageHeader"
 import { Skeleton } from "@/components/ui/skeleton"
 import type { LoadedConfig } from "@/features/config/api"
@@ -9,13 +10,22 @@ import { metricsAt } from "@/lib/config"
 import { todayISO } from "@/lib/dates"
 import type { LoadedMorning } from "./api"
 import { DayNavigator } from "./DayNavigator"
+import { eveningStarted } from "./lock"
 import { MetricGroups } from "./MetricGroups"
+import { MorningCard } from "./MorningRecap"
+import { dayQuery } from "./queries"
 import { useMorningAutosave } from "./useEntryAutosave"
 
 /**
  * The morning half of one day (/morning): the intention, the morning-timed
  * sliders and the week's tasks. Starts from `loaded` and saves itself — key
  * it by date to switch days.
+ *
+ * Once the day's evening is started the morning is read-only and nothing is
+ * saved; the task board stays live. Locked is either what the morning's read
+ * found (`loaded.locked`, also set when `save_morning` refuses), or the day as
+ * this session holds it: an evening written on /reflect or the dashboard
+ * reaches the day's cache at once, without a refetch.
  */
 export function MorningDay({
   config,
@@ -28,18 +38,9 @@ export function MorningDay({
   selectedDate: string
   goTo: (date: string) => void
 }) {
-  const { entry, setEntry } = useMorningAutosave(config, loaded)
-  const intentionRef = useAutoGrow(entry.intention)
-  const morningMetrics = metricsAt(config.metrics, "morning")
-
-  const stamp = () => new Date().toISOString()
-  const setMetric = (id: string, v: number | undefined) =>
-    setEntry((e) => {
-      const { [id]: _, ...rest } = e.metrics
-      return { ...e, metrics: v === undefined ? rest : { ...rest, [id]: v }, updatedAt: stamp() }
-    })
-  const setIntention = (text: string) =>
-    setEntry((e) => ({ ...e, intention: text, updatedAt: stamp() }))
+  // Only what's already cached: this never fetches the day.
+  const { data: day } = useQuery({ ...dayQuery(selectedDate), enabled: false })
+  const locked = loaded.locked || (day !== undefined && eveningStarted(day.entry, config.metrics))
 
   const actualToday = todayISO()
   const prettyDate = new Date(selectedDate + "T00:00:00").toLocaleDateString(undefined, {
@@ -79,6 +80,52 @@ export function MorningDay({
         Morning intention
       </h1>
 
+      {locked ? (
+        <MorningCard
+          morning={loaded.entry}
+          config={config}
+          name="Morning intention, read-only"
+          heading={
+            <>
+              <Lock size={13} className="shrink-0" /> Read-only: the evening for this day has been
+              started.
+            </>
+          }
+        />
+      ) : (
+        <MorningEditor config={config} loaded={loaded} />
+      )}
+
+      {/* The same living list as the dashboard and /reflect: pull today's
+          tasks onto the board (compact: no parking lot, no add row). */}
+      <section className="mt-5">
+        <p className="mb-2 text-xs text-muted-foreground">This week's 1-3-5</p>
+        <TaskBoard compact />
+      </section>
+
+      <p className="mt-3 text-center text-[11px] text-muted-foreground">Synced to your account</p>
+    </>
+  )
+}
+
+// The intention and morning sliders, saving themselves. Mounted only while the
+// morning is unlocked, so a locked day never drafts or syncs.
+function MorningEditor({ config, loaded }: { config: LoadedConfig; loaded: LoadedMorning }) {
+  const { entry, setEntry } = useMorningAutosave(config, loaded)
+  const intentionRef = useAutoGrow(entry.intention)
+  const morningMetrics = metricsAt(config.metrics, "morning")
+
+  const stamp = () => new Date().toISOString()
+  const setMetric = (id: string, v: number | undefined) =>
+    setEntry((e) => {
+      const { [id]: _, ...rest } = e.metrics
+      return { ...e, metrics: v === undefined ? rest : { ...rest, [id]: v }, updatedAt: stamp() }
+    })
+  const setIntention = (text: string) =>
+    setEntry((e) => ({ ...e, intention: text, updatedAt: stamp() }))
+
+  return (
+    <>
       <section className="mt-3">
         <textarea
           ref={intentionRef}
@@ -102,15 +149,6 @@ export function MorningDay({
           to ask it here.
         </p>
       )}
-
-      {/* The same living list as the dashboard and /reflect: pull today's
-          tasks onto the board (compact: no parking lot, no add row). */}
-      <section className="mt-5">
-        <p className="mb-2 text-xs text-muted-foreground">This week's 1-3-5</p>
-        <TaskBoard compact />
-      </section>
-
-      <p className="mt-3 text-center text-[11px] text-muted-foreground">Synced to your account</p>
     </>
   )
 }

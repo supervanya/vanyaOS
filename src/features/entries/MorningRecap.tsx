@@ -1,9 +1,10 @@
 import { useSuspenseQuery } from "@tanstack/react-query"
 import { Sun } from "lucide-react"
+import type { ReactNode } from "react"
 import type { LoadedConfig } from "@/features/config/api"
 import { metricsAt } from "@/lib/config"
 import { cn } from "@/lib/utils"
-import { INTENTION_LIVED, type IntentionLived } from "./api"
+import { INTENTION_LIVED, type IntentionLived, type MorningEntry } from "./api"
 import { dayQuery } from "./queries"
 
 const LIVED_LABEL = {
@@ -39,41 +40,76 @@ export function MorningRecap({
   onLivedChange: (value: IntentionLived | null) => void
 }) {
   const { data } = useSuspenseQuery(dayQuery(date))
-  const { intention, metrics } = data.entry
-  const text = intention.trim()
-  const values = metricsAt(config.metrics, "morning").flatMap((m) => {
-    const value = metrics[m.id]
-    return value === undefined ? [] : [{ metric: m, value }]
-  })
+  const { text, values } = readMorning(data.entry, config)
   if (!text && !values.length) return null
 
   return (
     <>
-      <section
-        aria-label="This morning"
-        className="mt-4 rounded-lg border border-border bg-muted/40 px-3 py-2.5"
-      >
-        <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          <Sun size={14} className="text-amber-500 dark:text-amber-300" /> This morning
-        </p>
-        {text && <p className="mt-1.5 text-[14px] whitespace-pre-wrap">{text}</p>}
-        {values.length > 0 && (
-          <dl className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[12px]">
-            {values.map(({ metric, value }) => (
-              <div key={metric.id} className="flex items-baseline gap-1.5">
-                <dt className="text-muted-foreground">{metric.label}</dt>
-                <dd className="font-semibold tabular-nums">
-                  {value}
-                  <span className="font-normal text-muted-foreground">/{metric.scale}</span>
-                </dd>
-              </div>
-            ))}
-          </dl>
-        )}
-      </section>
-
+      <MorningCard
+        morning={data.entry}
+        config={config}
+        name="This morning"
+        heading={
+          <>
+            <Sun size={14} className="text-amber-500 dark:text-amber-300" /> This morning
+          </>
+        }
+      />
       {text && <LivedChips value={lived} onChange={onLivedChange} />}
     </>
+  )
+}
+
+// The intention's text and the morning values that are set, in config order.
+function readMorning(morning: Pick<MorningEntry, "intention" | "metrics">, config: LoadedConfig) {
+  const values = metricsAt(config.metrics, "morning").flatMap((m) => {
+    const value = morning.metrics[m.id]
+    return value === undefined ? [] : [{ metric: m, value }]
+  })
+  return { text: morning.intention.trim(), values }
+}
+
+/**
+ * A morning half, read-only: the intention as text and each set morning value
+ * over its scale, under a small `heading`. Shared by /reflect's recap and a
+ * locked /morning.
+ */
+export function MorningCard({
+  morning,
+  config,
+  name,
+  heading,
+}: {
+  morning: Pick<MorningEntry, "intention" | "metrics">
+  config: LoadedConfig
+  name: string // the region's accessible name
+  heading: ReactNode
+}) {
+  const { text, values } = readMorning(morning, config)
+  return (
+    <section
+      aria-label={name}
+      className="mt-4 rounded-lg border border-border bg-muted/40 px-3 py-2.5"
+    >
+      <p className="flex items-center gap-1.5 text-xs text-muted-foreground">{heading}</p>
+      {text && <p className="mt-1.5 text-[14px] whitespace-pre-wrap">{text}</p>}
+      {values.length > 0 && (
+        <dl className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[12px]">
+          {values.map(({ metric, value }) => (
+            <div key={metric.id} className="flex items-baseline gap-1.5">
+              <dt className="text-muted-foreground">{metric.label}</dt>
+              <dd className="font-semibold tabular-nums">
+                {value}
+                <span className="font-normal text-muted-foreground">/{metric.scale}</span>
+              </dd>
+            </div>
+          ))}
+        </dl>
+      )}
+      {!text && !values.length && (
+        <p className="mt-1.5 text-[13px] text-muted-foreground">No intention was set.</p>
+      )}
+    </section>
   )
 }
 

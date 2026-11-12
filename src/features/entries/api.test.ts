@@ -184,7 +184,7 @@ describe("loadOrInitDay with an evening draft", () => {
 })
 
 describe("loadOrInitMorning", () => {
-  it("loads the morning half of a saved day", async () => {
+  it("loads the morning half of a saved day, locked once its evening is started", async () => {
     savedBothHalves()
     expect(await loadOrInitMorning(date, split)).toEqual({
       entry: {
@@ -195,7 +195,18 @@ describe("loadOrInitMorning", () => {
         updatedAt: savedRow.updated_at,
       },
       unsynced: false,
+      locked: true,
     })
+  })
+
+  it("leaves a day with only habit checks unlocked", async () => {
+    results.entries = {
+      data: { ...savedRow, reflection: "", intention_lived: null },
+      error: null,
+    }
+    results.entry_habits = { data: [{ habit_id: "habit-steps", done: true }], error: null }
+    const { locked } = await loadOrInitMorning(date, split)
+    expect(locked).toBe(false)
   })
 
   it("starts a blank morning when the day has no row", async () => {
@@ -219,7 +230,11 @@ describe("loadOrInitMorning", () => {
       updatedAt: "2026-09-24T22:00:00.000Z",
     }
     saveMorningDraft(draft)
-    expect(await loadOrInitMorning(date, split)).toEqual({ entry: draft, unsynced: true })
+    expect(await loadOrInitMorning(date, split)).toEqual({
+      entry: draft,
+      unsynced: true,
+      locked: false,
+    })
   })
 
   it("keeps an unsynced draft when a habit tap has since bumped the day row", async () => {
@@ -245,7 +260,11 @@ describe("loadOrInitMorning", () => {
       updatedAt: "2026-09-24T07:00:00.000Z",
     }
     saveMorningDraft(draft)
-    expect(await loadOrInitMorning(date, split)).toEqual({ entry: draft, unsynced: true })
+    expect(await loadOrInitMorning(date, split)).toEqual({
+      entry: draft,
+      unsynced: true,
+      locked: false,
+    })
   })
 
   it("drops a draft once the day's evening is started", async () => {
@@ -257,8 +276,9 @@ describe("loadOrInitMorning", () => {
       metrics: {},
       updatedAt: "2026-09-24T22:00:00.000Z",
     })
-    const { entry, unsynced } = await loadOrInitMorning(date, split)
+    const { entry, unsynced, locked } = await loadOrInitMorning(date, split)
     expect(unsynced).toBe(false)
+    expect(locked).toBe(true)
     expect(entry.intention).toBe("stay calm")
     expect(loadMorningDraft(date)).toBeNull()
   })

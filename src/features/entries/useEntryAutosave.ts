@@ -7,6 +7,7 @@ import { beginSave, type SettleSave } from "@/lib/saveStatus"
 import {
   clearDraft,
   clearMorningDraft,
+  discardMorningDraft,
   isMorningLocked,
   saveDay,
   saveDraft,
@@ -38,8 +39,10 @@ type Half<T extends Edited> = {
   cacheEdit: (queryClient: QueryClient, entry: T, config: LoadedConfig) => void
   // Puts the saved entry into the cache once its sync lands.
   cacheSaved: (queryClient: QueryClient, entry: T, config: LoadedConfig) => void
-  // A refusal that saving again can't fix: the editor stops syncing after it.
+  // A refusal that saving again can't fix: the editor stops drafting and
+  // syncing after it, and `refused` cleans up.
   isFinal: (err: unknown) => boolean
+  refused: (queryClient: QueryClient, entry: T) => void
   failure: (err: unknown) => string
 }
 
@@ -82,6 +85,7 @@ const evening: Half<DayEntry> = {
     refreshWellness(queryClient)
   },
   isFinal: () => false,
+  refused: () => {},
   failure: kept,
 }
 
@@ -94,11 +98,11 @@ const morning: Half<MorningEntry> = {
   cacheEdit: (queryClient, entry) => {
     const morningKey = morningQuery(entry.date).queryKey
     void queryClient.cancelQueries({ queryKey: morningKey, exact: true })
-    queryClient.setQueryData(morningKey, { entry, unsynced: true })
+    queryClient.setQueryData(morningKey, { entry, unsynced: true, locked: false })
   },
   cacheSaved: (queryClient, entry, config) => {
     queryClient.setQueryData(morningQuery(entry.date).queryKey, (m) =>
-      m && m.entry.updatedAt > entry.updatedAt ? m : { entry, unsynced: false },
+      m && m.entry.updatedAt > entry.updatedAt ? m : { entry, unsynced: false, locked: false },
     )
     // Only the morning half changes, and the day keeps its own `updatedAt`
     // and unsynced flag: those track the evening's edits. A day read that
@@ -112,9 +116,18 @@ const morning: Half<MorningEntry> = {
     refreshWellness(queryClient)
   },
   isFinal: isMorningLocked,
+  // The other device started the evening: the edit can never be saved, so its
+  // draft goes, /morning turns read-only at once, and a refetch brings the
+  // morning as it was saved.
+  refused: (queryClient, entry) => {
+    discardMorningDraft(entry.date)
+    const morningKey = morningQuery(entry.date).queryKey
+    queryClient.setQueryData(morningKey, (m) => m && { ...m, locked: true })
+    void queryClient.invalidateQueries({ queryKey: morningKey, exact: true })
+  },
   failure: (err) =>
     isMorningLocked(err)
-      ? "This morning is read-only now: its evening is started. Your edit is kept on this device."
+      ? "This morning is read-only now: its evening has been started. Your edit wasn't saved."
       : kept(err),
 }
 
@@ -135,9 +148,11 @@ export function useEntryAutosave(config: LoadedConfig, loaded: LoadedDay) {
 }
 
 /**
- * The same for a day's morning half (/morning), with its own draft. If the
- * day's evening is already started, `save_morning` refuses: that shows one
- * toast and the editor stops syncing, while edits still reach the draft.
+ * The same for a day's morning half (/morning), with its own draft. Render it
+ * only while the morning is unlocked. If the day's evening was started
+ * elsewhere meanwhile, `save_morning` refuses: that shows one toast, drops the
+ * draft, marks the morning locked and refetches it, and nothing is drafted or
+ * sent again.
  */
 export function useMorningAutosave(config: LoadedConfig, loaded: LoadedMorning) {
   return useAutosave(morning, config, loaded)
@@ -160,10 +175,9 @@ function useAutosave<T extends Edited>(
   const stopped = useRef(false)
 
   useEffect(() => {
-    if (entry === baseline.current) return
+    if (entry === baseline.current || stopped.current) return
     half.saveDraft(entry)
     half.cacheEdit(queryClient, entry, config)
-    if (stopped.current) return
     unsaved.current ??= beginSave()
     const sync = () => {
       pending.current = null
@@ -209,7 +223,10 @@ function syncEntry<T extends Edited>(
       settle?.("saved")
     } catch (err: unknown) {
       settle?.("failed")
-      if (half.isFinal(err)) stopped.current = true
+      if (half.isFinal(err)) {
+        stopped.current = true
+        half.refused(queryClient, entry)
+      }
       toast.error(half.failure(err))
     }
   })
