@@ -5,6 +5,7 @@ import { Check, ArrowLeft } from "lucide-react"
 import confetti from "canvas-confetti"
 
 import { cn } from "@/lib/utils"
+import { MetricSlider } from "@/features/entries/MetricSlider"
 
 export const Route = createFileRoute("/playground")({ component: Playground })
 
@@ -296,15 +297,46 @@ const VARIANTS: { name: string; desc: string; el: React.ReactNode }[] = [
   },
 ]
 
+function SliderTestVariant() {
+  const [value, setValue] = useState<number | undefined>(undefined)
+  const [value2, setValue2] = useState<number | undefined>(20)
+  return (
+    <div className="mt-4 flex flex-col gap-8">
+      <MetricSlider
+        value={value}
+        max={100}
+        tone="danger"
+        onValueChange={(v) => {
+          setValue(v)
+          buzz()
+        }}
+        className="w-64"
+      />
+
+      <MetricSlider
+        value={value2}
+        max={100}
+        tone="success"
+        onValueChange={(v) => {
+          setValue2(v)
+          buzz()
+        }}
+        className="w-64"
+      />
+    </div>
+  )
+}
+
 function Playground() {
   return (
-    <>
+    <div className="flex flex-col gap-2 py-6">
       <Link
         to="/"
         className="mb-4 inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
       >
         <ArrowLeft size={14} /> Back to reflection
       </Link>
+
       <h1 className="text-lg font-semibold">Habit animation playground</h1>
       <p className="mt-1 text-xs text-muted-foreground">
         Tap each habit to feel its completion animation (tap again to reset). None of them shift
@@ -322,6 +354,16 @@ function Playground() {
           </div>
         ))}
       </div>
-    </>
+
+      <h1 className="text-lg font-semibold">Sliders to scroll with</h1>
+      <div className="mt-1 text-xs text-muted-foreground">
+        The reflection screen uses a custom slider that can be tapped or dragged to set a value, or
+        cleared back to unset. To clear, drag the slider all the way to the left and tap it once.
+        <br />
+        You should also be able to scroll up and down vertically without affecting the slider
+        values, but horizontal scroll should change the slider value.
+      </div>
+      <SliderTestVariant />
+    </div>
   )
 }

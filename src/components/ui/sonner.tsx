@@ -7,6 +7,14 @@ import {
 } from "lucide-react"
 import { Toaster as Sonner, type ToasterProps } from "sonner"
 
+// CSSProperties has no entry for custom properties, so the type adds them.
+const toastVars: React.CSSProperties & Record<`--${string}`, string> = {
+  "--normal-bg": "var(--popover)",
+  "--normal-text": "var(--popover-foreground)",
+  "--normal-border": "var(--border)",
+  "--border-radius": "var(--radius)",
+}
+
 const Toaster = ({ ...props }: ToasterProps) => {
   return (
     <Sonner
@@ -23,14 +31,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
         error: <OctagonXIcon className="size-4" />,
         loading: <Loader2Icon className="size-4 animate-spin" />,
       }}
-      style={
-        {
-          "--normal-bg": "var(--popover)",
-          "--normal-text": "var(--popover-foreground)",
-          "--normal-border": "var(--border)",
-          "--border-radius": "var(--radius)",
-        } as React.CSSProperties
-      }
+      style={toastVars}
       {...props}
     />
   )
