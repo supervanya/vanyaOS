@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest"
 import type { LoadedConfig } from "@/features/config/api"
 import type { Metric } from "@/lib/config"
 import { saveDay, withMorning, type DayEntry, type IntentionLived } from "./api"
+import { celebrate } from "./celebrate"
 import { LivedRating } from "./LivedRating"
 import { MorningRecap } from "./MorningRecap"
 import { dayQuery } from "./queries"
@@ -13,6 +14,8 @@ import { useEntryAutosave } from "./useEntryAutosave"
 
 // Only Postgres is mocked; the day is put straight into the cache.
 vi.mock("@/lib/supabaseClient", () => ({ supabase: {} }))
+// jsdom has no canvas to draw confetti on.
+vi.mock("./celebrate", () => ({ celebrate: vi.fn<typeof celebrate>() }))
 vi.mock("./api", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./api")>()),
   saveDay: vi.fn<typeof saveDay>(() => Promise.resolve()),
@@ -116,6 +119,27 @@ describe("MorningRecap", () => {
     expect(onLivedChange).toHaveBeenLastCalledWith("yes")
     fireEvent.click(screen.getByRole("checkbox", { name: "Partly" }))
     expect(onLivedChange).toHaveBeenLastCalledWith(null)
+  })
+
+  it("celebrates a yes from its button, and nothing else", () => {
+    const { rerender, onLivedChange } = renderRecap({ ...day, intention: "stay calm" })
+    fireEvent.click(screen.getByRole("checkbox", { name: "No" }))
+    fireEvent.click(screen.getByRole("checkbox", { name: "Partly" }))
+    expect(celebrate).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "Yes" }))
+    expect(celebrate).toHaveBeenCalledTimes(1)
+    expect(vi.mocked(celebrate).mock.calls[0]?.[0].textContent).toBe("Yes")
+
+    // Clearing a yes is not a celebration.
+    rerender(
+      <>
+        <MorningRecap date={date} config={config} />
+        <LivedRating date={date} value="yes" onChange={onLivedChange} />
+      </>,
+    )
+    fireEvent.click(screen.getByRole("checkbox", { name: "Yes" }))
+    expect(celebrate).toHaveBeenCalledTimes(1)
   })
 
   it("follows a morning saved into the cache after it opened", async () => {

@@ -229,6 +229,9 @@ function Layer({
   )
 }
 
+// Three rings a third of a cycle apart, so one is always leaving the sun.
+const RING_DELAYS = [0, -1.2, -2.4]
+
 function Sun({ scene }: { scene: Scene }) {
   const yes = scene === "yes"
   const glow = useId()
@@ -243,16 +246,26 @@ function Sun({ scene }: { scene: Scene }) {
           <stop offset="1" stopColor="#FFCF7A" />
         </linearGradient>
       </defs>
-      {/* Three soft rings, only once it has risen. */}
+      {/* Only once it has risen: a soft glow, and rings that keep spreading
+          out from the sun and fading. With reduced motion the rings hold still
+          as three plain halos. */}
       <g
         className={cn(
           "transition-opacity duration-700 motion-reduce:transition-none",
           yes ? "opacity-100 delay-200" : "opacity-0",
         )}
       >
-        <circle cx="171" r="116" fill="#FFBAA0" fillOpacity="0.16" />
-        <circle cx="171" r="90" fill="#FFC496" fillOpacity="0.22" />
-        <circle cx="171" r="66" fill="#FFD696" fillOpacity="0.32" />
+        <circle cx="171" r="62" fill="#FFD696" fillOpacity="0.35" />
+        {RING_DELAYS.map((delay) => (
+          <circle
+            key={delay}
+            cx="171"
+            r="120"
+            fill="#FFC9A0"
+            className="lived-ring"
+            style={{ animationDelay: `${delay}s` }}
+          />
+        ))}
       </g>
       <circle
         cx="171"

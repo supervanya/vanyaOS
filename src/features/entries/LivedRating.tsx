@@ -1,6 +1,7 @@
 import { useSuspenseQuery } from "@tanstack/react-query"
 import { cn } from "@/lib/utils"
 import { INTENTION_LIVED, type IntentionLived } from "./api"
+import { celebrate } from "./celebrate"
 import { LivedScene, type Scene } from "./LivedScene"
 import { dayQuery } from "./queries"
 
@@ -71,10 +72,14 @@ export function LivedRating({
                 type="checkbox"
                 {...{ switch: "" }}
                 checked={on}
-                onChange={() => {
+                onChange={(event) => {
+                  const lived = option === "yes" && !on
                   if (typeof navigator !== "undefined" && "vibrate" in navigator) {
-                    navigator.vibrate?.(on ? 7 : option === "yes" ? [10, 40, 20] : 7)
+                    navigator.vibrate?.(lived ? [10, 40, 20] : 7)
                   }
+                  // Thrown from the Yes button itself (the label, not this
+                  // invisible input).
+                  if (lived) celebrate(event.currentTarget.parentElement ?? event.currentTarget)
                   onChange(on ? null : option)
                 }}
                 className="pointer-events-none absolute inset-0 m-0 size-full opacity-0 [clip-path:inset(0)]"
