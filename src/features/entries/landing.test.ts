@@ -3,6 +3,8 @@ import { QueryClient } from "@tanstack/react-query"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import type { LoadedConfig } from "@/features/config/api"
 import { configQuery } from "@/features/config/queries"
+import { DEFAULT_MORNING_PREFS, type MorningPrefs } from "@/features/settings/api"
+import { morningPrefsQuery } from "@/features/settings/queries"
 import type { Metric } from "@/lib/config"
 import type { DayEntry, LoadedMorning, loadOrInitMorning, MorningEntry } from "./api"
 import { morningSkipped, opensOnMorning, shouldOpenMorning, skipMorning } from "./landing"
@@ -26,7 +28,8 @@ const metric = (id: string, timing: Metric["timing"]): Metric => ({
 const metrics = [metric("mood", "evening"), metric("sleep", "morning")]
 const blank: Pick<MorningEntry, "intention" | "metrics"> = { intention: "", metrics: {} }
 const at = (hours: number, minutes = 0) => new Date(2026, 10, 12, hours, minutes)
-const base = { now: at(9), morning: blank, locked: false, skipped: false, metrics }
+const prefs = DEFAULT_MORNING_PREFS
+const base = { now: at(9), prefs, morning: blank, locked: false, skipped: false, metrics }
 
 describe("shouldOpenMorning", () => {
   it("opens on a blank morning before noon", () => {
@@ -37,6 +40,19 @@ describe("shouldOpenMorning", () => {
   it("stops at exactly 12:00", () => {
     expect(shouldOpenMorning({ ...base, now: at(12, 0) })).toBe(false)
     expect(shouldOpenMorning({ ...base, now: at(18) })).toBe(false)
+  })
+
+  it("stops at the time the morning closes, when Settings moves it", () => {
+    const early = { ...prefs, closesAt: 9 * 60 + 30 }
+    expect(shouldOpenMorning({ ...base, prefs: early, now: at(9, 29) })).toBe(true)
+    expect(shouldOpenMorning({ ...base, prefs: early, now: at(9, 30) })).toBe(false)
+    const late = { ...prefs, closesAt: 15 * 60 }
+    expect(shouldOpenMorning({ ...base, prefs: late, now: at(14, 59) })).toBe(true)
+    expect(shouldOpenMorning({ ...base, prefs: late, now: at(15) })).toBe(false)
+  })
+
+  it("never opens when the redirect is turned off", () => {
+    expect(shouldOpenMorning({ ...base, prefs: { ...prefs, redirect: false } })).toBe(false)
   })
 
   it("waits until the app's day starts, in the small hours", () => {
@@ -123,9 +139,10 @@ describe("opensOnMorning", () => {
     unsynced: false,
     locked: false,
   })
-  const client = (loaded?: LoadedMorning) => {
+  const client = (loaded?: LoadedMorning, saved: MorningPrefs | null = prefs) => {
     const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
     qc.setQueryData(configQuery.queryKey, config)
+    if (saved) qc.setQueryData(morningPrefsQuery.queryKey, saved)
     if (loaded) qc.setQueryData(morningQuery(today).queryKey, loaded)
     return qc
   }
@@ -171,10 +188,30 @@ describe("opensOnMorning", () => {
     expect(await opensOnMorning(client(), now)).toBe(false)
   })
 
-  it("loads nothing after noon or on a skipped day", async () => {
+  it("follows the saved preferences", async () => {
+    const off = client(morning(), { ...prefs, redirect: false })
+    expect(await opensOnMorning(off, morningOf(8))).toBe(false)
+    const late = client(morning(), { ...prefs, closesAt: 15 * 60 })
+    expect(await opensOnMorning(late, morningOf(14))).toBe(true)
+  })
+
+  it("falls through to the dashboard when the preferences can't be loaded", async () => {
+    // Nothing cached, and the mocked Supabase client can't answer.
+    expect(await opensOnMorning(client(morning(), null), morningOf(8))).toBe(false)
+  })
+
+  it("loads only the preferences once the morning has closed", async () => {
     const qc = client()
     const ensure = vi.spyOn(qc, "ensureQueryData")
     expect(await opensOnMorning(qc, morningOf(13))).toBe(false)
+    expect(ensure).toHaveBeenCalledTimes(1)
+    expect(ensure).toHaveBeenCalledWith(morningPrefsQuery)
+  })
+
+  it("loads nothing before the day starts or on a skipped day", async () => {
+    const qc = client()
+    const ensure = vi.spyOn(qc, "ensureQueryData")
+    expect(await opensOnMorning(qc, morningOf(2))).toBe(false)
     skipMorning(today)
     expect(await opensOnMorning(qc, morningOf(8))).toBe(false)
     expect(ensure).not.toHaveBeenCalled()

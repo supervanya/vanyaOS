@@ -4,6 +4,8 @@ import { Info, Lock, Sun } from "lucide-react"
 import { PageHeader } from "@/components/PageHeader"
 import { Skeleton } from "@/components/ui/skeleton"
 import type { LoadedConfig } from "@/features/config/api"
+import { DEFAULT_MORNING_PREFS } from "@/features/settings/api"
+import { morningPrefsQuery } from "@/features/settings/queries"
 import { TaskBoard } from "@/features/tasks/TaskBoard"
 import { useAutoGrow } from "@/hooks/useAutoGrow"
 import { metricsAt } from "@/lib/config"
@@ -122,6 +124,9 @@ function MorningEditor({
 }) {
   const { entry, setEntry } = useMorningAutosave(config, loaded)
   const navigate = useNavigate()
+  // Only decides whether "Skip today" is offered, so it isn't worth holding
+  // the page for or failing it over: the defaults stand in until it loads.
+  const { data: prefs = DEFAULT_MORNING_PREFS } = useQuery(morningPrefsQuery)
   const intentionRef = useAutoGrow(entry.intention)
   const morningMetrics = metricsAt(config.metrics, "morning")
 
@@ -161,7 +166,7 @@ function MorningEditor({
       )}
 
       {/* Only while it would matter: the app opens here until this is set. */}
-      {isToday && inMorningWindow(new Date()) && !morningIsSet(entry, config.metrics) && (
+      {isToday && inMorningWindow(new Date(), prefs) && !morningIsSet(entry, config.metrics) && (
         <div className="mt-4 flex justify-end">
           <button
             type="button"

@@ -1,24 +1,29 @@
-// Landing (ARCHITECTURE.md "One day, two halves"): before noon, `/` opens on
-// /morning until today's morning is set, unless "Skip today" was tapped on this
-// device.
+// Landing (ARCHITECTURE.md "One day, two halves"): until the morning closes
+// (noon unless Settings says otherwise), `/` opens on /morning until today's
+// morning is set, unless that is turned off in Settings or "Skip today" was
+// tapped on this device.
 
 import type { QueryClient } from "@tanstack/react-query"
 import { configQuery } from "@/features/config/queries"
+import type { MorningPrefs } from "@/features/settings/api"
+import { morningPrefsQuery } from "@/features/settings/queries"
 import { metricsAt, type Metric } from "@/lib/config"
 import { DAY_CUTOFF_HOUR, todayISO } from "@/lib/dates"
 import type { MorningEntry } from "./api"
 import { eveningStarted } from "./lock"
 import { dayQuery, morningQuery } from "./queries"
 
-const NOON = 12
+/** Before this hour the app's day hasn't started, so there is no morning yet. */
+const dayStarted = (now: Date): boolean => now.getHours() >= DAY_CUTOFF_HOUR
 
 /**
  * Whether `now` falls in the morning `/` redirects in: from the hour the app's
  * day starts (before it, `defaultEntryDate` still means yesterday, and the
- * night's reflection is what's being written) up to, not including, 12:00.
+ * night's reflection is what's being written) up to, not including, the time
+ * the morning closes. Never, when the redirect is turned off.
  */
-export const inMorningWindow = (now: Date): boolean =>
-  now.getHours() >= DAY_CUTOFF_HOUR && now.getHours() < NOON
+export const inMorningWindow = (now: Date, prefs: MorningPrefs): boolean =>
+  prefs.redirect && dayStarted(now) && now.getHours() * 60 + now.getMinutes() < prefs.closesAt
 
 /**
  * A morning is set once its intention has any non-whitespace text, or any
@@ -40,30 +45,35 @@ export function morningIsSet(
  */
 export function shouldOpenMorning({
   now,
+  prefs,
   morning,
   locked,
   skipped,
   metrics,
 }: {
   now: Date
+  prefs: MorningPrefs
   morning: Pick<MorningEntry, "intention" | "metrics">
   locked: boolean
   skipped: boolean
   metrics: Metric[]
 }): boolean {
-  return inMorningWindow(now) && !skipped && !locked && !morningIsSet(morning, metrics)
+  return inMorningWindow(now, prefs) && !skipped && !locked && !morningIsSet(morning, metrics)
 }
 
 /**
- * The index route's check, run before it loads. Fetches nothing outside the
- * morning window or on a skipped day. If today's morning can't be loaded
- * (offline, an error), the answer is "no": this feature never keeps anyone
- * from the dashboard.
+ * The index route's check, run before it loads. Fetches nothing before the
+ * day starts or on a skipped day, and only the preferences once the morning
+ * has closed or when the redirect is off. If the preferences or today's
+ * morning can't be loaded (offline, an error), the answer is "no": this
+ * feature never keeps anyone from the dashboard.
  */
 export async function opensOnMorning(queryClient: QueryClient, now = new Date()): Promise<boolean> {
   const date = todayISO()
-  if (!inMorningWindow(now) || morningSkipped(date)) return false
+  if (!dayStarted(now) || morningSkipped(date)) return false
   try {
+    const prefs = await queryClient.ensureQueryData(morningPrefsQuery)
+    if (!inMorningWindow(now, prefs)) return false
     const [config, loaded] = await Promise.all([
       queryClient.ensureQueryData(configQuery),
       queryClient.ensureQueryData(morningQuery(date)),
@@ -74,6 +84,7 @@ export async function opensOnMorning(queryClient: QueryClient, now = new Date())
     const locked = loaded.locked || (day !== undefined && eveningStarted(day.entry, config.metrics))
     return shouldOpenMorning({
       now,
+      prefs,
       morning: loaded.entry,
       locked,
       skipped: false,

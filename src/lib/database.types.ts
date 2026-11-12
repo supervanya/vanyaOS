@@ -421,6 +421,27 @@ export type Database = {
         }
         Relationships: []
       }
+      user_settings: {
+        Row: {
+          morning_closes_at: number
+          morning_redirect: boolean
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          morning_closes_at?: number
+          morning_redirect?: boolean
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          morning_closes_at?: number
+          morning_redirect?: boolean
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       entry_wellness_scores: {

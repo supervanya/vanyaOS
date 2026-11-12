@@ -135,6 +135,16 @@ create table projects (
 -- WIP-1 enforced at the DB, not just the UI:
 create unique index one_project_in_progress on projects (user_id) where status = 'in_progress';
 
+-- Per-account preferences that aren't config rows or secrets (M5). One row
+-- per account, created on the first change; no row means the defaults.
+create table user_settings (
+  user_id uuid primary key references auth.users default auth.uid(),
+  morning_redirect boolean not null default true,   -- `/` opens on /morning until it's set
+  morning_closes_at smallint not null default 720   -- minutes after local midnight; 720 = 12:00
+    check (morning_closes_at between 0 and 1439),
+  updated_at timestamptz not null default now()
+);
+
 -- Per-user AI configuration: BYO provider + key (no app-held AI secrets).
 -- RLS-protected; consider Supabase Vault encryption before any multi-user future.
 create table ai_settings (
@@ -204,7 +214,7 @@ A day is still one `entries` row. The morning half is `intention` plus the value
 - **Morning-only days.** A day with a morning (an intention or a morning slider) but no evening yet (no evening slider, reflection or lived rating — the lock's signals; habit ticks don't count) keeps its score but is marked as morning only: a small sun on its Reflect calendar tile and a ring on the Trends wellness line. Reflect's "vs last" skips such days. Computed client-side from the Trends history (`morningOnlyDates`); the SQL view is unchanged.
 - **Changing a metric's `timing`** in Settings moves where it is asked from then on. Existing values are untouched; a past day keeps whatever was recorded.
 - **Drafts.** Each half has its own localStorage draft (`vanyaos:draft:morning:<date>` beside the existing evening key), so an unsynced morning edit and an unsynced evening edit can't overwrite each other. The two are reconciled differently: the evening draft wins only when it is newer than the saved row, but a morning draft exists only while it is unsynced, so it always wins unless the day is locked (then it is dropped). Comparing timestamps for the morning would lose an offline intention to any later habit tap, because every evening-side save bumps the row's `updated_at`. Two devices editing the same morning is last-writer-wins.
-- **Landing.** Before 12:00 local time, `/` redirects to `/morning` when today has no intention text and no morning metric value, unless "Skip today" was tapped (a per-date localStorage flag — device-local on purpose) or the day is locked. Not before 04:00, while the app's day (`defaultEntryDate`) is still yesterday's. The check runs in the index route's `beforeLoad` (`features/entries/landing.ts`); if today's morning can't be loaded it lets the dashboard open.
+- **Landing.** Until the morning closes (`user_settings.morning_closes_at`, 12:00 by default), and unless the redirect is turned off (`user_settings.morning_redirect`), `/` redirects to `/morning` when today has no intention text and no morning metric value, unless "Skip today" was tapped (a per-date localStorage flag — device-local on purpose) or the day is locked. Not before 04:00, while the app's day (`defaultEntryDate`) is still yesterday's. The check runs in the index route's `beforeLoad` (`features/entries/landing.ts`); if today's morning can't be loaded it lets the dashboard open.
 
 ### Tasks: one list, three surfaces
 
@@ -219,7 +229,7 @@ The dashboard (`/`), the morning page (`/morning`) and the reflection screen (`/
 | `/` | **Command center** — the 1-3-5 board (hard caps + swap), habit chips (writes today's entry), goal glance, projects card (WIP-1, tap-to-swap), today's intention (read-only, M5), links to Morning and Reflect |
 | `/morning` | M5: the morning intention — textarea, morning sliders, the same task list. Read-only once the evening is started |
 | `/reflect` | The evening reflection (moved from `/`); shows the morning half read-only, asks "did I live it?", embeds the same task list |
-| `/settings` | M3: CRUD + archive for metrics/habits/goals, goal progress editing. M5: morning/evening toggle per metric |
+| `/settings` | M3: CRUD + archive for metrics/habits/goals, goal progress editing. M5: morning/evening toggle per metric; whether and until when the app opens on `/morning` |
 | `/login` | Magic link + paste-the-link sign-in |
 
 ## Save flow
