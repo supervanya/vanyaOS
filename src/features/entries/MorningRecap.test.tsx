@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest"
 import type { LoadedConfig } from "@/features/config/api"
 import type { Metric } from "@/lib/config"
 import { saveDay, withMorning, type DayEntry, type IntentionLived } from "./api"
+import { LivedRating } from "./LivedRating"
 import { MorningRecap } from "./MorningRecap"
 import { dayQuery } from "./queries"
 import { useEntryAutosave } from "./useEntryAutosave"
@@ -67,7 +68,10 @@ function cacheDay(entry: DayEntry) {
 function renderRecap(entry: DayEntry, lived: IntentionLived | null = null) {
   const onLivedChange = vi.fn<(value: IntentionLived | null) => void>()
   const result = render(
-    <MorningRecap date={date} config={config} lived={lived} onLivedChange={onLivedChange} />,
+    <>
+      <MorningRecap date={date} config={config} />
+      <LivedRating date={date} value={lived} onChange={onLivedChange} />
+    </>,
     { wrapper: cacheDay(entry) },
   )
   return { ...result, onLivedChange }
@@ -143,11 +147,10 @@ function Evening() {
     unsynced: false,
   })
   return (
-    <MorningRecap
+    <LivedRating
       date={date}
-      config={config}
-      lived={entry.intentionLived}
-      onLivedChange={(value) =>
+      value={entry.intentionLived}
+      onChange={(value) =>
         setEntry((e) => ({ ...e, intentionLived: value, updatedAt: new Date().toISOString() }))
       }
     />

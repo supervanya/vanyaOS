@@ -9,6 +9,7 @@ import { dayQuery, previousWellnessQuery } from "@/features/entries/queries"
 import { useEntryAutosave } from "@/features/entries/useEntryAutosave"
 import { DayNavigator } from "@/features/entries/DayNavigator"
 import { MetricGroups } from "@/features/entries/MetricGroups"
+import { LivedRating } from "@/features/entries/LivedRating"
 import { MorningRecap } from "@/features/entries/MorningRecap"
 import { wellness, wellnessTone, type WellnessTone } from "@/features/entries/wellness"
 import { trendSeriesQuery } from "@/features/trends/queries"
@@ -192,15 +193,6 @@ function ReflectionDay({
         symptoms inverted · theme: {entry.theme}
       </p>
 
-      {/* This morning, read-only, and "did I live it?" — nothing on a day
-          without a morning. */}
-      <MorningRecap
-        date={selectedDate}
-        config={config}
-        lived={entry.intentionLived}
-        onLivedChange={setLived}
-      />
-
       {/* Metric groups: only the evening half's sliders; morning-timed metrics
           are asked on /morning. `wellness` above still averages every value
           the day has. */}
@@ -244,8 +236,10 @@ function ReflectionDay({
         <TaskBoard compact />
       </section>
 
-      {/* Reflection */}
-      <section className="mt-5">
+      {/* Reflection, with this morning's intention right above it to check
+          the day against — nothing on a day without a morning. */}
+      <section className="mt-5 flex flex-col gap-2 [&>section]:mt-0">
+        <MorningRecap date={selectedDate} config={config} />
         <textarea
           ref={reflectionRef}
           rows={3}
@@ -255,6 +249,9 @@ function ReflectionDay({
           className="w-full resize-none overflow-hidden rounded-lg border border-input bg-input/30 p-3 text-base outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
         />
       </section>
+
+      {/* The last step of the ritual, once the day is written down. */}
+      <LivedRating date={selectedDate} value={entry.intentionLived} onChange={setLived} />
 
       <p className="mt-3 text-center text-[11px] text-muted-foreground">
         Synced to your account · theme: {entry.theme}
