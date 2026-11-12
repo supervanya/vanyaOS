@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
-import type { Config } from "@/lib/config"
+import type { Config, Metric } from "@/lib/config"
 import type { DayEntry } from "./api"
-import { wellness, wellnessByDate, wellnessTone } from "./wellness"
+import { morningOnlyDates, wellness, wellnessByDate, wellnessTone } from "./wellness"
 
 const config = {
   metrics: [
@@ -51,11 +51,53 @@ describe("wellnessByDate", () => {
         brain_fog: [{ date: "2026-11-01", value: 0 }],
       },
       habits: { walk: [{ date: "2026-11-03", value: 1 }] },
+      intentionDates: ["2026-11-04"],
+      writtenEveningDates: [],
     }
-    expect(Object.fromEntries(wellnessByDate(series, config))).toEqual({
-      "2026-11-01": 4.5,
-      "2026-11-02": 2,
-      "2026-11-03": null,
-    })
+    expect([...wellnessByDate(series, config)]).toEqual([
+      ["2026-11-01", 4.5],
+      ["2026-11-02", 2],
+      ["2026-11-03", null],
+      ["2026-11-04", null], // an intention and nothing else
+    ])
+  })
+})
+
+describe("morningOnlyDates", () => {
+  const metrics = [
+    { id: "mood", label: "Mood", group: "G", higherIsBetter: true, scale: 5, timing: "evening" },
+    { id: "sleep", label: "Sleep", group: "G", higherIsBetter: true, scale: 5, timing: "morning" },
+  ] satisfies Metric[]
+  const point = (date: string) => ({ date, value: 3 })
+
+  it("picks days with a morning and nothing of the evening", () => {
+    const series = {
+      firstDate: "2026-11-01",
+      metrics: {
+        sleep: ["01", "02", "03", "04", "06"].map((d) => point(`2026-11-${d}`)),
+        mood: [point("2026-11-01"), point("2026-11-05")],
+      },
+      // Habit ticks don't start the evening: the dashboard takes them all day.
+      habits: { walk: [point("2026-11-02"), point("2026-11-08")] },
+      intentionDates: ["2026-11-03", "2026-11-07"],
+      writtenEveningDates: ["2026-11-04"],
+    }
+    expect([...morningOnlyDates(series, metrics)].toSorted()).toEqual([
+      "2026-11-02", // a morning slider and a habit
+      "2026-11-03", // a morning slider and an intention
+      "2026-11-06", // a morning slider
+      "2026-11-07", // an intention
+    ])
+  })
+
+  it("leaves days from before any metric was asked in the morning alone", () => {
+    const series = {
+      firstDate: "2026-11-01",
+      metrics: { mood: [point("2026-11-01")] },
+      habits: { walk: [point("2026-11-02")] },
+      intentionDates: [],
+      writtenEveningDates: [],
+    }
+    expect(morningOnlyDates(series, metrics).size).toBe(0)
   })
 })

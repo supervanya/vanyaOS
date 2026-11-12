@@ -39,17 +39,6 @@ export type MorningEntry = {
   updatedAt: string
 }
 
-export async function listDayDates(): Promise<string[]> {
-  const userId = await currentUserId()
-  const { data, error } = await supabase
-    .from("entries")
-    .select("entry_date")
-    .eq("user_id", userId)
-    .order("entry_date")
-  if (error) throw error
-  return data.map((r) => r.entry_date)
-}
-
 // Null only when the day has no row. A failed read throws instead: taken for
 // an empty day, it would open a blank editor whose first autosave overwrites
 // the saved entry.
@@ -97,7 +86,13 @@ async function hydrateEntry(
     const key = metricKeyById[v.metric_id]
     if (key) metrics[key] = v.value
   }
-  const habits: Record<string, boolean> = {}
+  // A day with no habit rows yet — the morning created it, nothing was ticked —
+  // starts every habit unchecked, as a fresh day does. Otherwise the evening
+  // would save only the habits it ticked, and the rest would read as "no
+  // entry" in Trends instead of missed, never breaking a streak.
+  const habits: Record<string, boolean> = habitRes.data.length
+    ? {}
+    : Object.fromEntries(config.habits.map((h) => [h.id, false]))
   for (const h of habitRes.data) {
     const key = habitKeyById[h.habit_id]
     if (key) habits[key] = h.done
@@ -118,7 +113,7 @@ async function hydrateEntry(
   }
 }
 
-export async function loadDay(date: string, config: LoadedConfig): Promise<DayEntry | null> {
+async function loadDay(date: string, config: LoadedConfig): Promise<DayEntry | null> {
   const userId = await currentUserId()
   const row = await fetchEntryRow(userId, date)
   return row ? hydrateEntry(row, config) : null

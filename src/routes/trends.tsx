@@ -1,10 +1,11 @@
 import { useSuspenseQuery } from "@tanstack/react-query"
 import { createFileRoute } from "@tanstack/react-router"
 import { useState, type ReactNode } from "react"
-import { ArrowUpDown, TrendingUp } from "lucide-react"
+import { ArrowUpDown, Sun, TrendingUp } from "lucide-react"
 import { Skeleton } from "@/components/ui/skeleton"
 import type { LoadedConfig } from "@/features/config/api"
 import { configQuery } from "@/features/config/queries"
+import { morningOnlyDates } from "@/features/entries/wellness"
 import type { TrendSeries } from "@/features/trends/api"
 import { trendSeriesQuery } from "@/features/trends/queries"
 import { todayISO } from "@/lib/dates"
@@ -95,6 +96,11 @@ function TrendSections({
   const from = start ?? history.firstDate ?? today
   const axis: Axis = { from, to: today, size: bucketSize(trendWindow, from, today) }
   const wellness = pointsSince(wellnessSeries(history.metrics, config.metrics), start)
+  // Days scored from the morning sliders alone, marked on the wellness line.
+  const morningOnly = morningOnlyDates(history, config.metrics)
+  const partialWellness = new Set(
+    wellness.flatMap((p) => (morningOnly.has(p.date) ? [p.date] : [])),
+  )
 
   const metricRows: MetricRow[] = config.metrics.map((metric) => {
     const points = pointsSince(history.metrics[metric.id] ?? [], start)
@@ -119,6 +125,7 @@ function TrendSections({
           trend={wellnessTrend(wellness)}
           max={Math.max(1, ...config.metrics.map((m) => m.scale))}
           axis={axis}
+          partialDates={partialWellness}
         />
       </Section>
       {metricSections(metricRows, sortOrder).map(({ title, note, rows }) => (
@@ -127,6 +134,7 @@ function TrendSections({
             <ChartedRow
               key={metric.id}
               label={metric.label}
+              morning={metric.timing === "morning"}
               points={points}
               trend={trend}
               max={metric.scale}
@@ -280,15 +288,18 @@ function Section({
 }
 
 // Label, optional chart, readout (with an optional aside before it). The chart
-// column takes whatever width is left.
+// column takes whatever width is left. A metric asked in the morning gets a
+// small sun after its label.
 function TrendRow({
   label,
+  morning = false,
   trend,
   format,
   chart,
   aside,
 }: {
   label: string
+  morning?: boolean
   trend: Trend | null
   format: (value: number) => string
   chart?: ReactNode
@@ -301,7 +312,15 @@ function TrendRow({
         chart ? "grid-cols-[6.5rem_minmax(0,1fr)_auto]" : "grid-cols-[minmax(0,1fr)_auto]",
       )}
     >
-      <span className="truncate">{label}</span>
+      <span className="flex min-w-0 items-center gap-1">
+        <span className="truncate">{label}</span>
+        {morning && (
+          <span title="Asked in the morning" className="shrink-0 text-muted-foreground">
+            <Sun aria-hidden="true" size={11} strokeWidth={2.5} />
+            <span className="sr-only">(asked in the morning)</span>
+          </span>
+        )}
+      </span>
       {chart}
       <span className="flex items-center justify-end gap-2">
         {aside}
@@ -317,20 +336,25 @@ type Axis = { from: string; to: string; size: number }
 // A row with a sparkline, coloured by the row's trend.
 function ChartedRow({
   label,
+  morning = false,
   points,
   trend,
   max,
   axis,
+  partialDates,
 }: {
   label: string
+  morning?: boolean
   points: Point[]
   trend: Trend | null
   max: number
   axis: Axis
+  partialDates?: ReadonlySet<string>
 }) {
   return (
     <TrendRow
       label={label}
+      morning={morning}
       trend={trend}
       format={formatScore}
       chart={
@@ -338,6 +362,7 @@ function ChartedRow({
           buckets={bucketize(points, axis.from, axis.to, axis.size)}
           max={max}
           format={formatScore}
+          partialDates={partialDates}
           className={trendTone(trend?.verdict)}
         />
       }

@@ -4,7 +4,6 @@ import type { Metric } from "@/lib/config"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import {
   isMorningLocked,
-  listDayDates,
   loadOrInitDay,
   loadMorningDraft,
   loadOrInitMorning,
@@ -130,6 +129,22 @@ describe("loadOrInitDay", () => {
       metrics: {},
       habits: { steps: false },
     })
+  })
+
+  it("starts every habit unchecked on a day the morning created", async () => {
+    results.entries = { data: { ...savedRow, reflection: "" }, error: null }
+    results.entry_habits = { data: [], error: null }
+
+    const { entry } = await loadOrInitDay(date, config)
+    expect(entry.habits).toEqual({ steps: false })
+  })
+
+  it("keeps a saved day's habits as saved", async () => {
+    results.entries = { data: savedRow, error: null }
+    results.entry_habits = { data: [{ habit_id: "habit-other", done: true }], error: null }
+
+    const { entry } = await loadOrInitDay(date, config)
+    expect(entry.habits).toEqual({})
   })
 
   it("reads an unrated day as not rated", async () => {
@@ -373,12 +388,5 @@ describe("saveDay", () => {
       "save_day",
       expect.objectContaining({ intention_lived: "" }),
     )
-  })
-})
-
-describe("listDayDates", () => {
-  it("throws when the read fails, instead of listing no days", async () => {
-    results.entries = failure
-    await expect(listDayDates()).rejects.toEqual(failure.error)
   })
 })
