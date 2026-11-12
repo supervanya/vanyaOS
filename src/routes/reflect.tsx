@@ -21,7 +21,7 @@ import { ReflectDatePicker } from "@/features/entries/ReflectDatePicker"
 import { wellness, wellnessTone, type WellnessTone } from "@/features/entries/wellness"
 import { trendSeriesQuery } from "@/features/trends/queries"
 import { TaskBoard } from "@/features/tasks/TaskBoard"
-import { groupMetrics } from "@/lib/config"
+import { groupMetrics, metricsAt } from "@/lib/config"
 import { defaultEntryDate, shiftISO, todayISO } from "@/lib/dates"
 import { MetricSlider } from "@/features/entries/MetricSlider"
 import { HabitChip } from "@/components/HabitChip"
@@ -98,7 +98,9 @@ function ReflectionDay({
   // so it doesn't hold up the page — the delta appears once it's loaded.
   const prevScore = useQuery(previousWellnessQuery(entry.date)).data ?? null
 
-  const groups = groupMetrics(config.metrics).map((g) => ({
+  // Only the evening half's sliders; morning-timed metrics are asked on
+  // /morning. `wellness` above still averages every value the day has.
+  const groups = groupMetrics(metricsAt(config.metrics, "evening")).map((g) => ({
     ...g,
     inverted: g.metrics.every((m) => !m.higherIsBetter),
   }))

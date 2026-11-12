@@ -2,13 +2,22 @@
 // Seeded from the prototype (see docs/REQUIREMENTS.md). Treated as a "config
 // file" for now — edit these defaults directly; an in-app settings UI is deferred.
 
+/** Which half of the day asks for a metric (`metrics.timing`, ARCHITECTURE.md "One day, two halves"). */
+export const METRIC_TIMINGS = ["morning", "evening"] as const
+export type MetricTiming = (typeof METRIC_TIMINGS)[number]
+
 export type Metric = {
   id: string
   label: string
   group: string
   higherIsBetter: boolean // symptoms are false -> inverted in the wellness score
   scale: number // max value; sliders run 0..scale (we use 0-5)
+  timing: MetricTiming // where the slider is asked; wellness counts both halves
 }
+
+/** The metrics asked in one half of the day, in their configured order. */
+export const metricsAt = (metrics: Metric[], timing: MetricTiming): Metric[] =>
+  metrics.filter((m) => m.timing === timing)
 
 export type MetricGroup = { group: string; metrics: Metric[] }
 
@@ -45,6 +54,7 @@ export const DEFAULT_CONFIG: Config = {
       group: "Discipline",
       higherIsBetter: true,
       scale: 5,
+      timing: "evening",
     },
     {
       id: "movement_health",
@@ -52,6 +62,7 @@ export const DEFAULT_CONFIG: Config = {
       group: "Discipline",
       higherIsBetter: true,
       scale: 5,
+      timing: "evening",
     },
     {
       id: "iq_stimulation",
@@ -59,15 +70,31 @@ export const DEFAULT_CONFIG: Config = {
       group: "Stimulation",
       higherIsBetter: true,
       scale: 5,
+      timing: "evening",
     },
-    { id: "reading", label: "Reading", group: "Stimulation", higherIsBetter: true, scale: 5 },
-    { id: "brain_fog", label: "Brain fog", group: "Symptoms", higherIsBetter: false, scale: 5 },
+    {
+      id: "reading",
+      label: "Reading",
+      group: "Stimulation",
+      higherIsBetter: true,
+      scale: 5,
+      timing: "evening",
+    },
+    {
+      id: "brain_fog",
+      label: "Brain fog",
+      group: "Symptoms",
+      higherIsBetter: false,
+      scale: 5,
+      timing: "evening",
+    },
     {
       id: "lower_back_pain",
       label: "Lower back pain",
       group: "Symptoms",
       higherIsBetter: false,
       scale: 5,
+      timing: "evening",
     },
     // Appended last: sort_order is the array index, and existing accounts keep
     // their persisted sort_order — inserting mid-list would collide with it.
@@ -77,6 +104,7 @@ export const DEFAULT_CONFIG: Config = {
       group: "Recovery",
       higherIsBetter: true,
       scale: 5,
+      timing: "evening",
     },
   ],
   habits: [

@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label"
 import { addMetricRow, updateMetric } from "./api"
 import { metricRowsQuery } from "./queries"
 import { ArchivedList, LabelInput, RowShell, useRowEditing } from "./rows"
+import { TimingToggle } from "./TimingToggle"
 
 type MetricPatch = Parameters<typeof updateMetric>[1]
 
@@ -66,6 +67,11 @@ export function MetricsSection() {
               />
               Symptom
             </Label>
+            <TimingToggle
+              value={m.timing}
+              metricLabel={m.label}
+              onChange={(timing) => patch(m.id, { timing })}
+            />
           </RowShell>
         )}
       </SortableList>

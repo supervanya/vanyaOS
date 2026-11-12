@@ -2,7 +2,15 @@
 // Postgres rows scoped by RLS, seeded from the code defaults in lib/config.ts.
 
 import { currentUserId } from "@/lib/auth"
-import { DEFAULT_CONFIG, type Config, type Goal, type Habit, type Metric } from "@/lib/config"
+import {
+  DEFAULT_CONFIG,
+  METRIC_TIMINGS,
+  type Config,
+  type Goal,
+  type Habit,
+  type Metric,
+} from "@/lib/config"
+import { oneOf } from "@/lib/parse"
 import { supabase } from "@/lib/supabaseClient"
 
 // Config rows keyed by their stable slug (`key` in Postgres, `id` in the UI
@@ -32,6 +40,7 @@ export async function loadConfig(): Promise<LoadedConfig> {
     group: r.group_name,
     higherIsBetter: r.higher_is_better,
     scale: r.scale,
+    timing: oneOf(METRIC_TIMINGS, r.timing, "metrics.timing"),
   }))
   const habits: Habit[] = habitRes.data.map((r) => ({ id: r.key, label: r.label }))
   const goals: Goal[] = goalRes.data.map((r) => ({
@@ -99,6 +108,7 @@ async function seedMissingDefaults(userId: string): Promise<void> {
       group_name: m.group,
       higher_is_better: m.higherIsBetter,
       scale: m.scale,
+      timing: m.timing,
       sort_order: i,
     }))
     .filter((r) => !metricSet.has(r.key))

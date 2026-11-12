@@ -30,6 +30,7 @@ const mood: Metric = {
   group: "Stimulation",
   higherIsBetter: true,
   scale: 5,
+  timing: "evening",
 }
 const brainFog: Metric = {
   id: "brain_fog",
@@ -37,6 +38,7 @@ const brainFog: Metric = {
   group: "Symptoms",
   higherIsBetter: false,
   scale: 5,
+  timing: "morning",
 }
 
 describe("metricTrend", () => {

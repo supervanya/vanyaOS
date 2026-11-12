@@ -1,4 +1,6 @@
+import { METRIC_TIMINGS, type MetricTiming } from "@/lib/config"
 import type { TablesUpdate } from "@/lib/database.types"
+import { oneOf } from "@/lib/parse"
 import { supabase } from "@/lib/supabaseClient"
 
 // Settings CRUD (M3): full config rows (uuid, archived, sort_order) for the
@@ -14,6 +16,7 @@ export type MetricRow = {
   groupName: string
   higherIsBetter: boolean
   scale: number
+  timing: MetricTiming
   sortOrder: number
   archived: boolean
 }
@@ -53,6 +56,7 @@ export async function listMetricRows(): Promise<MetricRow[]> {
     groupName: r.group_name,
     higherIsBetter: r.higher_is_better,
     scale: r.scale,
+    timing: oneOf(METRIC_TIMINGS, r.timing, "metrics.timing"),
     sortOrder: r.sort_order,
     archived: r.archived,
   }))
@@ -109,11 +113,14 @@ export async function updateConfigRow(
 
 export async function updateMetric(
   id: string,
-  patch: ConfigPatch & Partial<{ groupName: string; higherIsBetter: boolean }>,
+  patch: ConfigPatch &
+    Partial<{ groupName: string; higherIsBetter: boolean; timing: MetricTiming }>,
 ): Promise<void> {
   const row: TablesUpdate<"metrics"> = commonColumns(patch)
   if (patch.groupName !== undefined) row.group_name = patch.groupName
   if (patch.higherIsBetter !== undefined) row.higher_is_better = patch.higherIsBetter
+  // Moves where the slider is asked from now on; recorded values stay put.
+  if (patch.timing !== undefined) row.timing = patch.timing
   const { error } = await supabase.from("metrics").update(row).eq("id", id)
   if (error) throw error
 }
@@ -148,6 +155,7 @@ export async function addMetricRow(input: {
     group_name: input.groupName,
     higher_is_better: input.higherIsBetter,
     scale: 5,
+    timing: "evening", // new metrics start in the evening; flip it in the row
     sort_order: input.sortOrder,
   })
   if (error) throw error
