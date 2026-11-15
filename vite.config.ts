@@ -28,6 +28,9 @@ export default defineConfig(({ command }) => ({
     port: 3000,
     allowedHosts: ["supervan.local", "*.lan"],
   },
+  // The repo is public: real file names and lines in production stack traces
+  // are worth more than hiding the source.
+  build: { sourcemap: true },
   plugins: [
     // file-based routing (src/routes) without the TanStack Start server layer
     tanstackRouter({ target: "react", autoCodeSplitting: true }),

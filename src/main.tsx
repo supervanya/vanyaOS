@@ -4,9 +4,13 @@ import { RouterProvider } from "@tanstack/react-router"
 
 import { trackLanding } from "@/features/entries/landing"
 import { onSignInOrOut } from "@/lib/auth"
+import { recoverFromPreloadError } from "@/lib/preloadRecovery"
 import { queryClient } from "@/lib/queryClient"
 import { getRouter } from "./router"
 import "./styles.css"
+
+// A lazy chunk missing after a deploy: reload once onto the new build.
+window.addEventListener("vite:preloadError", (event) => void recoverFromPreloadError(event))
 
 const router = getRouter()
 // `/` opens on /morning only on the app's first page, not on later visits.
@@ -22,7 +26,18 @@ onSignInOrOut((signedIn) => {
 const root = document.getElementById("app")
 if (!root) throw new Error("index.html is missing #app")
 
-createRoot(root).render(
+createRoot(root, {
+  // React unmounts the whole tree after this, leaving a blank page. The
+  // component stack says which component threw, even when the thrown value
+  // (say, `undefined`) has no stack of its own.
+  onUncaughtError(error, errorInfo) {
+    console.error("Uncaught render error:", error, errorInfo.componentStack)
+  },
+  // Already shown to the user by the router's RouteError; just keep the trace.
+  onCaughtError(error, errorInfo) {
+    console.error("Caught render error:", error, errorInfo.componentStack)
+  },
+}).render(
   <StrictMode>
     <RouterProvider router={router} />
   </StrictMode>,
