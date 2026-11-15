@@ -3,6 +3,7 @@ import { tanstackRouter } from "@tanstack/router-plugin/vite"
 import viteReact from "@vitejs/plugin-react"
 import tailwindcss from "@tailwindcss/vite"
 import { VitePWA } from "vite-plugin-pwa"
+import { sentryVitePlugin } from "@sentry/vite-plugin"
 
 // GitHub Pages serves this project site at https://supervanya.github.io/vanyaOS/
 // so production assets/routes live under /vanyaOS/. Dev stays at / for the LAN preview.
@@ -61,5 +62,16 @@ export default defineConfig(({ command }) => ({
         ],
       },
     }),
+    // Uploads source maps to Sentry so production stack traces resolve to the
+    // original source. Needs the SENTRY_AUTH_TOKEN secret; without it (local
+    // builds, PRs) the plugin is left out. Must stay last.
+    process.env.SENTRY_AUTH_TOKEN
+      ? sentryVitePlugin({
+          org: "supervanya",
+          project: "vanyaos-frontend",
+          authToken: process.env.SENTRY_AUTH_TOKEN,
+          release: process.env.VITE_SENTRY_RELEASE ? { name: process.env.VITE_SENTRY_RELEASE } : {},
+        })
+      : null,
   ],
 }))
