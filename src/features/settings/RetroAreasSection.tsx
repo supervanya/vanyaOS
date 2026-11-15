@@ -3,7 +3,7 @@ import { BookOpen } from "lucide-react"
 import { SortableList } from "@/components/SortableList"
 import { retroAreasQuery } from "@/features/retro/queries"
 import { addRetroAreaRow, updateConfigRow, type ConfigPatch } from "./api"
-import { AddRow, ArchivedList, LabelInput, RowShell, useRowEditing } from "./rows"
+import { AddRow, ArchivedList, EmptyHint, LabelInput, RowShell, useRowEditing } from "./rows"
 
 export function RetroAreasSection() {
   const { data: rows } = useSuspenseQuery(retroAreasQuery)
@@ -16,10 +16,13 @@ export function RetroAreasSection() {
     update(id, p, () => updateConfigRow("retro_areas", id, p))
 
   return (
-    <section className="mt-6">
+    <section id="retro-areas" className="mt-6 scroll-mt-14">
       <p className="mb-2 flex items-center gap-1.5 text-xs text-muted-foreground">
         <BookOpen size={14} /> Retro areas
       </p>
+      {!active.length && (
+        <EmptyHint>None yet. Add an area of life to run retrospectives on.</EmptyHint>
+      )}
       <SortableList items={active} onReorder={reorder} className="flex flex-col gap-2">
         {(a) => (
           <RowShell onArchive={() => patch(a.id, { archived: true })}>

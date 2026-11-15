@@ -34,6 +34,7 @@ import { TrendReadout, trendTone } from "@/features/trends/TrendReadout"
 import { WithDetail, shortDate } from "@/features/trends/chartHover"
 import { cn } from "@/lib/utils"
 import { PageHeader } from "@/components/PageHeader"
+import { SettingsLink } from "@/components/SettingsLink"
 
 export const Route = createFileRoute("/trends")({
   loader: ({ context: { queryClient } }) =>
@@ -118,15 +119,20 @@ function TrendSections({
 
   return (
     <>
-      <Section title="Overall">
-        <ChartedRow
-          label="Wellness"
-          points={wellness}
-          trend={wellnessTrend(wellness)}
-          max={Math.max(1, ...config.metrics.map((m) => m.scale))}
-          axis={axis}
-          partialDates={partialWellness}
-        />
+      <Section
+        title="Overall"
+        aside={<SettingsLink section="metrics" empty={!config.metrics.length} />}
+      >
+        {config.metrics.length > 0 && (
+          <ChartedRow
+            label="Wellness"
+            points={wellness}
+            trend={wellnessTrend(wellness)}
+            max={Math.max(1, ...config.metrics.map((m) => m.scale))}
+            axis={axis}
+            partialDates={partialWellness}
+          />
+        )}
       </Section>
       {metricSections(metricRows, sortOrder).map(({ title, note, rows }) => (
         <Section key={title} title={title} note={note}>
@@ -145,11 +151,14 @@ function TrendSections({
       ))}
       <Section
         title={sorted ? `Habits · ${SORT_LABEL[sortOrder].toLowerCase()}` : "Habits"}
+        aside={<SettingsLink section="habits" empty={!habitRows.length} />}
         note={
-          <>
-            {sorted && <SortNote>Ranked by recent completion rate.</SortNote>}
-            <HabitLegend cellDays={axis.size} />
-          </>
+          habitRows.length > 0 && (
+            <>
+              {sorted && <SortNote>Ranked by recent completion rate.</SortNote>}
+              <HabitLegend cellDays={axis.size} />
+            </>
+          )
         }
       >
         {sortByStanding(habitRows, (r) => r.standing, sortOrder).map(
@@ -271,16 +280,21 @@ function SortNote({ children }: { children: ReactNode }) {
 
 function Section({
   title,
+  aside,
   note,
   children,
 }: {
   title: string
+  aside?: ReactNode
   note?: ReactNode
   children: ReactNode
 }) {
   return (
     <section className="mt-6">
-      <p className="mb-1 text-xs text-muted-foreground">{title}</p>
+      <p className="mb-1 flex items-center justify-between gap-2 text-xs text-muted-foreground">
+        {title}
+        {aside}
+      </p>
       {note}
       <div className="divide-y divide-border">{children}</div>
     </section>

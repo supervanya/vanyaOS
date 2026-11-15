@@ -32,8 +32,9 @@ vi.mock("@tanstack/react-router", async (importOriginal) => ({
   useNavigate: () => navigate,
 }))
 vi.mock("sonner", () => ({ toast: { error: vi.fn<(message: string) => void>() } }))
-// The top bar needs a router; the task board has its own tests.
+// The top bar and settings link need a router; the task board has its own tests.
 vi.mock("@/components/PageHeader", () => ({ PageHeader: () => null }))
+vi.mock("@/components/SettingsLink", () => ({ SettingsLink: () => null }))
 vi.mock("@/features/tasks/TaskBoard", () => ({ TaskBoard: () => <p>task board</p> }))
 
 // Radix measures the slider thumb with ResizeObserver, which jsdom lacks.

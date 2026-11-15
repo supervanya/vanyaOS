@@ -155,7 +155,7 @@ create table ai_settings (
   updated_at timestamptz not null default now()
 );
 
--- Retro areas (seeded: Finances, Health, Exercise, Work) — Settings-managed,
+-- Retro areas (none until the user adds them) — Settings-managed,
 -- same CRUD+archive pattern as habits.
 create table retro_areas (
   id uuid primary key default gen_random_uuid(),

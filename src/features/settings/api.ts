@@ -8,8 +8,7 @@ import { supabase } from "@/lib/supabaseClient"
 // Settings CRUD (M3): full config rows (uuid, archived, sort_order) for the
 // /settings screen — unlike the active-only config other screens read
 // (features/config). Mutations are by row uuid. Archive, never delete:
-// historical entry values keep their FK targets, and seeding checks keys
-// unfiltered by archived, so an archived default stays archived.
+// historical entry values keep their FK targets.
 
 export type MetricRow = {
   id: string

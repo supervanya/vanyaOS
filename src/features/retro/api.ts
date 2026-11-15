@@ -1,4 +1,3 @@
-import { currentUserId } from "@/lib/auth"
 import { trackSave } from "@/lib/saveStatus"
 import { supabase } from "@/lib/supabaseClient"
 
@@ -10,39 +9,10 @@ export type RetroArea = {
   archived: boolean
 }
 
-const RETRO_AREA_DEFAULTS = [
-  { key: "finances", label: "Finances" },
-  { key: "health", label: "Health" },
-  { key: "exercise", label: "Exercise" },
-  { key: "work", label: "Work" },
-]
-
-// Same seeding contract as config defaults: insert missing keys only, checked
-// UNFILTERED by archived so an archived default stays archived.
 export async function listRetroAreas(): Promise<RetroArea[]> {
-  const userId = await currentUserId()
-  const { data: existing, error } = await supabase
-    .from("retro_areas")
-    .select("*")
-    .order("sort_order")
+  const { data, error } = await supabase.from("retro_areas").select("*").order("sort_order")
   if (error) throw error
-  const have = new Set((existing ?? []).map((r) => r.key))
-  const missing = RETRO_AREA_DEFAULTS.filter((d) => !have.has(d.key)).map((d, i) => ({
-    user_id: userId,
-    key: d.key,
-    label: d.label,
-    sort_order: (existing?.length ?? 0) + i,
-  }))
-  let rows = existing ?? []
-  if (missing.length) {
-    const { data: inserted, error: insErr } = await supabase
-      .from("retro_areas")
-      .insert(missing)
-      .select("*")
-    if (insErr) throw insErr
-    rows = [...rows, ...(inserted ?? [])]
-  }
-  return rows.map((r) => ({
+  return data.map((r) => ({
     id: r.id,
     key: r.key,
     label: r.label,

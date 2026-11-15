@@ -13,6 +13,7 @@ import {
 } from "lucide-react"
 
 import { HabitChip } from "@/components/HabitChip"
+import { SettingsLink } from "@/components/SettingsLink"
 import { TopBar } from "@/components/TopBar"
 import { Skeleton } from "@/components/ui/skeleton"
 import type { LoadedConfig } from "@/features/config/api"
@@ -147,6 +148,7 @@ function HabitChips({ config, day }: { config: LoadedConfig; day: LoadedDay }) {
     <section>
       <p className="mb-2 flex items-center gap-1.5 text-xs text-muted-foreground">
         <Repeat size={14} /> Habits today
+        <SettingsLink section="habits" empty={!config.habits.length} className="ml-auto" />
       </p>
       <div className="flex flex-wrap gap-2">
         {config.habits.map((h) => (
@@ -168,6 +170,7 @@ function GoalsGlance() {
     <section>
       <p className="mb-2 flex items-center gap-1.5 text-xs text-muted-foreground">
         <Flag size={14} /> Goals
+        <SettingsLink section="goals" empty={!config.goals.length} className="ml-auto" />
       </p>
       {config.goals.map((g) => (
         <GoalBar key={g.id} goal={g} />

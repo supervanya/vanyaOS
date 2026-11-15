@@ -6,6 +6,7 @@ import { isRetroDue } from "@/features/retro/api"
 import { latestRetroDatesQuery, retroAreasQuery } from "@/features/retro/queries"
 import { cn } from "@/lib/utils"
 import { PageHeader } from "@/components/PageHeader"
+import { SettingsLink } from "@/components/SettingsLink"
 
 export const Route = createFileRoute("/retro/")({
   loader: ({ context: { queryClient } }) =>
@@ -24,10 +25,13 @@ function RetroList() {
     <>
       <PageHeader label="Retrospectives" />
 
-      <h1 className="mt-3 flex items-center gap-2 text-[15px] font-medium">
-        <BookOpen size={17} className="text-indigo-500 dark:text-indigo-300" />
-        Fitness areas
-      </h1>
+      <div className="mt-3 flex items-center justify-between gap-2">
+        <h1 className="flex items-center gap-2 text-[15px] font-medium">
+          <BookOpen size={17} className="text-indigo-500 dark:text-indigo-300" />
+          Fitness areas
+        </h1>
+        <SettingsLink section="retro-areas" empty={!areas.length} className="text-xs" />
+      </div>
       <p className="mt-0.5 text-[11px] text-muted-foreground">
         Each area keeps a living state-of-affairs doc, updated by running a retrospective with your
         coach.

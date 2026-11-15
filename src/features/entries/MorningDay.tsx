@@ -1,7 +1,8 @@
 import { useQuery } from "@tanstack/react-query"
-import { Link, useNavigate } from "@tanstack/react-router"
+import { useNavigate } from "@tanstack/react-router"
 import { Info, Lock, Sun } from "lucide-react"
 import { PageHeader } from "@/components/PageHeader"
+import { SettingsLink } from "@/components/SettingsLink"
 import { Skeleton } from "@/components/ui/skeleton"
 import type { LoadedConfig } from "@/features/config/api"
 import { DEFAULT_MORNING_PREFS } from "@/features/settings/api"
@@ -78,10 +79,18 @@ export function MorningDay({
         </div>
       )}
 
-      <h1 className="mt-3 flex items-center gap-2 text-[15px] font-medium">
-        <Sun size={17} className="text-amber-500 dark:text-amber-300" />
-        Morning intention
-      </h1>
+      <div className="mt-3 flex items-center justify-between gap-2">
+        <h1 className="flex items-center gap-2 text-[15px] font-medium">
+          <Sun size={17} className="text-amber-500 dark:text-amber-300" />
+          Morning intention
+        </h1>
+        <SettingsLink
+          section="metrics"
+          empty={!metricsAt(config.metrics, "morning").length}
+          hint="No morning metrics."
+          className="text-xs"
+        />
+      </div>
 
       {locked ? (
         <MorningCard
@@ -128,7 +137,6 @@ function MorningEditor({
   // the page for or failing it over: the defaults stand in until it loads.
   const { data: prefs = DEFAULT_MORNING_PREFS } = useQuery(morningPrefsQuery)
   const intentionRef = useAutoGrow(entry.intention)
-  const morningMetrics = metricsAt(config.metrics, "morning")
 
   const stamp = () => new Date().toISOString()
   const setMetric = (id: string, v: number | undefined) =>
@@ -153,17 +161,11 @@ function MorningEditor({
         />
       </section>
 
-      {morningMetrics.length > 0 ? (
-        <MetricGroups metrics={morningMetrics} values={entry.metrics} onChange={setMetric} />
-      ) : (
-        <p className="mt-5 text-xs text-muted-foreground">
-          No morning check-in yet. Switch a metric to Morning in{" "}
-          <Link to="/settings" className="underline hover:text-foreground">
-            Settings
-          </Link>{" "}
-          to ask it here.
-        </p>
-      )}
+      <MetricGroups
+        metrics={metricsAt(config.metrics, "morning")}
+        values={entry.metrics}
+        onChange={setMetric}
+      />
 
       {/* Only while it would matter: the app opens here until this is set. */}
       {isToday && inMorningWindow(new Date(), prefs) && !morningIsSet(entry, config.metrics) && (
