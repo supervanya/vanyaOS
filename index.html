@@ -17,6 +17,229 @@
   </head>
   <body>
     <div id="app"></div>
+    <!--
+      Fatal error screen. It lives here, inline and dependency-free, rather than
+      in the bundle because it must work when the bundle fails to load or parse,
+      or when React unmounts the whole tree after an uncaught render error. It
+      only ever shows while #app is empty, so it never covers a working app.
+      App code can hand it richer details: window.__vanyaFatal(error, extra).
+    -->
+    <script>
+      ;(function () {
+        var recent = [] // the last few captured errors, newest last
+        var shown = null
+        var everRendered = false
+        var app = document.getElementById("app")
+
+        function describe(value) {
+          if (value instanceof Error) return (value.name || "Error") + ": " + value.message
+          if (value === undefined) return "undefined (a non-Error value was thrown)"
+          if (value === null) return "null (a non-Error value was thrown)"
+          if (typeof value === "string") return value
+          if (value && typeof value === "object" && "message" in value) return String(value.message)
+          try {
+            return JSON.stringify(value)
+          } catch (_) {
+            return String(value)
+          }
+        }
+
+        function record(kind, value, extra) {
+          extra = extra || {}
+          recent.push({
+            kind: kind,
+            message: extra.message || describe(value),
+            stack: (value && typeof value.stack === "string" && value.stack) || "",
+            componentStack: extra.componentStack || "",
+            time: new Date().toISOString(),
+          })
+          if (recent.length > 5) recent.shift()
+          // A rejected promise before the first render (say, the service worker
+          // failing to register offline) usually isn't fatal: a slow start would
+          // flash this screen. The 10 second check below still covers it.
+          if (kind === "unhandledrejection" && !everRendered) return
+          setTimeout(check, 300) // let React finish unmounting first
+        }
+
+        function appIsEmpty() {
+          return !app || app.childElementCount === 0
+        }
+
+        function check() {
+          if (appIsEmpty()) render()
+        }
+
+        function el(tag, style, text) {
+          var node = document.createElement(tag)
+          if (style) node.style.cssText = style
+          if (text != null) node.textContent = text
+          return node
+        }
+
+        function button(label, onClick, primary) {
+          var b = el(
+            "button",
+            "font:inherit;font-size:15px;padding:12px 16px;border-radius:10px;cursor:pointer;" +
+              (primary
+                ? "background:#e5e5ea;color:#0b0b0f;border:0;"
+                : "background:transparent;color:#e5e5ea;border:1px solid #3a3a44;"),
+            label,
+          )
+          b.type = "button"
+          b.onclick = onClick
+          return b
+        }
+
+        function resetAndReload() {
+          var jobs = []
+          if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations) {
+            jobs.push(
+              navigator.serviceWorker.getRegistrations().then(function (regs) {
+                return Promise.all(regs.map((r) => r.unregister()))
+              }),
+            )
+          }
+          if (window.caches) {
+            jobs.push(
+              caches.keys().then(function (keys) {
+                return Promise.all(keys.map((k) => caches.delete(k)))
+              }),
+            )
+          }
+          // localStorage is left alone on purpose: the Supabase session lives there.
+          Promise.all(jobs)
+            .catch(function () {})
+            .then(function () {
+              location.reload()
+            })
+        }
+
+        function render() {
+          if (shown) shown.remove()
+          var meta = document.querySelector('meta[name="build-id"]')
+          var pre =
+            "white-space:pre-wrap;word-break:break-word;margin:0 0 12px;font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;color:#c7c7d1;"
+          var root = el(
+            "div",
+            "position:fixed;inset:0;overflow:auto;z-index:2147483647;background:#0b0b0f;color:#e5e5ea;" +
+              "font:15px/1.5 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;" +
+              "padding:calc(env(safe-area-inset-top) + 24px) calc(env(safe-area-inset-right) + 16px) " +
+              "calc(env(safe-area-inset-bottom) + 24px) calc(env(safe-area-inset-left) + 16px);" +
+              "user-select:text;-webkit-user-select:text;",
+          )
+          root.id = "fatal-error"
+          root.setAttribute("role", "alert")
+          var box = el("div", "max-width:720px;margin:0 auto;")
+          box.appendChild(
+            el("h1", "font-size:22px;margin:0 0 8px;", "VanyaOS hit an error and stopped"),
+          )
+          box.appendChild(
+            el(
+              "p",
+              "margin:0 0 16px;color:#a1a1aa;",
+              "Try Reload first. If it keeps happening, Reset clears the offline cache (you stay signed in). A screenshot of this page helps fix it.",
+            ),
+          )
+          var actions = el("div", "display:flex;flex-wrap:wrap;gap:8px;margin:0 0 20px;")
+          actions.appendChild(button("Reload", () => location.reload(), true))
+          actions.appendChild(button("Reset app and reload", resetAndReload, false))
+          box.appendChild(actions)
+
+          var errors = recent.length
+            ? recent.slice().reverse()
+            : [
+                {
+                  kind: "startup",
+                  message: "Nothing rendered within 10 seconds and no error was captured.",
+                  stack: "",
+                  componentStack: "",
+                  time: "",
+                },
+              ]
+          errors.forEach(function (e, i) {
+            box.appendChild(
+              el(
+                "h2",
+                "font-size:16px;margin:16px 0 4px;color:#fca5a5;word-break:break-word;",
+                (i ? "Earlier: " : "") + e.message,
+              ),
+            )
+            box.appendChild(
+              el(
+                "div",
+                "font-size:12px;color:#71717a;margin:0 0 8px;",
+                e.kind + (e.time ? " · " + e.time : ""),
+              ),
+            )
+            if (e.stack) box.appendChild(el("pre", pre, e.stack))
+            if (e.componentStack)
+              box.appendChild(el("pre", pre, "Component stack:" + e.componentStack))
+          })
+
+          box.appendChild(
+            el(
+              "pre",
+              pre + "margin-top:20px;padding-top:12px;border-top:1px solid #27272f;",
+              "Path: " +
+                location.pathname +
+                location.search +
+                location.hash +
+                "\nBuild: " +
+                (meta ? meta.getAttribute("content") : "unknown") +
+                "\nTime: " +
+                new Date().toISOString() +
+                "\nUser agent: " +
+                navigator.userAgent,
+            ),
+          )
+          root.appendChild(box)
+          document.body.appendChild(root)
+          shown = root
+        }
+
+        // The app came (back) to life: never cover it.
+        if (app && window.MutationObserver) {
+          new MutationObserver(function () {
+            if (!appIsEmpty()) everRendered = true
+            if (shown && !appIsEmpty()) {
+              shown.remove()
+              shown = null
+            }
+          }).observe(app, { childList: true })
+        }
+
+        // Capture phase also sees resource failures (a <script> or chunk 404).
+        window.addEventListener(
+          "error",
+          function (event) {
+            var t = event.target
+            if (t && t !== window && (t.src || t.href)) {
+              record("resource", undefined, { message: "Failed to load " + (t.src || t.href) })
+            } else {
+              // A thrown non-Error (e.g. `undefined`) arrives with no event.error.
+              var bare = event.error == null && event.message
+              record(
+                "error",
+                event.error,
+                bare ? { message: describe(event.error) + " (" + event.message + ")" } : null,
+              )
+            }
+          },
+          true,
+        )
+        window.addEventListener("unhandledrejection", function (event) {
+          record("unhandledrejection", event.reason)
+        })
+        window.__vanyaFatal = function (error, extra) {
+          record(
+            (extra && extra.source) || "app",
+            error,
+            extra && extra.componentStack ? { componentStack: extra.componentStack } : null,
+          )
+        }
+        setTimeout(check, 10000) // nothing rendered at all, even with no error
+      })()
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
