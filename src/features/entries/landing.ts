@@ -1,9 +1,11 @@
 // Landing (ARCHITECTURE.md "One day, two halves"): until the morning closes
-// (noon unless Settings says otherwise), `/` opens on /morning until today's
-// morning is set, unless that is turned off in Settings or "Skip today" was
-// tapped on this device.
+// (noon unless Settings says otherwise), opening the app on `/` lands on
+// /morning until today's morning is set, unless that is turned off in Settings
+// or "Skip today" was tapped on this device. Only the app's first page of a
+// page load is a landing; later in-app visits to `/` show the dashboard.
 
 import type { QueryClient } from "@tanstack/react-query"
+import type { AnyRouter } from "@tanstack/react-router"
 import { configQuery } from "@/features/config/queries"
 import type { MorningPrefs } from "@/features/settings/api"
 import { morningPrefsQuery } from "@/features/settings/queries"
@@ -61,16 +63,35 @@ export function shouldOpenMorning({
   return inMorningWindow(now, prefs) && !skipped && !locked && !morningIsSet(morning, metrics)
 }
 
+// --- The initial landing ----------------------------------------------------
+// The redirect is for opening the app, not for every visit to `/`: once the
+// first page of this page load has shown (wherever it was — /morning after the
+// redirect, or a deep link), the header's "VanyaOS" link, NavCards and browser
+// back reach the dashboard. A module flag is enough: it resets on every page
+// load, which is exactly "opening the app". /login doesn't count, so the first
+// `/` after signing in is still a landing. Preloads never resolve, so hovering
+// a link to `/` doesn't use the landing up.
+
+let landed = false
+
+/** Marks the landing as done once `router` first resolves a page other than /login. */
+export function trackLanding(router: AnyRouter): () => void {
+  return router.subscribe("onResolved", ({ toLocation }) => {
+    if (!toLocation.pathname.endsWith("/login")) landed = true
+  })
+}
+
 /**
- * The index route's check, run before it loads. Fetches nothing before the
- * day starts or on a skipped day, and only the preferences once the morning
- * has closed or when the redirect is off. If the preferences or today's
+ * The index route's check, run before it loads. Always "no" after the initial
+ * landing (see above). Fetches nothing then, before the day starts or on a
+ * skipped day, and only the preferences once the morning has closed or when
+ * the redirect is off. If the preferences or today's
  * morning can't be loaded (offline, an error), the answer is "no": this
  * feature never keeps anyone from the dashboard.
  */
 export async function opensOnMorning(queryClient: QueryClient, now = new Date()): Promise<boolean> {
   const date = todayISO()
-  if (!dayStarted(now) || morningSkipped(date)) return false
+  if (landed || !dayStarted(now) || morningSkipped(date)) return false
   try {
     const prefs = await queryClient.ensureQueryData(morningPrefsQuery)
     if (!inMorningWindow(now, prefs)) return false
