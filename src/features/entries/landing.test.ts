@@ -1,5 +1,16 @@
 // @vitest-environment jsdom
 import { QueryClient } from "@tanstack/react-query"
+import {
+  createMemoryHistory,
+  createRootRoute,
+  createRoute,
+  createRouter,
+  redirect,
+  RouterProvider,
+  type AnyRouter,
+} from "@tanstack/react-router"
+import { act, cleanup, render, waitFor } from "@testing-library/react"
+import { createElement } from "react"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import type { LoadedConfig } from "@/features/config/api"
 import { configQuery } from "@/features/config/queries"
@@ -215,5 +226,88 @@ describe("opensOnMorning", () => {
     skipMorning(today)
     expect(await opensOnMorning(qc, morningOf(8))).toBe(false)
     expect(ensure).not.toHaveBeenCalled()
+  })
+})
+
+describe("the initial landing", () => {
+  afterEach(() => {
+    cleanup()
+    vi.useRealTimers()
+    localStorage.clear()
+  })
+
+  // A router shaped like the app's: `/` asks opensOnMorning, as the index
+  // route does. A fresh copy of landing.ts per test, so its flag starts unset.
+  async function app(initial: string) {
+    vi.resetModules()
+    const landing = await import("./landing")
+    const { configQuery: config } = await import("@/features/config/queries")
+    const { morningPrefsQuery: prefsQuery } = await import("@/features/settings/queries")
+    const { morningQuery: mq } = await import("./queries")
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const today = "2026-11-12"
+    qc.setQueryData(config.queryKey, {
+      activeTheme: "recovery",
+      themes: ["recovery"],
+      metrics,
+      habits: [],
+      goals: [],
+      metricRowId: {},
+      habitRowId: {},
+    } satisfies LoadedConfig)
+    qc.setQueryData(prefsQuery.queryKey, prefs)
+    qc.setQueryData(mq(today).queryKey, {
+      entry: { date: today, theme: "recovery", ...blank, updatedAt: "" },
+      unsynced: false,
+      locked: false,
+    } satisfies LoadedMorning)
+
+    const root = createRootRoute()
+    const index = createRoute({
+      getParentRoute: () => root,
+      path: "/",
+      beforeLoad: async () => {
+        if (await landing.opensOnMorning(qc)) throw redirect({ to: "/morning", replace: true })
+      },
+    })
+    const page = (path: string) => createRoute({ getParentRoute: () => root, path })
+    const router = createRouter({
+      routeTree: root.addChildren([index, page("/morning"), page("/trends"), page("/login")]),
+      history: createMemoryHistory({ initialEntries: [initial] }),
+    })
+    landing.trackLanding(router)
+    // Rendered, as in the app: the router reports a resolved page only then.
+    render(createElement(RouterProvider, { router }))
+    await waitFor(() => expect(router.state.resolvedLocation).toBeDefined())
+    return router
+  }
+  const path = (router: AnyRouter) => router.state.resolvedLocation?.pathname
+  const go = (router: AnyRouter, to: string) => act(() => router.navigate({ to }))
+
+  it("opens on /morning, then lets an in-app visit reach the dashboard", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] })
+    vi.setSystemTime(at(8))
+    const router = await app("/")
+    await waitFor(() => expect(path(router)).toBe("/morning"))
+    await go(router, "/")
+    expect(path(router)).toBe("/")
+  })
+
+  it("leaves a deep link alone, and doesn't redirect a later visit to `/`", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] })
+    vi.setSystemTime(at(8))
+    const router = await app("/trends")
+    expect(path(router)).toBe("/trends")
+    await go(router, "/")
+    expect(path(router)).toBe("/")
+  })
+
+  it("still lands on /morning on the first `/` after /login", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] })
+    vi.setSystemTime(at(8))
+    const router = await app("/login")
+    expect(path(router)).toBe("/login")
+    await go(router, "/")
+    await waitFor(() => expect(path(router)).toBe("/morning"))
   })
 })

@@ -33,7 +33,8 @@ import { GoalBar } from "@/components/GoalBar"
 
 export const Route = createFileRoute("/")({
   // Before noon the app opens on /morning until today's morning is set or
-  // skipped. Only `/` does this; deep links to other pages are left alone.
+  // skipped. Only when the app opens on `/` (see landing.ts): deep links to
+  // other pages and later in-app visits to the dashboard are left alone.
   beforeLoad: async ({ context: { queryClient } }) => {
     if (await opensOnMorning(queryClient)) throw redirect({ to: "/morning", replace: true })
   },
