@@ -27,11 +27,11 @@ const root = document.getElementById("app")
 if (!root) throw new Error("index.html is missing #app")
 
 createRoot(root, {
-  // React unmounts the whole tree after this. Hand the error and the component
-  // that threw to the fatal screen in index.html, so the blank page explains itself.
+  // React unmounts the whole tree after this, leaving a blank page. The
+  // component stack says which component threw, even when the thrown value
+  // (say, `undefined`) has no stack of its own.
   onUncaughtError(error, errorInfo) {
     console.error("Uncaught render error:", error, errorInfo.componentStack)
-    window.__vanyaFatal?.(error, { source: "react", componentStack: errorInfo.componentStack })
   },
   // Already shown to the user by the router's RouteError; just keep the trace.
   onCaughtError(error, errorInfo) {

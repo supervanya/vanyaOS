@@ -12,12 +12,3 @@ interface ImportMetaEnv {
 interface ImportMeta {
   readonly env: ImportMetaEnv
 }
-
-// The fatal error screen's hook, defined by the inline script in index.html.
-// Optional: tests and anything else without that script don't have it.
-interface Window {
-  __vanyaFatal?: (
-    error: unknown,
-    extra?: { source?: string; componentStack?: string | undefined },
-  ) => void
-}
