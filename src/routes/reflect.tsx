@@ -17,6 +17,7 @@ import { TaskBoard } from "@/features/tasks/TaskBoard"
 import { metricsAt } from "@/lib/config"
 import { defaultEntryDate, todayISO } from "@/lib/dates"
 import { HabitChip } from "@/components/HabitChip"
+import { SettingsLink } from "@/components/SettingsLink"
 import { useAutoGrow } from "@/hooks/useAutoGrow"
 import { Skeleton } from "@/components/ui/skeleton"
 import { PageHeader } from "@/components/PageHeader"
@@ -189,8 +190,9 @@ function ReflectionDay({
           </span>
         )}
       </div>
-      <p className="mt-0.5 text-[11px] text-muted-foreground">
+      <p className="mt-0.5 flex items-center text-[11px] text-muted-foreground">
         symptoms inverted · theme: {entry.theme}
+        <SettingsLink section="metrics" empty={!config.metrics.length} className="ml-auto" />
       </p>
 
       {/* Metric groups: only the evening half's sliders; morning-timed metrics
@@ -206,6 +208,7 @@ function ReflectionDay({
       <section className="mt-5">
         <p className="mb-2 flex items-center gap-1.5 text-xs text-muted-foreground">
           <Flag size={14} /> Goal check · what you're building toward
+          <SettingsLink section="goals" empty={!config.goals.length} className="ml-auto" />
         </p>
         {config.goals.map((g) => (
           <GoalBar key={g.id} goal={g} />
@@ -216,6 +219,7 @@ function ReflectionDay({
       <section className="mt-5">
         <p className="mb-2 flex items-center gap-1.5 text-xs text-muted-foreground">
           <Repeat size={14} /> Habits
+          <SettingsLink section="habits" empty={!config.habits.length} className="ml-auto" />
         </p>
         <div className="flex flex-wrap gap-2">
           {config.habits.map((h) => (

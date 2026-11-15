@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { DEFAULT_CONFIG, groupMetrics, metricsAt, type Metric, type MetricTiming } from "./config"
+import { groupMetrics, metricsAt, type Metric, type MetricTiming } from "./config"
 
 const metric = (id: string, group: string, timing: MetricTiming = "evening"): Metric => ({
   id,
@@ -33,9 +33,5 @@ describe("metricsAt", () => {
     ]
     expect(metricsAt([sleep, eating, energy], "morning")).toEqual([sleep, energy])
     expect(metricsAt([sleep, eating, energy], "evening")).toEqual([eating])
-  })
-
-  it("asks every default metric in the evening", () => {
-    expect(metricsAt(DEFAULT_CONFIG.metrics, "evening")).toEqual(DEFAULT_CONFIG.metrics)
   })
 })

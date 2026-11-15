@@ -3,7 +3,7 @@ import { Repeat } from "lucide-react"
 import { SortableList } from "@/components/SortableList"
 import { addHabitRow, updateConfigRow, type ConfigPatch } from "./api"
 import { habitRowsQuery } from "./queries"
-import { AddRow, ArchivedList, LabelInput, RowShell, useRowEditing } from "./rows"
+import { AddRow, ArchivedList, EmptyHint, LabelInput, RowShell, useRowEditing } from "./rows"
 
 export function HabitsSection() {
   const { data: rows } = useSuspenseQuery(habitRowsQuery)
@@ -16,10 +16,11 @@ export function HabitsSection() {
     update(id, p, () => updateConfigRow("habits", id, p))
 
   return (
-    <section className="mt-6">
+    <section id="habits" className="mt-6 scroll-mt-14">
       <p className="mb-2 flex items-center gap-1.5 text-xs text-muted-foreground">
         <Repeat size={14} /> Habits
       </p>
+      {!active.length && <EmptyHint>None yet. Add habits to tick off each day.</EmptyHint>}
       <SortableList items={active} onReorder={reorder} className="flex flex-col gap-2">
         {(h) => (
           <RowShell onArchive={() => patch(h.id, { archived: true })}>

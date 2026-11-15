@@ -30,7 +30,7 @@
 | v1→v2 core | **Evening reflection + habits** (incl. goal glance + tomorrow's todos) **+ automated AI coaching** | The daily heartbeat, now closing the loop automatically instead of via manual paste |
 | Slider scale | **0–5**, symptoms inverted ("0 is best"), folded into a composite **wellness score** | Thumb-fast on a phone; 0 captures a true none/skipped |
 | Habits | **Binary** done / not-done (chips) | Cleanest data, one tap, easy streaks |
-| Config | **DB tables** (metrics/habits/goals), managed in-app once M3's Settings ships; `config.ts` demotes to first-run seed only | The DB was already the source of truth; Settings makes it editable from the phone |
+| Config | **DB tables** (metrics/habits/goals), managed in-app once M3's Settings ships; a new account starts empty and sets them up there | The DB was already the source of truth; Settings makes it editable from the phone |
 | Users | **Solo** — one account, just Vanya | Multi-user is explicitly out of scope; schema happens to be `user_id`-scoped anyway (free isolation, not a commitment to build accounts for others) |
 | Todos | **One living list** (`tasks` table, scopes today/week/someday), shown on both the dashboard and the reflection screen | "Current to-dos" is a real thing you open the app for; roll-forward copying is deleted — an undone task simply stays. `completed_at` gives history for free |
 | 1-3-5 rule | Tasks carry a **size** (big/medium/small); the weekly board is **hard-capped at 1/3/5 per size** — going over forces a swap to Someday | ~80 competing things → the constraint forces picking. No silent overflow, ever |
@@ -43,7 +43,7 @@
 | Markdown export | **Dropped** — no Copy/Export button in v2 | DB rows are the only source of truth; export can return later as a generated view if ever wanted |
 | AI provider | **Bring your own** — provider (Anthropic/OpenAI/Google) + model + API key chosen in Settings, stored per-user in RLS-protected `ai_settings`; one provider-agnostic Edge Function proxies calls | No provider lock-in, no app-held AI secrets; every user sets up their own key |
 | Retrospectives | Per-area **living state-of-affairs markdown doc**, versioned per run. "Run retrospective" = an **interactive coaching session**: (1) intake — current doc + all new signal since last retro + anything the user adds; (2) a *prompted* structured retro; (3) a coach voice that's proficient and incredibly sharp at getting goals done and improving that area's posture; (4) the coach prompts the user with new info, proposed changes, and **new goals**. Session ends in an updated doc + change summary | The retro is a conversation with a sharp coach, not a background job; the doc is the session's product. On-demand cadence with a monthly due-nudge |
-| Retro areas | `retro_areas` DB rows seeded with Finances / Health / Exercise / Work; Settings-managed (CRUD + archive) | Same pattern as habits/metrics/goals — nothing hardcoded |
+| Retro areas | `retro_areas` DB rows, none until the user adds them; Settings-managed (CRUD + archive) | Same pattern as habits/metrics/goals — nothing hardcoded |
 
 **The AI loop is no longer manual-first.** M4 builds the provider-agnostic coach plumbing and its first consumer (retrospectives); M5 gives the day a morning half (an intention the evening reflection and the coach measure the day against); M6 adds a chat coach you can ask anything about your goals, tasks, reflections, and retro docs; M7 adds the nightly synthesis ("Finish reflection" → action items + goal-progress notes). No copy, no paste — and no provider lock-in at any point.
 
@@ -76,7 +76,7 @@ Everything below is filled on **one screen**:
 1. **Storage** — ✅ Postgres via Supabase. Markdown-in-git is dropped; see ADR-002.
 2. **Auth** — ✅ Real magic-link login via Supabase Auth, replacing the single-passcode-gate plan. Solo account only.
 3. **AI loop** — ✅ Automated, not manual. Validated by hand first (the north star is proven, not a bet), then built as a server-triggered Edge Function call.
-4. **Config** — ✅ DB tables, editable in-app once M3's Settings ships (add/rename/reorder/archive); `config.ts` is a first-run seed only.
+4. **Config** — ✅ DB tables, editable in-app once M3's Settings ships (add/rename/reorder/archive); nothing is pre-created — a new account starts empty.
 5. **Export** — ✅ Dropped for v2. Was the manual AI bridge in M0; the bridge is now automated, so the button has no remaining job.
 6. **Todos (2026-07-17)** — ✅ promoted from per-day snapshots to one living `tasks` list; roll-forward deleted. Slider scale, habits, themes — unchanged from the original grill.
 

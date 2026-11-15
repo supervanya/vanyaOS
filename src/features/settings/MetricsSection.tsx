@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { addMetricRow, updateMetric } from "./api"
 import { metricRowsQuery } from "./queries"
-import { ArchivedList, LabelInput, RowShell, useRowEditing } from "./rows"
+import { ArchivedList, EmptyHint, LabelInput, RowShell, useRowEditing } from "./rows"
 import { TimingToggle } from "./TimingToggle"
 
 type MetricPatch = Parameters<typeof updateMetric>[1]
@@ -43,10 +43,11 @@ export function MetricsSection() {
   }
 
   return (
-    <section className="mt-6">
+    <section id="metrics" className="mt-6 scroll-mt-14">
       <p className="mb-2 flex items-center gap-1.5 text-xs text-muted-foreground">
         <Activity size={14} /> Metrics
       </p>
+      {!active.length && <EmptyHint>None yet. Add what you'd like to rate each day.</EmptyHint>}
       <SortableList items={active} onReorder={reorder} className="flex flex-col gap-2">
         {(m) => (
           <RowShell onArchive={() => patch(m.id, { archived: true })}>

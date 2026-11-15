@@ -99,6 +99,11 @@ function LabelDraft({ value, onSave, className }: LabelInputProps) {
   )
 }
 
+/** What a section with no active rows says above its list. */
+export function EmptyHint({ children }: { children: ReactNode }) {
+  return <p className="mb-2 text-[11px] text-muted-foreground">{children}</p>
+}
+
 export function ArchivedList<T extends { id: string; label: string }>({
   rows,
   onRestore,

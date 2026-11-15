@@ -4,7 +4,7 @@ import { SortableList } from "@/components/SortableList"
 import { Slider } from "@/components/ui/slider"
 import { addGoalRow, updateGoal, type GoalRow } from "./api"
 import { goalRowsQuery } from "./queries"
-import { AddRow, ArchivedList, LabelInput, RowShell, useRowEditing } from "./rows"
+import { AddRow, ArchivedList, EmptyHint, LabelInput, RowShell, useRowEditing } from "./rows"
 
 type GoalPatch = Parameters<typeof updateGoal>[1]
 
@@ -25,10 +25,11 @@ export function GoalsSection() {
     )
 
   return (
-    <section className="mt-6">
+    <section id="goals" className="mt-6 scroll-mt-14">
       <p className="mb-2 flex items-center gap-1.5 text-xs text-muted-foreground">
         <Flag size={14} /> Goals
       </p>
+      {!active.length && <EmptyHint>None yet. Add what you're working toward.</EmptyHint>}
       <SortableList items={active} onReorder={reorder} className="flex flex-col gap-3">
         {(g) => (
           <>
