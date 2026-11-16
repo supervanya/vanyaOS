@@ -31,7 +31,6 @@ The owner reads every line of this codebase, and it has grown past easy reading.
 - Before adding code, look for a fix that deletes code or fixes the cause upstream (a dependency bump, a built-in option).
 - No new abstractions, helpers or config for a single use. Three similar lines beat a premature helper.
 - Code you notice could go, but that's out of scope, becomes an issue.
-- Say in the PR body how many lines it adds and removes.
 
 ## Conventions
 
