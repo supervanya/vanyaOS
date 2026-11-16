@@ -44,8 +44,10 @@ export default defineConfig(({ command }) => ({
       devOptions: { enabled: true },
       includeAssets: ["favicon.ico", "logo192.png", "logo512.png"],
       manifest: {
-        name: "VanyaOS — Evening reflection",
-        short_name: "VanyaOS",
+        // The default name: the manifest is a static file, so it can't carry
+        // the account's own. AppIdentity sets that on the page itself.
+        name: "MyOS",
+        short_name: "MyOS",
         description: "Evening reflection — habits, wellbeing, goals.",
         theme_color: "#0b0b0f",
         background_color: "#0b0b0f",

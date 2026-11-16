@@ -3,6 +3,7 @@ import { useState } from "react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { NameForm } from "@/features/identity/NameForm"
 import { errorMessage } from "@/lib/errors"
 import { supabase } from "@/lib/supabaseClient"
 
@@ -36,6 +37,11 @@ export function AccountSection() {
     <section className="mt-6">
       <p className="mb-2 flex items-center gap-1.5 text-xs text-muted-foreground">
         <UserRound size={14} /> Account
+      </p>
+      <NameForm />
+      <p className="mt-1 mb-3 text-[11px] text-muted-foreground">
+        Already on your Home Screen? It keeps the name it was added with; remove it and add it again
+        to pick up a new one.
       </p>
       <form
         className="flex items-center gap-2"

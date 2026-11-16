@@ -4,6 +4,7 @@ import { toast } from "sonner"
 import { supabase } from "@/lib/supabaseClient"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { AppName } from "@/features/identity/AppName"
 import { errorMessage } from "@/lib/errors"
 
 export const Route = createFileRoute("/login")({ component: Login })
@@ -39,7 +40,9 @@ function Login() {
           void signIn()
         }}
       >
-        <p className="text-center text-lg font-medium">VanyaOS</p>
+        <p className="text-center text-lg font-medium">
+          <AppName />
+        </p>
         <Input
           type="email"
           name="email"
