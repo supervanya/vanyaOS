@@ -24,7 +24,11 @@ import { tasksQuery } from "./queries"
 
 const SIZES = TASK_SIZES
 // Named by size, not by cap: a "1" was the biggest task, which read backwards.
-const SIZE_LABEL: Record<TaskSize, string> = { big: "Large", medium: "Medium", small: "Small" }
+const SIZE_LABEL: Record<TaskSize, string> = {
+  big: "Large Sized",
+  medium: "Medium Sized",
+  small: "Small Sized",
+}
 
 // Occupies a weekly 1-3-5 slot: on the board (today or week) and not deleted.
 // Completed items still count — done work used up its slot this week.

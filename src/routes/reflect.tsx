@@ -236,7 +236,7 @@ function ReflectionDay({
       {/* The week's 1-3-5, reviewed as part of the ritual — same living list
           as the dashboard (compact: no parking lot, no add row). */}
       <section className="mt-5">
-        <p className="mb-2 text-xs text-muted-foreground">This week's 1-3-5</p>
+        <p className="mb-2 text-xs text-muted-foreground">This week's important tasks</p>
         <TaskBoard compact />
       </section>
 

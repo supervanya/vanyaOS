@@ -31,6 +31,7 @@ import { TaskBoard } from "@/features/tasks/TaskBoard"
 import { tasksQuery } from "@/features/tasks/queries"
 import { dayOfYear, defaultEntryDate, isoWeek } from "@/lib/dates"
 import { GoalBar } from "@/components/GoalBar"
+import { FeatureHint } from "@/components/FeatureHint"
 
 export const Route = createFileRoute("/")({
   // Before noon the app opens on /morning until today's morning is set or
@@ -79,10 +80,13 @@ function Dashboard() {
 }
 
 function Tasks() {
-  /* This week's 1-3-5 (the living task list) */
+  /* This week's important tasks (the living task list) */
   return (
-    <section className="mt-4">
-      <p className="mb-2 text-xs text-muted-foreground">This week's 1-3-5</p>
+    <section className="flex flex-col gap-2">
+      <FeatureHint id="tasks" heading="This week's important tasks" title="How to use tasks">
+        You should protect your time and try to complete 1 large task during the week; about 3
+        medium-, and 5 small-sized.
+      </FeatureHint>
       <TaskBoard />
     </section>
   )
