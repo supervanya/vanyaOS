@@ -30,27 +30,27 @@ export function MetricGroups({
       {members.map((m) => {
         const val = values[m.id] // undefined until you set it
         return (
-          <div key={m.id} className="mb-4 flex items-center gap-3">
-            <span className="w-24 shrink-0 text-[13px] text-foreground/85">{m.label}</span>
-            <div className="flex-1">
-              <MetricSlider
-                value={val}
-                min={0}
-                max={m.scale}
-                tone={inverted ? "danger" : "success"}
-                onValueChange={(v) => onChange(m.id, v)}
-              />
-              <div className="mt-1.5 flex justify-between px-4 text-[7px] text-muted-foreground tabular-nums select-none">
-                {Array.from({ length: m.scale + 1 }, (_, i) => (
-                  <span key={i}>{i}</span>
-                ))}
-              </div>
-            </div>
+          // A grid so the label and score center on the slider's track, not on
+          // the track plus the tick numbers under it.
+          <div key={m.id} className="mb-4 grid grid-cols-[6rem_1fr_1.5rem] items-center gap-x-3">
+            <span className="text-[13px] text-foreground/85">{m.label}</span>
+            <MetricSlider
+              value={val}
+              min={0}
+              max={m.scale}
+              tone={inverted ? "danger" : "success"}
+              onValueChange={(v) => onChange(m.id, v)}
+            />
             <span
-              className={`w-6 text-right text-[15px] font-semibold tabular-nums ${val === undefined ? "text-muted-foreground" : ""}`}
+              className={`text-right text-[15px] font-semibold tabular-nums ${val === undefined ? "text-muted-foreground" : ""}`}
             >
               {val ?? "–"}
             </span>
+            <div className="col-start-2 mt-0.5 flex justify-between px-4 text-[7px] text-muted-foreground tabular-nums select-none">
+              {Array.from({ length: m.scale + 1 }, (_, i) => (
+                <span key={i}>{i}</span>
+              ))}
+            </div>
           </div>
         )
       })}
