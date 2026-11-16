@@ -31,7 +31,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       # Node and Bun at the versions pinned in mise.toml.
-      - uses: jdx/mise-action@v4
+      - uses: jdx/mise-action@v5
       - run: bun install --frozen-lockfile
       - run: bun run check
       - run: bun run test
@@ -89,7 +89,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       # Node and Bun at the versions pinned in mise.toml.
-      - uses: jdx/mise-action@v4
+      - uses: jdx/mise-action@v5
       - run: bun install --frozen-lockfile
       - run: bun run build
         env:
