@@ -1,21 +1,26 @@
 import { Info } from "lucide-react"
 import { useState, type ReactNode } from "react"
 
+import { SettingsLink, type SettingsSection } from "@/components/SettingsLink"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 
-// A section heading with an explanation of the feature under it. "Don't show
-// again" hides the explanation on this device; the ⓘ next to the heading
-// brings it back.
-export function FeatureHint({
+// A section's header row (icon, heading, optional Settings link) with an
+// explanation of the feature under it; `children` is the explanation's body.
+// "Don't show again" hides it on this device; the ⓘ by the heading brings it back.
+export function SectionHeader({
   id,
+  icon,
   heading,
   title,
+  settings,
   children,
 }: {
   id: string
+  icon: ReactNode
   heading: string
   title: string
+  settings?: SettingsSection
   children: ReactNode
 }) {
   const key = `vanyaos:hint-hidden:${id}`
@@ -38,8 +43,9 @@ export function FeatureHint({
   }
 
   return (
-    <>
-      <p className="flex items-center gap-1 text-xs text-muted-foreground">
+    <div className="mb-2 flex flex-col gap-2">
+      <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+        {icon}
         {heading}
         {hidden && (
           <Button
@@ -51,6 +57,7 @@ export function FeatureHint({
             <Info />
           </Button>
         )}
+        {settings && <SettingsLink section={settings} className="ml-auto" />}
       </p>
       {!hidden && (
         <Alert variant="info" role="note">
@@ -64,6 +71,6 @@ export function FeatureHint({
           </AlertDescription>
         </Alert>
       )}
-    </>
+    </div>
   )
 }

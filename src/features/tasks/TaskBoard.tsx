@@ -1,6 +1,6 @@
 import { useSuspenseQuery } from "@tanstack/react-query"
 import { useState } from "react"
-import { ArrowUp, Plus, X, Inbox } from "lucide-react"
+import { ArrowUp, Plus, X } from "lucide-react"
 
 import { HapticToggle } from "@/components/HapticToggle"
 import { Button } from "@/components/ui/button"
@@ -280,9 +280,11 @@ export function TaskBoard({ compact = false }: { compact?: boolean }) {
       {/* Someday: the task parking lot */}
       {!compact && (
         <section className="mt-4">
-          <p className="mb-1.5 flex items-center gap-1.5 text-xs text-muted-foreground">
-            <Inbox size={14} /> Someday · {someday.length}
-          </p>
+          {someday.length > 0 && (
+            <p className="mb-1.5 flex items-center gap-1.5 text-xs text-muted-foreground">
+              Someday · {someday.length}
+            </p>
+          )}
           <div className="flex flex-col gap-1.5">
             {someday.map((t) => (
               <div key={t.id} className="flex items-center gap-2.5">

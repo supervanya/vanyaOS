@@ -191,7 +191,7 @@ function ReflectionDay({
         )}
       </div>
       <p className="mt-0.5 flex items-center text-[11px] text-muted-foreground">
-        symptoms inverted · theme: {entry.theme}
+        Daily Metrics
         <SettingsLink section="metrics" empty={!config.metrics.length} className="ml-auto" />
       </p>
 
@@ -256,10 +256,6 @@ function ReflectionDay({
 
       {/* The last step of the ritual, once the day is written down. */}
       <LivedRating date={selectedDate} value={entry.intentionLived} onChange={setLived} />
-
-      <p className="mt-3 text-center text-[11px] text-muted-foreground">
-        Synced to your account · theme: {entry.theme}
-      </p>
     </>
   )
 }

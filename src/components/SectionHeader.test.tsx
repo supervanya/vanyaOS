@@ -2,7 +2,7 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { afterEach, expect, it } from "vitest"
 
-import { FeatureHint } from "./FeatureHint"
+import { SectionHeader } from "./SectionHeader"
 
 afterEach(() => {
   cleanup()
@@ -10,9 +10,9 @@ afterEach(() => {
 })
 
 const hint = () => (
-  <FeatureHint id="tasks" heading="Tasks" title="How to use tasks">
+  <SectionHeader id="tasks" icon={null} heading="Tasks" title="How to use tasks">
     Do the big one first.
-  </FeatureHint>
+  </SectionHeader>
 )
 
 it("hides on 'Don't show again', remembers it, and comes back from the ⓘ", () => {
