@@ -150,6 +150,7 @@ function AiSettingsForm({ stored }: { stored: AiSettings | null }) {
         </div>
         <Input
           type="password"
+          aria-autocomplete="none"
           value={key}
           onChange={(e) => setKey(e.target.value)}
           placeholder={
@@ -158,7 +159,7 @@ function AiSettingsForm({ stored }: { stored: AiSettings | null }) {
               : `Paste your ${AI_PROVIDERS[provider].label} API key`
           }
           aria-label="API key"
-          autoComplete="off"
+          autoComplete="new-password"
           className="h-8 text-[13px]"
         />
         <Button

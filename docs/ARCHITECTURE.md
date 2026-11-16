@@ -11,7 +11,7 @@
 | Frontend | **TanStack Router + React**, Vite, mobile-first, `vite build → dist/` | Unchanged from M0 — still a static SPA, no server render |
 | Data + Auth | **Supabase** — managed Postgres, built-in Auth, Row-Level Security | One platform for schema + real login; RLS replaces hand-rolled authorization |
 | Client access | **Supabase JS client**, called directly from the browser | RLS is the security boundary; no server needed for ordinary reads/writes |
-| Login | **Magic link** (passwordless email) via Supabase Auth | No password to type nightly on a phone; still a real account, not a shared passcode |
+| Login | **Email + password** via Supabase Auth | A magic link signs in the browser, never the installed PWA (iOS keeps their storage apart); the password manager fills this in one tap. Still a real account, not a shared passcode |
 | AI coach | **One provider-agnostic Edge Function** (`ai-coach`) using the **AI SDK** (`ai` + provider packages) to call the *user's own* provider with the *user's own* key from `ai_settings`; also serves a **live model catalog** (`list-models`) fetched from the provider's API so the app never ships stale model lists | The only server-side code; the app holds **zero AI secrets** — no provider lock-in, each account brings its own key |
 | Realtime | **Supabase Realtime** subscription on `ai_reports` | Coaching output appears in the UI without polling |
 | PWA | **`vite-plugin-pwa`** (manifest + service worker) | Installable on the phone home screen — unchanged from M0 |
@@ -22,11 +22,11 @@
 ## System shape
 
 ```
- ┌─────────────┐                                    ┌────────────────────────────┐
+ ┌─────────────┐                                     ┌────────────────────────────┐
  │  Phone PWA  │ ── Supabase JS client (HTTPS) ────▶ │          Supabase          │
- │ (installed) │    auth · Postgres · Realtime       │  Auth (magic link)        │
- └─────────────┘                                     │  Postgres + RLS           │
- ┌─────────────┐                                     │  Edge Fn: ai-coach        │──▶ user's chosen provider
+ │ (installed) │    auth · Postgres · Realtime       │  Auth (email + password)   │
+ └─────────────┘                                     │  Postgres + RLS            │
+ ┌─────────────┐                                     │  Edge Fn: ai-coach         │──▶ user's chosen provider
  │  Mac browser│ ── same login, same rows ─────────▶ │                            │
  └─────────────┘                                     └────────────────────────────┘
    Both devices log into the same account → same rows = sync, no sync engine to write.
@@ -230,7 +230,7 @@ The dashboard (`/`), the morning page (`/morning`) and the reflection screen (`/
 | `/morning` | M5: the morning intention — textarea, morning sliders, the same task list. Read-only once the evening is started |
 | `/reflect` | The evening reflection (moved from `/`); shows the morning half read-only, asks "did I live it?", embeds the same task list |
 | `/settings` | M3: CRUD + archive for metrics/habits/goals, goal progress editing. M5: morning/evening toggle per metric; whether and until when the app opens on `/morning` |
-| `/login` | Magic link + paste-the-link sign-in |
+| `/login` | Email + password sign-in |
 
 ## Save flow
 

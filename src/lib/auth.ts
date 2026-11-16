@@ -1,4 +1,4 @@
-// Solo-account auth (Supabase Auth, magic link) — see ADR-002 / ARCHITECTURE.md.
+// Solo-account auth (Supabase Auth, email + password) — see ADR-002 / ARCHITECTURE.md.
 // The router checks the session before every navigation (routes/__root.tsx);
 // data code asks for the user id when it has to write `user_id` explicitly.
 

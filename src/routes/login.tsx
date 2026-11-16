@@ -8,92 +8,19 @@ import { errorMessage } from "@/lib/errors"
 
 export const Route = createFileRoute("/login")({ component: Login })
 
-// The magic link's `token` query param is a token hash that verifyOtp accepts
-// directly, so pasting the emailed link into the app completes sign-in without
-// any navigation. That's the whole trick that lets the installed PWA log in:
-// on iOS the PWA and the browser have separate storage partitions, so *tapping*
-// the link signs in the browser, never the PWA.
-function extractTokenHash(pasted: string): string | null {
-  const raw = pasted.trim()
-  if (!raw) return null
-  try {
-    const token = new URL(raw).searchParams.get("token")
-    if (token) return token
-  } catch {
-    // Not a URL — assume they copied just the token itself.
-    return raw
-  }
-  return null
-}
-
-// Dev server only: deleting a Home Screen app wipes its storage, so every
-// re-add means a fresh magic link. `import.meta.env.DEV` is a build-time
-// `false` in production, so this folds to null and the credentials are never
-// bundled.
-const devLogin =
-  import.meta.env.DEV &&
-  import.meta.env.VITE_DEV_LOGIN_EMAIL &&
-  import.meta.env.VITE_DEV_LOGIN_PASSWORD
-    ? {
-        email: import.meta.env.VITE_DEV_LOGIN_EMAIL,
-        password: import.meta.env.VITE_DEV_LOGIN_PASSWORD,
-      }
-    : null
-
-function DevSignIn({ email, password }: { email: string; password: string }) {
+// Email + password, not a magic link: on iOS the installed PWA and the browser
+// have separate storage, so tapping an emailed link signs in the browser, never
+// the PWA. A real <form> with these autocomplete values lets the password
+// manager fill and save the credentials in both.
+function Login() {
+  const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
   const [loading, setLoading] = useState(false)
+
   const signIn = async () => {
     setLoading(true)
     try {
       const { error } = await supabase.auth.signInWithPassword({ email, password })
-      if (error) toast.error(error.message)
-      // Success → the router's auth check leaves /login.
-    } catch (err) {
-      toast.error(errorMessage(err))
-    } finally {
-      setLoading(false)
-    }
-  }
-  return (
-    <Button variant="outline" className="w-full" onClick={() => void signIn()} disabled={loading}>
-      {loading ? "Signing in…" : `Dev sign-in as ${email}`}
-    </Button>
-  )
-}
-
-function Login() {
-  const [email, setEmail] = useState("")
-  const [pastedLink, setPastedLink] = useState("")
-  const [sent, setSent] = useState(false)
-  const [loading, setLoading] = useState(false)
-  const sendLink = async () => {
-    if (!email || loading) return
-    setLoading(true)
-    try {
-      const { error } = await supabase.auth.signInWithOtp({
-        email,
-        options: { emailRedirectTo: window.location.origin + import.meta.env.BASE_URL },
-      })
-      if (error) {
-        toast.error(error.message)
-        return
-      }
-      setSent(true)
-    } catch (err) {
-      toast.error(errorMessage(err))
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const tokenHash = extractTokenHash(pastedLink)
-
-  const verifyPastedLink = async () => {
-    if (!tokenHash || loading) return
-    setLoading(true)
-    try {
-      const { error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type: "email" })
-      // Links are single-use and expire after ~1h — resending is the fix.
       if (error) toast.error(error.message)
       // Success → the sign-in re-runs the router's auth check, which leaves /login.
     } catch (err) {
@@ -103,64 +30,39 @@ function Login() {
     }
   }
 
-  if (sent) {
-    return (
-      <div className="flex min-h-[70dvh] flex-col items-center justify-center">
-        <div className="w-full max-w-xs space-y-3 text-center">
-          <p className="text-lg font-medium">Check your inbox</p>
-          <p className="text-sm text-muted-foreground">
-            Tap the link we sent to {email} — or, in the installed app, copy the link from the email
-            and paste it here:
-          </p>
-          <Input
-            type="text"
-            inputMode="url"
-            autoComplete="off"
-            placeholder="Paste the sign-in link"
-            value={pastedLink}
-            onChange={(e) => setPastedLink(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && void verifyPastedLink()}
-          />
-          <Button
-            className="w-full"
-            onClick={() => void verifyPastedLink()}
-            disabled={loading || !tokenHash}
-          >
-            {loading ? "Signing in…" : "Sign in"}
-          </Button>
-          <button
-            type="button"
-            onClick={() => {
-              setSent(false)
-              setPastedLink("")
-            }}
-            className="text-xs text-muted-foreground underline hover:text-foreground"
-          >
-            Use a different email
-          </button>
-        </div>
-      </div>
-    )
-  }
-
   return (
     <div className="flex min-h-[70dvh] flex-col items-center justify-center">
-      <div className="w-full max-w-xs space-y-3">
+      <form
+        className="w-full max-w-xs space-y-3"
+        onSubmit={(e) => {
+          e.preventDefault()
+          void signIn()
+        }}
+      >
         <p className="text-center text-lg font-medium">VanyaOS</p>
         <Input
           type="email"
+          name="email"
           inputMode="email"
-          autoComplete="email"
+          autoComplete="username"
+          aria-label="Email"
           placeholder="you@example.com"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && void sendLink()}
         />
-        <Button className="w-full" onClick={() => void sendLink()} disabled={loading || !email}>
-          {loading ? "Sending…" : "Send magic link"}
+        <Input
+          type="password"
+          name="password"
+          autoComplete="current-password"
+          aria-label="Password"
+          placeholder="Password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+        />
+        <Button type="submit" className="w-full" disabled={loading || !email || !password}>
+          {loading ? "Signing in…" : "Sign in"}
         </Button>
-        {devLogin && <DevSignIn {...devLogin} />}
-      </div>
+      </form>
     </div>
   )
 }

@@ -24,7 +24,7 @@
 |---|---|---|
 | Form factor | Cloud-hosted **PWA**, installable on phone; one URL on phone + Mac | True cross-device with zero hand-rolled sync |
 | Source of truth | **Postgres** (Supabase) — normalized tables, not a file | Real schema, queryable history, no markdown parsing |
-| Auth | **Real login**, magic link (passwordless email) via Supabase Auth | Solo account, not a shared passcode; no password to type nightly |
+| Auth | **Real login**, email + password via Supabase Auth | Solo account, not a shared passcode; the password manager fills it in the installed PWA |
 | Cross-device | **Eventual sync** — both devices log into the same account, same rows; no realtime co-editing | A reflection happens once, in one sitting; realtime sync is 10x cost for ~0 value here |
 | Primary device | **Phone** (evening, touch sliders) | Drives mobile-first, big tap targets |
 | v1→v2 core | **Evening reflection + habits** (incl. goal glance + tomorrow's todos) **+ automated AI coaching** | The daily heartbeat, now closing the loop automatically instead of via manual paste |
@@ -74,7 +74,7 @@ Everything below is filled on **one screen**:
 ## Resolved decisions (superseding the 2026-06-19 grill)
 
 1. **Storage** — ✅ Postgres via Supabase. Markdown-in-git is dropped; see ADR-002.
-2. **Auth** — ✅ Real magic-link login via Supabase Auth, replacing the single-passcode-gate plan. Solo account only.
+2. **Auth** — ✅ Real email + password login via Supabase Auth, replacing the single-passcode-gate plan. Solo account only.
 3. **AI loop** — ✅ Automated, not manual. Validated by hand first (the north star is proven, not a bet), then built as a server-triggered Edge Function call.
 4. **Config** — ✅ DB tables, editable in-app once M3's Settings ships (add/rename/reorder/archive); nothing is pre-created — a new account starts empty.
 5. **Export** — ✅ Dropped for v2. Was the manual AI bridge in M0; the bridge is now automated, so the button has no remaining job.
