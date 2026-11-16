@@ -6,6 +6,7 @@ import { GoalsSection } from "@/features/settings/GoalsSection"
 import { HabitsSection } from "@/features/settings/HabitsSection"
 import { MetricsSection } from "@/features/settings/MetricsSection"
 import { MorningSection } from "@/features/settings/MorningSection"
+import { AccountSection } from "@/features/settings/AccountSection"
 import { RetroAreasSection } from "@/features/settings/RetroAreasSection"
 import {
   goalRowsQuery,
@@ -44,6 +45,7 @@ function Settings() {
       <MorningSection />
       <RetroAreasSection />
       <AiSettingsSection />
+      <AccountSection />
     </>
   )
 }

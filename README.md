@@ -4,7 +4,7 @@ A personal life-OS, installed on the phone as a PWA: a command-center dashboard 
 
 **Live:** [supervanya.github.io/vanyaOS](https://supervanya.github.io/vanyaOS/) · **Where it's going:** [docs/ROADMAP.md](docs/ROADMAP.md) · **How it's built:** [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 
-React 19 on Vite 8 with TanStack Router and TanStack Query, Tailwind v4 + shadcn/ui, and Supabase (Postgres with row-level security, magic-link auth, one Edge Function). TypeScript 7, Bun.
+React 19 on Vite 8 with TanStack Router and TanStack Query, Tailwind v4 + shadcn/ui, and Supabase (Postgres with row-level security, email + password auth, one Edge Function). TypeScript 7, Bun.
 
 ## Run it locally
 
@@ -17,7 +17,7 @@ cp .env.example .env.local   # then paste the API URL and publishable key `supab
 bun --bun run dev            # http://localhost:3000
 ```
 
-Sign in with any email: the magic link lands in the local mail inbox at http://localhost:54324, not a real mailbox. To work against a copy of production data instead, run `bun run db:mirror` (it resets the local database).
+Create your local account in Supabase Studio (http://localhost:54323 → Authentication → Add user), then sign in with that email and password. To work against a copy of production data instead, run `bun run db:mirror` (it resets the local database).
 
 The AI coach calls your own provider. Add a key under **Settings → AI coach**; it's stored in your account row and only read by the `ai-coach` Edge Function.
 
