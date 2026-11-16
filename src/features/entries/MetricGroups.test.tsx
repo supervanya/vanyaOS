@@ -46,7 +46,7 @@ describe("MetricGroups", () => {
 
   it("shows set values and a dash for unset ones", () => {
     renderGroups({ Energy: 4 })
-    expect(screen.getByText("4", { selector: "span.w-6" })).toBeDefined()
+    expect(screen.getByText("4", { selector: "span.font-semibold" })).toBeDefined()
     expect(screen.getAllByText("–")).toHaveLength(2)
   })
 

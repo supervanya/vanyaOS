@@ -1,6 +1,6 @@
 import { useSuspenseQuery } from "@tanstack/react-query"
 import { useState } from "react"
-import { ArrowUp, Plus, X, Inbox } from "lucide-react"
+import { ArrowUp, Plus, X } from "lucide-react"
 
 import { HapticToggle } from "@/components/HapticToggle"
 import { Button } from "@/components/ui/button"
@@ -24,7 +24,11 @@ import { tasksQuery } from "./queries"
 
 const SIZES = TASK_SIZES
 // Named by size, not by cap: a "1" was the biggest task, which read backwards.
-const SIZE_LABEL: Record<TaskSize, string> = { big: "Large", medium: "Medium", small: "Small" }
+const SIZE_LABEL: Record<TaskSize, string> = {
+  big: "Large Sized",
+  medium: "Medium Sized",
+  small: "Small Sized",
+}
 
 // Occupies a weekly 1-3-5 slot: on the board (today or week) and not deleted.
 // Completed items still count — done work used up its slot this week.
@@ -276,9 +280,11 @@ export function TaskBoard({ compact = false }: { compact?: boolean }) {
       {/* Someday: the task parking lot */}
       {!compact && (
         <section className="mt-4">
-          <p className="mb-1.5 flex items-center gap-1.5 text-xs text-muted-foreground">
-            <Inbox size={14} /> Someday · {someday.length}
-          </p>
+          {someday.length > 0 && (
+            <p className="mb-1.5 flex items-center gap-1.5 text-xs text-muted-foreground">
+              Someday · {someday.length}
+            </p>
+          )}
           <div className="flex flex-col gap-1.5">
             {someday.map((t) => (
               <div key={t.id} className="flex items-center gap-2.5">

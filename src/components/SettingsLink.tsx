@@ -25,7 +25,7 @@ export function SettingsLink({
   className,
 }: {
   section: SettingsSection
-  empty: boolean
+  empty?: boolean
   hint?: string
   className?: string
 }) {

@@ -1,6 +1,7 @@
 import { useSuspenseQuery } from "@tanstack/react-query"
 import { Monitor, Plus, X } from "lucide-react"
 import { useState } from "react"
+import { SectionHeader } from "@/components/SectionHeader"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useOptimisticList } from "@/lib/optimistic"
@@ -42,9 +43,17 @@ export function ProjectsCard() {
 
   return (
     <section>
-      <p className="mb-2 flex items-center gap-1.5 text-xs text-muted-foreground">
-        <Monitor size={14} /> Projects · WIP limit 1 · tap to swap
-      </p>
+      <SectionHeader
+        id="projects"
+        icon={<Monitor size={14} />}
+        heading="Projects"
+        title="How to use projects"
+      >
+        <p>
+          Keep one project in progress at a time; the rest wait in the parking lot. Tap a parked
+          project to swap it in.
+        </p>
+      </SectionHeader>
       <div className="flex flex-col gap-1.5">
         {projects.map((p) => {
           const active = p.status === "in_progress"

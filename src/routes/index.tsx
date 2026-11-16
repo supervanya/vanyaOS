@@ -5,6 +5,7 @@ import {
   BookOpen,
   Flag,
   Layers,
+  ListChecks,
   Moon,
   Repeat,
   Settings as SettingsIcon,
@@ -13,7 +14,6 @@ import {
 } from "lucide-react"
 
 import { HabitChip } from "@/components/HabitChip"
-import { SettingsLink } from "@/components/SettingsLink"
 import { TopBar } from "@/components/TopBar"
 import { Skeleton } from "@/components/ui/skeleton"
 import type { LoadedConfig } from "@/features/config/api"
@@ -31,6 +31,7 @@ import { TaskBoard } from "@/features/tasks/TaskBoard"
 import { tasksQuery } from "@/features/tasks/queries"
 import { dayOfYear, defaultEntryDate, isoWeek } from "@/lib/dates"
 import { GoalBar } from "@/components/GoalBar"
+import { SectionHeader } from "@/components/SectionHeader"
 
 export const Route = createFileRoute("/")({
   // Before noon the app opens on /morning until today's morning is set or
@@ -79,10 +80,20 @@ function Dashboard() {
 }
 
 function Tasks() {
-  /* This week's 1-3-5 (the living task list) */
+  /* This week's important tasks (the living task list) */
   return (
-    <section className="mt-4">
-      <p className="mb-2 text-xs text-muted-foreground">This week's 1-3-5</p>
+    <section>
+      <SectionHeader
+        id="tasks"
+        icon={<ListChecks size={14} />}
+        heading="This week's important tasks"
+        title="How to use tasks"
+      >
+        <p>
+          You should protect your time and try to complete 1 large task during the week; about 3
+          medium-, and 5 small-sized.
+        </p>
+      </SectionHeader>
       <TaskBoard />
     </section>
   )
@@ -146,10 +157,27 @@ function HabitChips({ config, day }: { config: LoadedConfig; day: LoadedDay }) {
 
   return (
     <section>
-      <p className="mb-2 flex items-center gap-1.5 text-xs text-muted-foreground">
-        <Repeat size={14} /> Habits today
-        <SettingsLink section="habits" empty={!config.habits.length} className="ml-auto" />
-      </p>
+      <SectionHeader
+        id="habits"
+        icon={<Repeat size={14} />}
+        heading="Habits today"
+        title="How to use habits"
+        settings="habits"
+      >
+        <p>
+          Habits are a way to track your daily routines and develop consistency. Tap one when you've
+          done it today.
+        </p>
+      </SectionHeader>
+      {!config.habits.length && (
+        <p className="text-xs text-muted-foreground">
+          No habits. Go to{" "}
+          <Link to="/settings" hash="habits" className="underline hover:text-foreground">
+            settings
+          </Link>{" "}
+          to configure.
+        </p>
+      )}
       <div className="flex flex-wrap gap-2">
         {config.habits.map((h) => (
           <HabitChip
@@ -168,10 +196,27 @@ function GoalsGlance() {
   const { data: config } = useSuspenseQuery(configQuery)
   return (
     <section>
-      <p className="mb-2 flex items-center gap-1.5 text-xs text-muted-foreground">
-        <Flag size={14} /> Goals
-        <SettingsLink section="goals" empty={!config.goals.length} className="ml-auto" />
-      </p>
+      <SectionHeader
+        id="goals"
+        icon={<Flag size={14} />}
+        heading="Goals"
+        title="How to use goals"
+        settings="goals"
+      >
+        <p>
+          Goals are the few outcomes you're working toward. Each bar shows how far along you are;
+          update it in the settings.
+        </p>
+      </SectionHeader>
+      {!config.goals.length && (
+        <p className="text-xs text-muted-foreground">
+          No goals. Go to{" "}
+          <Link to="/settings" hash="goals" className="underline hover:text-foreground">
+            settings
+          </Link>{" "}
+          to configure.
+        </p>
+      )}
       {config.goals.map((g) => (
         <GoalBar key={g.id} goal={g} />
       ))}
