@@ -2,6 +2,8 @@ import { Link, type LinkProps } from "@tanstack/react-router"
 import { ArrowLeft, LayoutDashboard } from "lucide-react"
 import type { ReactNode } from "react"
 
+import { AppName } from "@/features/identity/AppName"
+
 import { TopBar } from "./TopBar"
 
 /**
@@ -25,7 +27,7 @@ export function PageHeader({
         className="flex items-center gap-1.5 text-sm font-semibold tracking-tight text-muted-foreground hover:text-foreground"
       >
         {back ? <ArrowLeft size={15} /> : <LayoutDashboard size={15} />}
-        {back?.label ?? "VanyaOS"}
+        {back?.label ?? <AppName />}
       </Link>
       {label && <span className="text-xs text-muted-foreground">{label}</span>}
       {children}

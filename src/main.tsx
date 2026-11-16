@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client"
 import { RouterProvider } from "@tanstack/react-router"
 
 import { trackLanding } from "@/features/entries/landing"
+import { nameQuery } from "@/features/identity/queries"
 import { onSignInOrOut } from "@/lib/auth"
 import { recoverFromPreloadError } from "@/lib/preloadRecovery"
 import { queryClient } from "@/lib/queryClient"
@@ -20,9 +21,11 @@ initSentry(router)
 trackLanding(router)
 
 // Signing in or out re-runs the root route's auth check (which redirects to or
-// from /login); signing out also drops everything cached for that account.
+// from /login); signing out also drops everything cached for that account, and
+// signing in drops the name read while nobody was signed in.
 onSignInOrOut((signedIn) => {
-  if (!signedIn) queryClient.clear()
+  if (signedIn) void queryClient.resetQueries({ queryKey: nameQuery.queryKey })
+  else queryClient.clear()
   void router.invalidate()
 })
 
