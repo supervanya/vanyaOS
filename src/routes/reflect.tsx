@@ -1,7 +1,7 @@
 import { useQuery, useSuspenseQuery } from "@tanstack/react-query"
 import { createFileRoute } from "@tanstack/react-router"
 import { useState } from "react"
-import { Moon, Flag, Repeat, Info } from "lucide-react"
+import { Moon, Flag, Gauge, Repeat, Info } from "lucide-react"
 import type { LoadedConfig } from "@/features/config/api"
 import { configQuery } from "@/features/config/queries"
 import { withMorning, type IntentionLived, type LoadedDay } from "@/features/entries/api"
@@ -190,8 +190,8 @@ function ReflectionDay({
           </span>
         )}
       </div>
-      <p className="mt-0.5 flex items-center text-[11px] text-muted-foreground">
-        Daily Metrics
+      <p className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
+        <Gauge size={14} /> Daily metrics
         <SettingsLink section="metrics" empty={!config.metrics.length} className="ml-auto" />
       </p>
 
@@ -249,7 +249,7 @@ function ReflectionDay({
           rows={3}
           value={entry.reflection}
           onChange={(ev) => setReflection(ev.target.value)}
-          placeholder="Verbal reflection: how was today? (copied out with your metrics)"
+          placeholder="Verbal reflection: how was today?"
           className="w-full resize-none overflow-hidden rounded-lg border border-input bg-input/30 p-3 text-base outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
         />
       </section>

@@ -1,4 +1,3 @@
-import { Activity, Lightbulb, Moon, Target } from "lucide-react"
 import { groupMetrics, type Metric } from "@/lib/config"
 import { MetricSlider } from "./MetricSlider"
 
@@ -24,18 +23,7 @@ export function MetricGroups({
 
   return groups.map(({ group, metrics: members, inverted }) => (
     <section key={group} className="mt-5">
-      <p
-        className={`mb-3 flex items-center gap-1.5 text-xs ${inverted ? "text-destructive" : "text-muted-foreground"}`}
-      >
-        {inverted ? (
-          <Activity size={14} />
-        ) : group === "Stimulation" ? (
-          <Lightbulb size={14} />
-        ) : group === "Recovery" ? (
-          <Moon size={14} />
-        ) : (
-          <Target size={14} />
-        )}
+      <p className={`mb-3 text-xs ${inverted ? "text-destructive" : "text-muted-foreground"}`}>
         {group}
         {inverted ? " · 0 is best" : ""}
       </p>
