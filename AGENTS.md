@@ -24,6 +24,15 @@ Git hooks (Lefthook, installed by `bun install`) lint, format and typecheck ever
 | `src/lib/` | Generic helpers only: Supabase client, auth, dates, parsing, errors, the query client. `database.types.ts` is generated — never edit it. |
 | `supabase/` | Migrations and the `ai-coach` Edge Function (Deno, not part of the Vite project). |
 
+## Less code first
+
+The owner reads every line of this codebase, and it has grown past easy reading. Every PR should leave it smaller or simpler where it can:
+
+- Before adding code, look for a fix that deletes code or fixes the cause upstream (a dependency bump, a built-in option).
+- No new abstractions, helpers or config for a single use. Three similar lines beat a premature helper.
+- Code you notice could go, but that's out of scope, becomes an issue.
+- Say in the PR body how many lines it adds and removes.
+
 ## Conventions
 
 How to write React here — data loading, mutations, effects, components — is in [docs/conventions/react.md](docs/conventions/react.md). Read it before touching a component. The short version:
