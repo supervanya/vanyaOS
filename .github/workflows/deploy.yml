@@ -97,6 +97,11 @@ jobs:
           # Set via `gh variable set` (repo Settings > Secrets and variables > Actions > Variables).
           VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
           VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}
+          # Sentry: the DSN is public (a repo variable); the auth token, which
+          # uploads source maps, is a secret. Either unset just skips that part.
+          VITE_SENTRY_DSN: ${{ vars.VITE_SENTRY_DSN }}
+          VITE_SENTRY_RELEASE: ${{ github.sha }}
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
       - name: SPA fallback + .nojekyll
         run: |
           cp dist/index.html dist/404.html
