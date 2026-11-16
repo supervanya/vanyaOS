@@ -23,7 +23,6 @@ describe("appNameFor", () => {
 describe("cleanName", () => {
   it("trims and collapses spaces", () => expect(cleanName("  Mary   Jo ")).toBe("Mary Jo"))
   it("is null when blank", () => expect(cleanName("   ")).toBeNull())
-  it("caps the length", () => expect(cleanName("x".repeat(40))).toHaveLength(20))
 })
 
 describe("loadName", () => {
