@@ -13,6 +13,8 @@ pre-commit:
         jobs:
           - name: lint
             glob: "*.{js,jsx,mjs,cjs,ts,tsx}"
+            # Oxlint ignores it and exits 1 when it's the only file passed.
+            exclude: ["src/routeTree.gen.ts"]
             run: bunx oxlint --fix --report-unused-disable-directives-severity=error {staged_files}
             stage_fixed: true
           - name: format
