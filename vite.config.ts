@@ -4,7 +4,6 @@ import viteReact from "@vitejs/plugin-react"
 import tailwindcss from "@tailwindcss/vite"
 import { VitePWA } from "vite-plugin-pwa"
 import { sentryVitePlugin } from "@sentry/vite-plugin"
-import { MANIFEST } from "./src/features/identity/manifest"
 
 // GitHub Pages serves this project site at https://supervanya.github.io/vanyaOS/
 // so production assets/routes live under /vanyaOS/. Dev stays at / for the LAN preview.
@@ -44,8 +43,26 @@ export default defineConfig(({ command }) => ({
       // a phone's Home Screen from the LAN preview opens standalone.
       devOptions: { enabled: true },
       includeAssets: ["favicon.ico", "logo192.png", "logo512.png"],
-      // Under the default name; AppIdentity swaps in the account's own at runtime.
-      manifest: MANIFEST,
+      manifest: {
+        // The default name: the manifest is a static file, so it can't carry
+        // the account's own. AppIdentity sets that on the page itself.
+        name: "MyOS",
+        short_name: "MyOS",
+        description: "Evening reflection — habits, wellbeing, goals.",
+        theme_color: "#0b0b0f",
+        background_color: "#0b0b0f",
+        display: "standalone",
+        icons: [
+          { src: "logo192.png", sizes: "192x192", type: "image/png" },
+          { src: "logo512.png", sizes: "512x512", type: "image/png" },
+          {
+            src: "logo512.png",
+            sizes: "512x512",
+            type: "image/png",
+            purpose: "maskable",
+          },
+        ],
+      },
     }),
     // Uploads source maps to Sentry so production stack traces resolve to the
     // original source. Needs the SENTRY_AUTH_TOKEN secret; without it (local

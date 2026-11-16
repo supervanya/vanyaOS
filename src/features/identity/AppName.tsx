@@ -1,7 +1,6 @@
 import { useQuery } from "@tanstack/react-query"
 import { useEffect } from "react"
 import { appNameFor } from "./api"
-import { manifestFor } from "./manifest"
 import { nameQuery } from "./queries"
 
 /**
@@ -21,12 +20,9 @@ export function AppName() {
 }
 
 /**
- * Puts the app's name where the browser reads it on install: the tab title,
- * the iOS Home Screen title, and the web app manifest. Rendered once, in the
- * root layout.
- *
- * Only new installs pick up a new name. iOS never renames a Home Screen app;
- * Chrome may, after its own periodic manifest check.
+ * Puts the app's name in the tab title and the iOS Home Screen title. Rendered
+ * once, in the root layout. The web app manifest is a static file and keeps
+ * the default name. iOS never renames an app already on the Home Screen.
  */
 export function AppIdentity() {
   const name = useAppName()
@@ -34,22 +30,6 @@ export function AppIdentity() {
   useEffect(() => {
     document.title = name
     document.querySelector('meta[name="apple-mobile-web-app-title"]')?.setAttribute("content", name)
-
-    // The manifest is a static file on GitHub Pages, so swap the <link> to a
-    // per-account copy. Absent in tests, where vite-plugin-pwa doesn't run.
-    const link = document.querySelector<HTMLLinkElement>('link[rel="manifest"]')
-    if (!link) return
-    const staticHref = link.href
-    const appUrl = new URL(import.meta.env.BASE_URL, location.origin).href
-    const blob = new Blob([JSON.stringify(manifestFor(name, appUrl))], {
-      type: "application/manifest+json",
-    })
-    const blobHref = URL.createObjectURL(blob)
-    link.href = blobHref
-    return () => {
-      link.href = staticHref
-      URL.revokeObjectURL(blobHref)
-    }
   }, [name])
 
   return null
