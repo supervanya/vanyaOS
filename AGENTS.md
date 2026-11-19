@@ -22,6 +22,7 @@ Git hooks (Lefthook, installed by `bun install`) lint, format and typecheck ever
 | `src/features/<name>/` | Everything for one feature: `api.ts` (Supabase calls, row mapping), `queries.ts` (`queryOptions`), its components and hooks, and their tests. |
 | `src/components/` | UI shared by several features. `ui/` is shadcn/ui. |
 | `src/lib/` | Generic helpers only: Supabase client, auth, dates, parsing, errors, the query client. `database.types.ts` is generated — never edit it. |
+| `watch.html` | The Apple Watch habit page: plain HTML + one inline script, no React or imports (the watch can't load the bundle). |
 | `supabase/` | Migrations and the `ai-coach` Edge Function (Deno, not part of the Vite project). |
 
 ## Less code first

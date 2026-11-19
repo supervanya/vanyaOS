@@ -31,7 +31,11 @@ export default defineConfig(({ command }) => ({
   },
   // The repo is public: real file names and lines in production stack traces
   // are worth more than hiding the source.
-  build: { sourcemap: true },
+  build: {
+    sourcemap: true,
+    // The no-bundle Apple Watch page is its own entry so Vite fills in its env values.
+    rolldownOptions: { input: ["index.html", "watch.html"] },
+  },
   plugins: [
     // file-based routing (src/routes) without the TanStack Start server layer
     tanstackRouter({ target: "react", autoCodeSplitting: true }),
