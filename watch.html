@@ -13,8 +13,9 @@
     signs in both. A failed load or sign-in shows the form with the reason.
   - Day: Morning is today, as /morning. Evening and Habits use the evening's
     day: before 4am it's still yesterday, as /reflect (src/lib/dates.ts).
-  - Morning saves don't check the app's morning lock (save_morning refuses once
-    the evening is started); the watch writes the values directly.
+  - Morning lock: once that day's evening is started (eveningStarted in
+    src/features/entries/lock.ts, the rule save_morning enforces), the morning
+    sliders are read-only, as on /morning.
   - Saves upsert that day's `entries` row first. A habit tap then writes every
     habit's state, so untapped habits read as missed in Trends, as the evening
     page saves them. A metric writes only its own value; ✕ deletes it (unset).
@@ -172,6 +173,13 @@
       .bars i.on {
         background: var(--on);
       }
+      /* A locked morning: values shown, controls hidden. */
+      .locked button {
+        visibility: hidden;
+      }
+      .locked .label::after {
+        content: " 🔒";
+      }
       .reset {
         width: 30px;
         height: 30px;
@@ -302,7 +310,7 @@
       }
 
       // `values` is that day's { metric id: value }; a value is absent until set.
-      function metricCard(m, date, values) {
+      function metricCard(m, date, values, locked) {
         let value = values[m.id]
         const card = el("section", "card")
         const minus = el("button", "step", "−")
@@ -318,6 +326,7 @@
         }
         const reset = el("button", "reset", "✕")
         card.append(el("div", "label", m.label), row, bars, reset)
+        card.classList.toggle("locked", locked)
 
         const paint = () => {
           shown.textContent = value ?? "–"
@@ -333,7 +342,7 @@
           shown.classList.add("bump")
         }
         const set = (next) => {
-          if (next === value) return
+          if (locked || next === value) return
           value = values[m.id] = next
           paint()
           save(async () => {
@@ -368,19 +377,30 @@
               TODAY +
               "," +
               DAY +
-              ")&select=id,entry_date,entry_habits(habit_id,done),entry_metric_values(metric_id,value)",
+              ")&select=id,entry_date,reflection,intention_lived," +
+              "entry_habits(habit_id,done),entry_metric_values(metric_id,value)",
           ),
         ])
         const values = { [TODAY]: {}, [DAY]: {} }
         const done = {}
+        let today // the morning's row, for its lock
         for (const e of entries) {
+          if (e.entry_date === TODAY) today = e
           entryIds[e.entry_date] = e.id
           for (const v of e.entry_metric_values) values[e.entry_date][v.metric_id] = v.value
           if (e.entry_date === DAY) for (const h of e.entry_habits) done[h.habit_id] = h.done
         }
-        data = { habits, metrics, values, done }
+        data = { habits, metrics, values, done, today }
         render()
       }
+
+      // The morning is locked once its day's evening is started: a non-blank
+      // reflection, a lived rating, or any evening metric value. Same rule as
+      // eveningStarted (src/features/entries/lock.ts) and save_morning.
+      const morningLocked = () =>
+        /[^ ]/.test(data.today?.reflection ?? "") ||
+        data.today?.intention_lived != null ||
+        data.metrics.some((m) => m.timing === "evening" && data.values[TODAY][m.id] !== undefined)
 
       const VIEWS = { morning: "#f59e0b", evening: "#818cf8", habits: "#4ade80" }
 
@@ -404,7 +424,9 @@
             ? data.habits.map((h) => habitButton(h, data))
             : data.metrics
                 .filter((m) => m.timing === view)
-                .map((m) => metricCard(m, date, data.values[date]))
+                .map((m) =>
+                  metricCard(m, date, data.values[date], view === "morning" && morningLocked()),
+                )
         const back = el("a", "back", "‹")
         back.href = "#"
         document.body.replaceChildren(
