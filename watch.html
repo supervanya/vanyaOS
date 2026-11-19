@@ -1,7 +1,8 @@
 <!doctype html>
 <!--
-  Apple Watch: tick today's habits and set the evening sliders. index.html sends
-  screens under 250px wide here.
+  Apple Watch: a menu of Morning sliders, Evening sliders and Habits, each its
+  own view (#morning, #evening, #habits). index.html sends screens under 250px
+  wide here.
 
   Deliberately outside the React app: the watch's WebKit can't load the app
   bundle, so this page is plain HTML with one inline script that calls Supabase's
@@ -10,8 +11,11 @@
 
   - Session: stored under supabase-js's key, so signing in here or in the app
     signs in both. A failed load or sign-in shows the form with the reason.
-  - Day: before 4am it's still yesterday, as in src/lib/dates.ts.
-  - Saves upsert the day's `entries` row first. A habit tap then writes every
+  - Day: Morning is today, as /morning. Evening and Habits use the evening's
+    day: before 4am it's still yesterday, as /reflect (src/lib/dates.ts).
+  - Morning saves don't check the app's morning lock (save_morning refuses once
+    the evening is started); the watch writes the values directly.
+  - Saves upsert that day's `entries` row first. A habit tap then writes every
     habit's state, so untapped habits read as missed in Trends, as the evening
     page saves them. A metric writes only its own value; ✕ deletes it (unset).
   - Saves run one at a time, so quick taps land in order. A failed save reloads
@@ -23,7 +27,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="disabled-adaptations" content="watch" />
-    <title>Evening</title>
+    <title>Reflect</title>
     <style>
       html {
         scroll-snap-type: y mandatory;
@@ -50,6 +54,7 @@
       }
       /* One screen per habit or metric. A black border, not margin, so each stays
          exactly one screen tall for the snapping. */
+      .nav,
       .habit,
       .card,
       p {
@@ -67,6 +72,27 @@
         align-items: center;
         justify-content: center;
         text-align: center;
+      }
+      .nav {
+        color: #000;
+        text-decoration: none;
+        font-size: 24px;
+      }
+      /* Back to the menu: a small circle in the bottom-left corner, clear of the
+         label above and the ✕ in the middle. */
+      .back {
+        position: fixed;
+        bottom: 12px;
+        left: 8px;
+        z-index: 1;
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        background: #444c;
+        color: #fff;
+        text-align: center;
+        line-height: 26px;
+        text-decoration: none;
       }
       .habit:active {
         transform: scale(0.93);
@@ -177,13 +203,13 @@
       if (/\.local$|^localhost$|^127\./.test(ENV_URL.hostname)) ENV_URL.hostname = location.hostname
       const SB = ENV_URL.origin
       let session = JSON.parse(localStorage.getItem(STORE) || "null")
-      const d = new Date(Date.now() - 4 * 3600e3)
-      const DAY =
-        d.getFullYear() +
-        "-" +
-        String(d.getMonth() + 1).padStart(2, "0") +
-        "-" +
-        String(d.getDate()).padStart(2, "0")
+      const isoDay = (ms) => {
+        const d = new Date(ms)
+        const pad = (n) => String(n).padStart(2, "0")
+        return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate())
+      }
+      const TODAY = isoDay(Date.now()) // the morning's day
+      const DAY = isoDay(Date.now() - 4 * 3600e3) // the evening's and habits' day
 
       async function auth(body, grant) {
         const r = await fetch(SB + "/auth/v1/token?grant_type=" + grant, {
@@ -223,16 +249,16 @@
           body: JSON.stringify(rows),
         })
 
-      let entryId
-      async function ensureEntry() {
-        entryId ??= (
+      const entryIds = {} // by date
+      async function ensureEntry(date) {
+        entryIds[date] ??= (
           await api("entries?on_conflict=user_id,entry_date&select=id", {
             method: "POST",
             headers: { Prefer: "resolution=merge-duplicates,return=representation" },
-            body: JSON.stringify({ user_id: session.user.id, entry_date: DAY }),
+            body: JSON.stringify({ user_id: session.user.id, entry_date: date }),
           })
         )[0].id
-        return entryId
+        return entryIds[date]
       }
 
       // Saves run one after another; a failed one resyncs from the server.
@@ -258,13 +284,13 @@
         return node
       }
 
-      function habitButton(h, habits, done) {
+      function habitButton(h, { habits, done }) {
         const b = el("button", "habit", h.label)
         b.classList.toggle("done", !!done[h.id])
         b.onclick = () => {
           b.classList.toggle("done", (done[h.id] = !done[h.id]))
           save(async () => {
-            const entry = await ensureEntry()
+            const entry = await ensureEntry(DAY)
             await upsert(
               "entry_habits",
               "entry_id,habit_id",
@@ -275,7 +301,9 @@
         return b
       }
 
-      function metricCard(m, value) {
+      // `values` is that day's { metric id: value }; a value is absent until set.
+      function metricCard(m, date, values) {
+        let value = values[m.id]
         const card = el("section", "card")
         const minus = el("button", "step", "−")
         const shown = el("div", "value")
@@ -291,7 +319,6 @@
         const reset = el("button", "reset", "✕")
         card.append(el("div", "label", m.label), row, bars, reset)
 
-        // `value` is undefined until set, like the evening page's sliders.
         const paint = () => {
           shown.textContent = value ?? "–"
           shown.classList.toggle("unset", value === undefined)
@@ -307,10 +334,10 @@
         }
         const set = (next) => {
           if (next === value) return
-          value = next
+          value = values[m.id] = next
           paint()
           save(async () => {
-            const entry = await ensureEntry()
+            const entry = await ensureEntry(date)
             await (value === undefined
               ? api("entry_metric_values?entry_id=eq." + entry + "&metric_id=eq." + m.id, {
                   method: "DELETE",
@@ -327,29 +354,65 @@
         return card
       }
 
+      // Loaded once, then each view is drawn from it. Saves update it in place.
+      let data
       async function load() {
-        const [habits, metrics, [entry]] = await Promise.all([
+        const [habits, metrics, entries] = await Promise.all([
           api("habits?archived=eq.false&order=sort_order&select=id,label"),
           api(
-            "metrics?archived=eq.false&timing=eq.evening&order=sort_order" +
-              "&select=id,label,scale,higher_is_better",
+            "metrics?archived=eq.false&order=sort_order" +
+              "&select=id,label,scale,higher_is_better,timing",
           ),
           api(
-            "entries?entry_date=eq." +
+            "entries?entry_date=in.(" +
+              TODAY +
+              "," +
               DAY +
-              "&select=id,entry_habits(habit_id,done),entry_metric_values(metric_id,value)",
+              ")&select=id,entry_date,entry_habits(habit_id,done),entry_metric_values(metric_id,value)",
           ),
         ])
-        entryId = entry?.id
+        const values = { [TODAY]: {}, [DAY]: {} }
         const done = {}
-        for (const h of entry?.entry_habits ?? []) done[h.habit_id] = h.done
-        const values = {}
-        for (const v of entry?.entry_metric_values ?? []) values[v.metric_id] = v.value
+        for (const e of entries) {
+          entryIds[e.entry_date] = e.id
+          for (const v of e.entry_metric_values) values[e.entry_date][v.metric_id] = v.value
+          if (e.entry_date === DAY) for (const h of e.entry_habits) done[h.habit_id] = h.done
+        }
+        data = { habits, metrics, values, done }
+        render()
+      }
+
+      const VIEWS = { morning: "#f59e0b", evening: "#818cf8", habits: "#4ade80" }
+
+      // The view is the URL hash, so the watch's back navigation returns to the menu.
+      function render() {
+        const view = location.hash.slice(1)
+        scrollTo(0, 0)
+        if (!(view in VIEWS)) {
+          return document.body.replaceChildren(
+            ...Object.entries(VIEWS).map(([id, color]) => {
+              const a = el("a", "nav", id[0].toUpperCase() + id.slice(1))
+              a.href = "#" + id
+              a.style.background = color
+              return a
+            }),
+          )
+        }
+        const date = view === "morning" ? TODAY : DAY
+        const cards =
+          view === "habits"
+            ? data.habits.map((h) => habitButton(h, data))
+            : data.metrics
+                .filter((m) => m.timing === view)
+                .map((m) => metricCard(m, date, data.values[date]))
+        const back = el("a", "back", "‹")
+        back.href = "#"
         document.body.replaceChildren(
-          ...habits.map((h) => habitButton(h, habits, done)),
-          ...metrics.map((m) => metricCard(m, values[m.id])),
+          back,
+          ...(cards.length ? cards : [el("p", "", "Nothing here")]),
         )
       }
+      addEventListener("hashchange", () => data && render())
 
       // Any failure shows the form with its reason ("Load failed" = unreachable).
       session ? load().catch(login) : login()
