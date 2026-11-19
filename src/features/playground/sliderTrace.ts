@@ -1,4 +1,4 @@
-import { classifySliderMove, TOUCH_SLOP } from "@/components/ui/slider"
+import { AXIS_MARGIN, classifySliderMove, TOUCH_SLOP } from "@/components/ui/slider"
 
 /** Observe the same pointer stream as the slider, including its replayed press. */
 export function recordSliderGestures(area: HTMLElement, save: (report: string) => void) {
@@ -13,7 +13,6 @@ export function recordSliderGestures(area: HTMLElement, save: (report: string) =
 
     const row = target.closest("fieldset")
     const slider = target.closest<HTMLElement>('[data-slot="slider"]')
-    const axisMargin = Number(slider?.dataset.touchAxisMargin ?? 0)
     const startValue = row?.dataset.value ?? "—"
     const initialScroll = window.scrollY
     const startTime = performance.now()
@@ -62,16 +61,17 @@ export function recordSliderGestures(area: HTMLElement, save: (report: string) =
         [
           `${row ? `Row ${row.dataset.row}` : "Between rows"} · ${outcome} · ${end || "interrupted"}${scrolled ? " · page scrolled" : ""}`,
           `${new Date().toISOString()} | ${mode} | ${navigator.userAgent}`,
-          `pointer=${down.pointerType} scrollLock=${row?.dataset.scrollLock ?? "—"} threshold=${TOUCH_SLOP}px axisMargin=${axisMargin}px value=${startValue} → ${row?.dataset.value ?? "—"}`,
+          `pointer=${down.pointerType} threshold=${TOUCH_SLOP}px axisMargin=${AXIS_MARGIN}px value=${startValue} → ${row?.dataset.value ?? "—"}`,
           ...lines,
           `${moves} moves; last move ${lastMove || "—"}; final scroll delta=${offset(window.scrollY - initialScroll)}px`,
         ].join("\n"),
       )
     }
     const complete = finish
-    // Observe after the experimental listener, including moves delivered before
-    // the pointer stream accepts the drag or after native scrolling takes over.
-    if (row?.dataset.scrollLock === "native") {
+    // Observe after the slider's own scroll lock (the row is its ancestor), including
+    // moves delivered before the pointer stream accepts the drag or after native
+    // scrolling takes over.
+    if (row) {
       let touchMoves = 0
       let afterCancel = 0
       let finger: number | undefined
@@ -115,7 +115,7 @@ export function recordSliderGestures(area: HTMLElement, save: (report: string) =
         lastMove = `dx=${offset(dx)} dy=${offset(dy)}`
         if (++moves <= 16) log(lastMove)
         if (!slider || (decision && decision !== "Undecided")) return
-        const phase = classifySliderMove(Math.abs(dx), Math.abs(dy), axisMargin)
+        const phase = classifySliderMove(Math.abs(dx), Math.abs(dy))
         if (phase === "pending" || (phase === "undecided" && decision)) return
         decision = { undecided: "Undecided", sliding: "Horizontal", ignored: "Vertical" }[phase]
         log(`${decision} at ${lastMove}`)

@@ -7,7 +7,6 @@ import confetti from "canvas-confetti"
 import { cn } from "@/lib/utils"
 import { MetricSlider } from "@/features/entries/MetricSlider"
 import { SliderDiagnostics } from "@/features/playground/SliderDiagnostics"
-import { lockSliderScroll } from "@/features/playground/lockSliderScroll"
 
 export const Route = createFileRoute("/playground")({ component: Playground })
 
@@ -302,19 +301,12 @@ const VARIANTS: { name: string; desc: string; el: React.ReactNode }[] = [
 function SliderTestRow({ row, initialValue }: { row: number; initialValue: number | undefined }) {
   const [value, setValue] = useState(initialValue)
   return (
-    <fieldset
-      ref={lockSliderScroll}
-      data-row={row}
-      data-scroll-lock="native"
-      data-value={value ?? "unset"}
-      className="max-w-full px-6 py-4"
-    >
+    <fieldset data-row={row} data-value={value ?? "unset"} className="max-w-full px-6 py-4">
       <legend className="text-sm font-medium">
         Row {row} · {value ?? "Unset"}
       </legend>
       <MetricSlider
         value={value}
-        touchAxisMargin={1}
         max={100}
         tone={initialValue === undefined ? "danger" : "success"}
         onValueChange={setValue}

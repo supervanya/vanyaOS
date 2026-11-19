@@ -43,7 +43,6 @@ export function MetricSlider({
   onValueChange,
   tone,
   className,
-  touchAxisMargin = 0,
 }: {
   value: number | undefined
   min?: number
@@ -51,7 +50,6 @@ export function MetricSlider({
   onValueChange: (value: number | undefined) => void
   tone: "success" | "danger"
   className?: string
-  touchAxisMargin?: number
 }) {
   const unset = value === undefined
   // Per press: whether it started on a set `min`, and whether it then moved.
@@ -71,7 +69,6 @@ export function MetricSlider({
       min={min}
       max={max}
       step={1}
-      touchAxisMargin={touchAxisMargin}
       // Runs before the slider handles the same event, so a tap further along
       // the track still wins: min first, then the tapped value.
       onPointerDown={() => {
