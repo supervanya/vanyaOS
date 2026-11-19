@@ -1,6 +1,7 @@
 <!doctype html>
 <!--
-  Apple Watch: tick today's habits. index.html sends screens under 250px wide here.
+  Apple Watch: tick today's habits and set the evening sliders. index.html sends
+  screens under 250px wide here.
 
   Deliberately outside the React app: the watch's WebKit can't load the app
   bundle, so this page is plain HTML with one inline script that calls Supabase's
@@ -10,8 +11,11 @@
   - Session: stored under supabase-js's key, so signing in here or in the app
     signs in both. A failed load or sign-in shows the form with the reason.
   - Day: before 4am it's still yesterday, as in src/lib/dates.ts.
-  - Saving a tap upserts the day's `entries` row, then every habit's state, so
-    untapped habits read as missed in Trends, as the evening page saves them.
+  - Saves upsert the day's `entries` row first. A habit tap then writes every
+    habit's state, so untapped habits read as missed in Trends, as the evening
+    page saves them. A metric writes only its own value; ✕ deletes it (unset).
+  - Saves run one at a time, so quick taps land in order. A failed save reloads
+    the page's state from the server.
 -->
 
 <html lang="en">
@@ -19,7 +23,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="disabled-adaptations" content="watch" />
-    <title>Habits</title>
+    <title>Evening</title>
     <style>
       html {
         scroll-snap-type: y mandatory;
@@ -32,31 +36,39 @@
           600 20px -apple-system,
           sans-serif;
       }
-      button,
+      button {
+        border: 0;
+        padding: 0;
+        font: inherit;
+        color: inherit;
+        transition:
+          transform 0.15s,
+          background-color 0.25s;
+      }
+      button:active {
+        transform: scale(0.9);
+      }
+      /* One screen per habit or metric. A black border, not margin, so each stays
+         exactly one screen tall for the snapping. */
+      .habit,
+      .card,
       p {
         display: flex;
         width: 100%;
         height: 100vh;
         box-sizing: border-box;
         margin: 0;
-        /* A black border, not margin, so each button stays exactly one screen tall. */
         border: 6px solid #000;
         border-radius: 30px;
-        background-clip: padding-box;
+        background: #222 padding-box;
         padding: 12px;
-        transition:
-          transform 0.15s,
-          background-color 0.25s;
         scroll-snap-align: start;
         scroll-snap-stop: always;
         align-items: center;
         justify-content: center;
         text-align: center;
-        font: inherit;
-        color: inherit;
-        background: #222;
       }
-      button:active {
+      .habit:active {
         transform: scale(0.93);
       }
       .done {
@@ -72,6 +84,67 @@
           transform: scale(1.06);
         }
       }
+
+      /* Metric card: label, then − value +, then the 1…scale bars, then ✕. */
+      .card {
+        flex-direction: column;
+        justify-content: space-between;
+        --on: #16a34a;
+      }
+      .card.lower {
+        --on: #dc2626; /* "0 is best" metrics, as on the evening page */
+      }
+      .label {
+        font-size: 15px;
+        color: #aaa;
+      }
+      .row {
+        display: flex;
+        width: 100%;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .step {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: #444;
+        font-size: 26px;
+        line-height: 1;
+      }
+      .value {
+        font-size: 40px;
+      }
+      .value.unset {
+        color: #555; /* a grey dash, so it doesn't read as the − button */
+      }
+      .value.bump {
+        animation: pop 0.25s ease-out;
+      }
+      .bars {
+        display: flex;
+        gap: 4px;
+        align-items: flex-end;
+        height: 24px;
+      }
+      .bars i {
+        width: 12px;
+        border-radius: 3px;
+        background: #444;
+        transition: background-color 0.2s;
+      }
+      .bars i.on {
+        background: var(--on);
+      }
+      .reset {
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        background: #333;
+        font-size: 14px;
+        color: #aaa;
+      }
+
       form {
         display: flex;
         flex-direction: column;
@@ -84,7 +157,7 @@
     </style>
   </head>
   <body>
-    <p id="msg">Loading…</p>
+    <p>Loading…</p>
     <script>
       const ENV_URL = new URL("%VITE_SUPABASE_URL%"),
         KEY = "%VITE_SUPABASE_PUBLISHABLE_KEY%"
@@ -133,9 +206,32 @@
         return text ? JSON.parse(text) : null
       }
 
+      const upsert = (table, conflict, rows) =>
+        api(table + "?on_conflict=" + conflict, {
+          method: "POST",
+          headers: { Prefer: "resolution=merge-duplicates" },
+          body: JSON.stringify(rows),
+        })
+
+      let entryId
+      async function ensureEntry() {
+        entryId ??= (
+          await api("entries?on_conflict=user_id,entry_date&select=id", {
+            method: "POST",
+            headers: { Prefer: "resolution=merge-duplicates,return=representation" },
+            body: JSON.stringify({ user_id: session.user.id, entry_date: DAY }),
+          })
+        )[0].id
+        return entryId
+      }
+
+      // Saves run one after another; a failed one resyncs from the server.
+      let queue = Promise.resolve()
+      const save = (write) => (queue = queue.then(write).catch(() => load().catch(login)))
+
       function login(error) {
         document.body.innerHTML = `<form><input name=e type=email placeholder=Email>
-          <input name=p type=password placeholder=Password><button style="height:auto">Sign in</button>
+          <input name=p type=password placeholder=Password><button>Sign in</button>
           <small>${error ? error + " · " + SB : ""}</small></form>`
         document.forms[0].onsubmit = (e) => {
           e.preventDefault()
@@ -145,43 +241,99 @@
         }
       }
 
+      function el(tag, className, text) {
+        const node = document.createElement(tag)
+        node.className = className
+        if (text !== undefined) node.textContent = text
+        return node
+      }
+
+      function habitButton(h, habits, done) {
+        const b = el("button", "habit", h.label)
+        b.classList.toggle("done", !!done[h.id])
+        b.onclick = () => {
+          b.classList.toggle("done", (done[h.id] = !done[h.id]))
+          save(async () => {
+            const entry = await ensureEntry()
+            await upsert(
+              "entry_habits",
+              "entry_id,habit_id",
+              habits.map((x) => ({ entry_id: entry, habit_id: x.id, done: !!done[x.id] })),
+            )
+          })
+        }
+        return b
+      }
+
+      function metricCard(m, value) {
+        const card = el("section", m.higher_is_better ? "card" : "card lower")
+        const minus = el("button", "step", "−")
+        const shown = el("div", "value")
+        const plus = el("button", "step", "+")
+        const row = el("div", "row")
+        row.append(minus, shown, plus)
+        const bars = el("div", "bars")
+        for (let i = 1; i <= m.scale; i++) {
+          const bar = el("i", "")
+          bar.style.height = (i / m.scale) * 100 + "%"
+          bars.append(bar)
+        }
+        const reset = el("button", "reset", "✕")
+        card.append(el("div", "label", m.label), row, bars, reset)
+
+        // `value` is undefined until set, like the evening page's sliders.
+        const paint = () => {
+          shown.textContent = value ?? "–"
+          shown.classList.toggle("unset", value === undefined)
+          bars.childNodes.forEach((bar, i) => bar.classList.toggle("on", i < (value ?? 0)))
+          shown.classList.remove("bump")
+          void shown.offsetWidth // restart the bump animation
+          shown.classList.add("bump")
+        }
+        const set = (next) => {
+          if (next === value) return
+          value = next
+          paint()
+          save(async () => {
+            const entry = await ensureEntry()
+            await (value === undefined
+              ? api("entry_metric_values?entry_id=eq." + entry + "&metric_id=eq." + m.id, {
+                  method: "DELETE",
+                })
+              : upsert("entry_metric_values", "entry_id,metric_id", [
+                  { entry_id: entry, metric_id: m.id, value },
+                ]))
+          })
+        }
+        minus.onclick = () => set(Math.max(0, (value ?? 1) - 1))
+        plus.onclick = () => set(Math.min(m.scale, (value ?? 0) + 1))
+        reset.onclick = () => set(undefined)
+        paint()
+        return card
+      }
+
       async function load() {
-        const [habits, [entry]] = await Promise.all([
+        const [habits, metrics, [entry]] = await Promise.all([
           api("habits?archived=eq.false&order=sort_order&select=id,label"),
-          api("entries?entry_date=eq." + DAY + "&select=id,entry_habits(habit_id,done)"),
+          api(
+            "metrics?archived=eq.false&timing=eq.evening&order=sort_order" +
+              "&select=id,label,scale,higher_is_better",
+          ),
+          api(
+            "entries?entry_date=eq." +
+              DAY +
+              "&select=id,entry_habits(habit_id,done),entry_metric_values(metric_id,value)",
+          ),
         ])
+        entryId = entry?.id
         const done = {}
         for (const h of entry?.entry_habits ?? []) done[h.habit_id] = h.done
-        let entryId = entry?.id
-        document.body.innerHTML = ""
-        for (const h of habits) {
-          const b = document.createElement("button")
-          b.textContent = h.label
-          const flip = () => b.classList.toggle("done", (done[h.id] = !done[h.id]))
-          b.classList.toggle("done", !!done[h.id])
-          b.onclick = async () => {
-            flip()
-            try {
-              entryId ??= (
-                await api("entries?on_conflict=user_id,entry_date&select=id", {
-                  method: "POST",
-                  headers: { Prefer: "resolution=merge-duplicates,return=representation" },
-                  body: JSON.stringify({ user_id: session.user.id, entry_date: DAY }),
-                })
-              )[0].id
-              await api("entry_habits?on_conflict=entry_id,habit_id", {
-                method: "POST",
-                headers: { Prefer: "resolution=merge-duplicates" },
-                body: JSON.stringify(
-                  habits.map((x) => ({ entry_id: entryId, habit_id: x.id, done: !!done[x.id] })),
-                ),
-              })
-            } catch {
-              flip() // undo: the tap didn't save
-            }
-          }
-          document.body.append(b)
-        }
+        const values = {}
+        for (const v of entry?.entry_metric_values ?? []) values[v.metric_id] = v.value
+        document.body.replaceChildren(
+          ...habits.map((h) => habitButton(h, habits, done)),
+          ...metrics.map((m) => metricCard(m, values[m.id])),
+        )
       }
 
       // Any failure shows the form with its reason ("Load failed" = unreachable).
