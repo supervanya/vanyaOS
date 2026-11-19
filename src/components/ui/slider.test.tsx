@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { createRef } from "react"
 import { cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { Slider } from "./slider"
@@ -59,7 +60,86 @@ const finger = (clientX: number, clientY: number) => ({
   clientY,
 })
 
+/** Sends a one-finger touchmove and reports whether the slider cancelled it (stopping the scroll). */
+function touchMoveBlocked(el: Element) {
+  const move = new Event("touchmove", { bubbles: true, cancelable: true })
+  Object.defineProperty(move, "touches", { value: [{}] })
+  el.dispatchEvent(move)
+  return move.defaultPrevented
+}
+
 describe("Slider, touch", () => {
+  it("forwards object and callback refs alongside the scroll lock", () => {
+    const ref = createRef<HTMLSpanElement>()
+    const detach = vi.fn<() => void>()
+    const callback = vi.fn<(node: HTMLSpanElement | null) => () => void>(() => detach)
+    const { rerender, unmount } = render(<Slider ref={ref} defaultValue={[10]} />)
+    const root = ref.current
+    if (!root) throw new Error("slider ref was not attached")
+    expect(root.getAttribute("data-slot")).toBe("slider")
+
+    rerender(<Slider ref={callback} defaultValue={[10]} />)
+    expect(ref.current).toBeNull()
+    expect(callback).toHaveBeenCalledWith(root)
+    fireEvent.pointerDown(root, finger(60, 10))
+    fireEvent.pointerMove(root, finger(70, 10))
+    expect(touchMoveBlocked(root)).toBe(true)
+    unmount()
+    expect(detach).toHaveBeenCalledTimes(1)
+    expect(touchMoveBlocked(root)).toBe(false)
+  })
+
+  it("leaves disabled gestures to the page, including when disabled mid-drag", () => {
+    const change = vi.fn<(values: number[]) => void>()
+    const commit = vi.fn<(values: number[]) => void>()
+    const props = { defaultValue: [10], onValueChange: change, onValueCommit: commit }
+    const { rerender } = render(<Slider disabled {...props} />)
+    const thumb = screen.getByRole("slider")
+    fireEvent.pointerDown(thumb, finger(10, 10))
+    fireEvent.pointerMove(thumb, finger(30, 11))
+    expect(touchMoveBlocked(thumb)).toBe(false)
+    rerender(<Slider {...props} />)
+    fireEvent.pointerMove(thumb, finger(35, 11))
+    fireEvent.pointerUp(thumb, finger(35, 11))
+    expect(change).not.toHaveBeenCalled()
+
+    fireEvent.pointerDown(thumb, finger(10, 10))
+    fireEvent.pointerMove(thumb, finger(40, 11))
+    fireEvent.pointerMove(thumb, finger(45, 11))
+    expect(touchMoveBlocked(thumb)).toBe(true)
+    rerender(<Slider disabled {...props} />)
+    expect(touchMoveBlocked(thumb)).toBe(false)
+    fireEvent.pointerCancel(thumb, finger(45, 11))
+    expect(commit).not.toHaveBeenCalled()
+  })
+
+  it("waits through a tied start on the thumb and accepts the next horizontal move", () => {
+    const { thumb, onPointerDown, onValueChange, onValueCommit } = renderSlider()
+    fireEvent.pointerDown(thumb, finger(10, 10))
+    fireEvent.pointerMove(thumb, finger(12, 12))
+    expect(onPointerDown).not.toHaveBeenCalled()
+    fireEvent.pointerMove(thumb, finger(21.33, 15))
+    expect(onPointerDown).toHaveBeenCalledTimes(1)
+    fireEvent.pointerMove(thumb, finger(28.67, 15))
+    fireEvent.pointerUp(thumb, finger(28.67, 15))
+    expect(onValueChange).toHaveBeenLastCalledWith([29])
+    expect(onValueCommit).toHaveBeenCalledTimes(1)
+  })
+
+  it.each([0, 12])(
+    "leaves the value alone when a near tie ends or turns vertical (%i px)",
+    (dy) => {
+      const { track, onPointerDown, onValueChange, onValueCommit } = renderSlider()
+      fireEvent.pointerDown(track, finger(60, 10))
+      fireEvent.pointerMove(track, finger(62.33, 12))
+      if (dy) fireEvent.pointerMove(track, finger(63, 10 + dy))
+      fireEvent.pointerUp(track, finger(63, 12 + dy))
+      expect(onPointerDown).not.toHaveBeenCalled()
+      expect(onValueChange).not.toHaveBeenCalled()
+      expect(onValueCommit).not.toHaveBeenCalled()
+    },
+  )
+
   it("does nothing when a finger lands on the track", () => {
     const { track, thumb, onPointerDown, onValueChange } = renderSlider()
     fireEvent.pointerDown(track, finger(60, 10))
@@ -93,7 +173,7 @@ describe("Slider, touch", () => {
   it("slides once the finger moves along the track, and commits on release", () => {
     const { track, thumb, onPointerDown, onValueCommit } = renderSlider()
     fireEvent.pointerDown(track, finger(60, 10))
-    fireEvent.pointerMove(track, finger(63, 11))
+    fireEvent.pointerMove(track, finger(61, 11))
     expect(thumb.getAttribute("aria-valuenow")).toBe("10")
     fireEvent.pointerMove(track, finger(70, 12))
     expect(onPointerDown).toHaveBeenCalledTimes(1)
@@ -116,6 +196,23 @@ describe("Slider, touch", () => {
     expect(onValueChange).toHaveBeenCalledTimes(1)
     expect(onValueCommit).toHaveBeenCalledTimes(1)
     expect(onValueCommit).toHaveBeenCalledWith([61])
+  })
+
+  it("stops the page from scrolling only while sliding", () => {
+    const { track } = renderSlider()
+    fireEvent.pointerDown(track, finger(60, 10))
+    expect(touchMoveBlocked(track)).toBe(false)
+    fireEvent.pointerMove(track, finger(70, 10))
+    expect(touchMoveBlocked(track)).toBe(true)
+    fireEvent.pointerUp(track, finger(70, 10))
+    expect(touchMoveBlocked(track)).toBe(false)
+  })
+
+  it("never stops a vertical swipe from scrolling the page", () => {
+    const { track } = renderSlider()
+    fireEvent.pointerDown(track, finger(60, 10))
+    fireEvent.pointerMove(track, finger(61, 20))
+    expect(touchMoveBlocked(track)).toBe(false)
   })
 
   it("commits what a slide reached if the browser cancels it", () => {
