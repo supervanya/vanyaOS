@@ -3,6 +3,8 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <!-- Without this, watchOS lays the page out at a fake 320px width. -->
+    <meta name="disabled-adaptations" content="watch" />
     <meta name="theme-color" content="#0b0b0f" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -19,6 +21,12 @@
   </head>
   <body>
     <div id="app"></div>
+    <!-- Apple Watch (any screen under 250px wide) gets the bundle-free habit page,
+        watch.html. Runs before the app bundle, so the watch never loads it. -->
+    <script>
+      if (screen.width < 250 && location.pathname === "%BASE_URL%")
+        location.replace("%BASE_URL%watch.html")
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

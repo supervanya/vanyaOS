@@ -1,0 +1,191 @@
+<!doctype html>
+<!--
+  Apple Watch: tick today's habits. index.html sends screens under 250px wide here.
+
+  Deliberately outside the React app: the watch's WebKit can't load the app
+  bundle, so this page is plain HTML with one inline script that calls Supabase's
+  REST API with fetch. Keep it that way: no imports, no build step beyond Vite
+  filling in the Supabase URL and key (it's a build entry in vite.config.ts).
+
+  - Session: stored under supabase-js's key, so signing in here or in the app
+    signs in both. A failed load or sign-in shows the form with the reason.
+  - Day: before 4am it's still yesterday, as in src/lib/dates.ts.
+  - Saving a tap upserts the day's `entries` row, then every habit's state, so
+    untapped habits read as missed in Trends, as the evening page saves them.
+-->
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="disabled-adaptations" content="watch" />
+    <title>Habits</title>
+    <style>
+      html {
+        scroll-snap-type: y mandatory;
+      }
+      body {
+        margin: 0;
+        background: #000;
+        color: #fff;
+        font:
+          600 20px -apple-system,
+          sans-serif;
+      }
+      button,
+      p {
+        display: flex;
+        width: 100%;
+        height: 100vh;
+        box-sizing: border-box;
+        margin: 0;
+        /* A black border, not margin, so each button stays exactly one screen tall. */
+        border: 6px solid #000;
+        border-radius: 30px;
+        background-clip: padding-box;
+        padding: 12px;
+        transition:
+          transform 0.15s,
+          background-color 0.25s;
+        scroll-snap-align: start;
+        scroll-snap-stop: always;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        font: inherit;
+        color: inherit;
+        background: #222;
+      }
+      button:active {
+        transform: scale(0.93);
+      }
+      .done {
+        background-color: #16a34a;
+        animation: pop 0.35s ease-out;
+      }
+      .done::before {
+        content: "✓";
+        margin-right: 6px;
+      }
+      @keyframes pop {
+        50% {
+          transform: scale(1.06);
+        }
+      }
+      form {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        padding: 8px;
+      }
+      input {
+        font-size: 16px;
+      }
+    </style>
+  </head>
+  <body>
+    <p id="msg">Loading…</p>
+    <script>
+      const ENV_URL = new URL("%VITE_SUPABASE_URL%"),
+        KEY = "%VITE_SUPABASE_PUBLISHABLE_KEY%"
+      const STORE = "sb-" + ENV_URL.hostname.split(".")[0] + "-auth-token"
+      // A local stack (*.local, localhost) is reached on the host this page came
+      // from: the watch can't resolve .local, so it opens the dev server by IP.
+      if (/\.local$|^localhost$|^127\./.test(ENV_URL.hostname)) ENV_URL.hostname = location.hostname
+      const SB = ENV_URL.origin
+      let session = JSON.parse(localStorage.getItem(STORE) || "null")
+      const d = new Date(Date.now() - 4 * 3600e3)
+      const DAY =
+        d.getFullYear() +
+        "-" +
+        String(d.getMonth() + 1).padStart(2, "0") +
+        "-" +
+        String(d.getDate()).padStart(2, "0")
+
+      async function auth(body, grant) {
+        const r = await fetch(SB + "/auth/v1/token?grant_type=" + grant, {
+          method: "POST",
+          headers: { apikey: KEY, "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        })
+        if (!r.ok) throw new Error("Sign-in " + r.status + ": " + (await r.text()))
+        session = await r.json()
+        localStorage.setItem(STORE, JSON.stringify(session))
+      }
+
+      // A REST call; an expired token is refreshed once and the call retried.
+      async function api(path, opts = {}, retry = true) {
+        const r = await fetch(SB + "/rest/v1/" + path, {
+          ...opts,
+          headers: {
+            apikey: KEY,
+            Authorization: "Bearer " + session.access_token,
+            "Content-Type": "application/json",
+            ...opts.headers,
+          },
+        })
+        if (r.status === 401 && retry) {
+          await auth({ refresh_token: session.refresh_token }, "refresh_token")
+          return api(path, opts, false)
+        }
+        if (!r.ok) throw new Error(await r.text())
+        const text = await r.text() // a write without return=representation has no body
+        return text ? JSON.parse(text) : null
+      }
+
+      function login(error) {
+        document.body.innerHTML = `<form><input name=e type=email placeholder=Email>
+          <input name=p type=password placeholder=Password><button style="height:auto">Sign in</button>
+          <small>${error ? error + " · " + SB : ""}</small></form>`
+        document.forms[0].onsubmit = (e) => {
+          e.preventDefault()
+          auth({ email: e.target.e.value, password: e.target.p.value }, "password")
+            .then(load)
+            .catch(login)
+        }
+      }
+
+      async function load() {
+        const [habits, [entry]] = await Promise.all([
+          api("habits?archived=eq.false&order=sort_order&select=id,label"),
+          api("entries?entry_date=eq." + DAY + "&select=id,entry_habits(habit_id,done)"),
+        ])
+        const done = {}
+        for (const h of entry?.entry_habits ?? []) done[h.habit_id] = h.done
+        let entryId = entry?.id
+        document.body.innerHTML = ""
+        for (const h of habits) {
+          const b = document.createElement("button")
+          b.textContent = h.label
+          const flip = () => b.classList.toggle("done", (done[h.id] = !done[h.id]))
+          b.classList.toggle("done", !!done[h.id])
+          b.onclick = async () => {
+            flip()
+            try {
+              entryId ??= (
+                await api("entries?on_conflict=user_id,entry_date&select=id", {
+                  method: "POST",
+                  headers: { Prefer: "resolution=merge-duplicates,return=representation" },
+                  body: JSON.stringify({ user_id: session.user.id, entry_date: DAY }),
+                })
+              )[0].id
+              await api("entry_habits?on_conflict=entry_id,habit_id", {
+                method: "POST",
+                headers: { Prefer: "resolution=merge-duplicates" },
+                body: JSON.stringify(
+                  habits.map((x) => ({ entry_id: entryId, habit_id: x.id, done: !!done[x.id] })),
+                ),
+              })
+            } catch {
+              flip() // undo: the tap didn't save
+            }
+          }
+          document.body.append(b)
+        }
+      }
+
+      // Any failure shows the form with its reason ("Load failed" = unreachable).
+      session ? load().catch(login) : login()
+    </script>
+  </body>
+</html>
