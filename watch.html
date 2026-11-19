@@ -1,6 +1,8 @@
 <!doctype html>
 <!--
-  Apple Watch: tick today's habits. index.html sends screens under 250px wide here.
+  Apple Watch: a menu of Morning sliders, Evening sliders and Habits, each its
+  own view (#morning, #evening, #habits). index.html sends screens under 250px
+  wide here.
 
   Deliberately outside the React app: the watch's WebKit can't load the app
   bundle, so this page is plain HTML with one inline script that calls Supabase's
@@ -9,9 +11,16 @@
 
   - Session: stored under supabase-js's key, so signing in here or in the app
     signs in both. A failed load or sign-in shows the form with the reason.
-  - Day: before 4am it's still yesterday, as in src/lib/dates.ts.
-  - Saving a tap upserts the day's `entries` row, then every habit's state, so
-    untapped habits read as missed in Trends, as the evening page saves them.
+  - Day: Morning is today, as /morning. Evening and Habits use the evening's
+    day: before 4am it's still yesterday, as /reflect (src/lib/dates.ts).
+  - Morning lock: once that day's evening is started (eveningStarted in
+    src/features/entries/lock.ts, the rule save_morning enforces), the morning
+    sliders are read-only, as on /morning.
+  - Saves upsert that day's `entries` row first. A habit tap then writes every
+    habit's state, so untapped habits read as missed in Trends, as the evening
+    page saves them. A metric writes only its own value; ✕ deletes it (unset).
+  - Saves run one at a time, so quick taps land in order. A failed save reloads
+    the page's state from the server.
 -->
 
 <html lang="en">
@@ -19,7 +28,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="disabled-adaptations" content="watch" />
-    <title>Habits</title>
+    <title>Reflect</title>
     <style>
       html {
         scroll-snap-type: y mandatory;
@@ -32,31 +41,61 @@
           600 20px -apple-system,
           sans-serif;
       }
-      button,
+      button {
+        border: 0;
+        padding: 0;
+        font: inherit;
+        color: inherit;
+        transition:
+          transform 0.15s,
+          background-color 0.25s;
+      }
+      button:active {
+        transform: scale(0.9);
+      }
+      /* One screen per habit or metric. A black border, not margin, so each stays
+         exactly one screen tall for the snapping. */
+      .nav,
+      .habit,
+      .card,
       p {
         display: flex;
         width: 100%;
         height: 100vh;
         box-sizing: border-box;
         margin: 0;
-        /* A black border, not margin, so each button stays exactly one screen tall. */
         border: 6px solid #000;
         border-radius: 30px;
-        background-clip: padding-box;
+        background: #222 padding-box;
         padding: 12px;
-        transition:
-          transform 0.15s,
-          background-color 0.25s;
         scroll-snap-align: start;
         scroll-snap-stop: always;
         align-items: center;
         justify-content: center;
         text-align: center;
-        font: inherit;
-        color: inherit;
-        background: #222;
       }
-      button:active {
+      .nav {
+        color: #000;
+        text-decoration: none;
+        font-size: 24px;
+      }
+      /* Back to the menu: a small circle in the bottom-left corner, clear of the
+         label above and the ✕ in the middle. */
+      .back {
+        position: fixed;
+        bottom: 12px;
+        left: 8px;
+        z-index: 1;
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        background: #444c;
+        color: #fff;
+        text-align: center;
+        line-height: 26px;
+        text-decoration: none;
+      }
+      .habit:active {
         transform: scale(0.93);
       }
       .done {
@@ -72,6 +111,84 @@
           transform: scale(1.06);
         }
       }
+
+      /* Metric card: label, then − value +, then the 1…scale bars, then ✕. */
+      .card {
+        flex-direction: column;
+        justify-content: space-between;
+      }
+      /* The value's tone, set by paint(): colors the filled bars and the number. */
+      .bad {
+        --on: #dc2626;
+      }
+      .ok {
+        --on: #eab308;
+      }
+      .good {
+        --on: #16a34a;
+      }
+      .label {
+        font-size: 15px;
+        color: #aaa;
+      }
+      .row {
+        display: flex;
+        width: 100%;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .step {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: #444;
+        font-size: 26px;
+        line-height: 1;
+      }
+      .value {
+        font-size: 40px;
+      }
+      .value {
+        color: var(--on);
+        transition: color 0.2s;
+      }
+      .value.unset {
+        color: #555; /* a grey dash, so it doesn't read as the − button */
+      }
+      .value.bump {
+        animation: pop 0.25s ease-out;
+      }
+      .bars {
+        display: flex;
+        gap: 4px;
+        align-items: flex-end;
+        height: 24px;
+      }
+      .bars i {
+        width: 12px;
+        border-radius: 3px;
+        background: #444;
+        transition: background-color 0.2s;
+      }
+      .bars i.on {
+        background: var(--on);
+      }
+      /* A locked morning: values shown, controls hidden. */
+      .locked button {
+        visibility: hidden;
+      }
+      .locked .label::after {
+        content: " 🔒";
+      }
+      .reset {
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        background: #333;
+        font-size: 14px;
+        color: #aaa;
+      }
+
       form {
         display: flex;
         flex-direction: column;
@@ -84,7 +201,7 @@
     </style>
   </head>
   <body>
-    <p id="msg">Loading…</p>
+    <p>Loading…</p>
     <script>
       const ENV_URL = new URL("%VITE_SUPABASE_URL%"),
         KEY = "%VITE_SUPABASE_PUBLISHABLE_KEY%"
@@ -94,13 +211,13 @@
       if (/\.local$|^localhost$|^127\./.test(ENV_URL.hostname)) ENV_URL.hostname = location.hostname
       const SB = ENV_URL.origin
       let session = JSON.parse(localStorage.getItem(STORE) || "null")
-      const d = new Date(Date.now() - 4 * 3600e3)
-      const DAY =
-        d.getFullYear() +
-        "-" +
-        String(d.getMonth() + 1).padStart(2, "0") +
-        "-" +
-        String(d.getDate()).padStart(2, "0")
+      const isoDay = (ms) => {
+        const d = new Date(ms)
+        const pad = (n) => String(n).padStart(2, "0")
+        return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate())
+      }
+      const TODAY = isoDay(Date.now()) // the morning's day
+      const DAY = isoDay(Date.now() - 4 * 3600e3) // the evening's and habits' day
 
       async function auth(body, grant) {
         const r = await fetch(SB + "/auth/v1/token?grant_type=" + grant, {
@@ -133,9 +250,32 @@
         return text ? JSON.parse(text) : null
       }
 
+      const upsert = (table, conflict, rows) =>
+        api(table + "?on_conflict=" + conflict, {
+          method: "POST",
+          headers: { Prefer: "resolution=merge-duplicates" },
+          body: JSON.stringify(rows),
+        })
+
+      const entryIds = {} // by date
+      async function ensureEntry(date) {
+        entryIds[date] ??= (
+          await api("entries?on_conflict=user_id,entry_date&select=id", {
+            method: "POST",
+            headers: { Prefer: "resolution=merge-duplicates,return=representation" },
+            body: JSON.stringify({ user_id: session.user.id, entry_date: date }),
+          })
+        )[0].id
+        return entryIds[date]
+      }
+
+      // Saves run one after another; a failed one resyncs from the server.
+      let queue = Promise.resolve()
+      const save = (write) => (queue = queue.then(write).catch(() => load().catch(login)))
+
       function login(error) {
         document.body.innerHTML = `<form><input name=e type=email placeholder=Email>
-          <input name=p type=password placeholder=Password><button style="height:auto">Sign in</button>
+          <input name=p type=password placeholder=Password><button>Sign in</button>
           <small>${error ? error + " · " + SB : ""}</small></form>`
         document.forms[0].onsubmit = (e) => {
           e.preventDefault()
@@ -145,44 +285,156 @@
         }
       }
 
-      async function load() {
-        const [habits, [entry]] = await Promise.all([
-          api("habits?archived=eq.false&order=sort_order&select=id,label"),
-          api("entries?entry_date=eq." + DAY + "&select=id,entry_habits(habit_id,done)"),
-        ])
-        const done = {}
-        for (const h of entry?.entry_habits ?? []) done[h.habit_id] = h.done
-        let entryId = entry?.id
-        document.body.innerHTML = ""
-        for (const h of habits) {
-          const b = document.createElement("button")
-          b.textContent = h.label
-          const flip = () => b.classList.toggle("done", (done[h.id] = !done[h.id]))
-          b.classList.toggle("done", !!done[h.id])
-          b.onclick = async () => {
-            flip()
-            try {
-              entryId ??= (
-                await api("entries?on_conflict=user_id,entry_date&select=id", {
-                  method: "POST",
-                  headers: { Prefer: "resolution=merge-duplicates,return=representation" },
-                  body: JSON.stringify({ user_id: session.user.id, entry_date: DAY }),
-                })
-              )[0].id
-              await api("entry_habits?on_conflict=entry_id,habit_id", {
-                method: "POST",
-                headers: { Prefer: "resolution=merge-duplicates" },
-                body: JSON.stringify(
-                  habits.map((x) => ({ entry_id: entryId, habit_id: x.id, done: !!done[x.id] })),
-                ),
-              })
-            } catch {
-              flip() // undo: the tap didn't save
-            }
-          }
-          document.body.append(b)
-        }
+      function el(tag, className, text) {
+        const node = document.createElement(tag)
+        node.className = className
+        if (text !== undefined) node.textContent = text
+        return node
       }
+
+      function habitButton(h, { habits, done }) {
+        const b = el("button", "habit", h.label)
+        b.classList.toggle("done", !!done[h.id])
+        b.onclick = () => {
+          b.classList.toggle("done", (done[h.id] = !done[h.id]))
+          save(async () => {
+            const entry = await ensureEntry(DAY)
+            await upsert(
+              "entry_habits",
+              "entry_id,habit_id",
+              habits.map((x) => ({ entry_id: entry, habit_id: x.id, done: !!done[x.id] })),
+            )
+          })
+        }
+        return b
+      }
+
+      // `values` is that day's { metric id: value }; a value is absent until set.
+      function metricCard(m, date, values, locked) {
+        let value = values[m.id]
+        const card = el("section", "card")
+        const minus = el("button", "step", "−")
+        const shown = el("div", "value")
+        const plus = el("button", "step", "+")
+        const row = el("div", "row")
+        row.append(minus, shown, plus)
+        const bars = el("div", "bars")
+        for (let i = 1; i <= m.scale; i++) {
+          const bar = el("i", "")
+          bar.style.height = (i / m.scale) * 100 + "%"
+          bars.append(bar)
+        }
+        const reset = el("button", "reset", "✕")
+        card.append(el("div", "label", m.label), row, bars, reset)
+        card.classList.toggle("locked", locked)
+
+        const paint = () => {
+          shown.textContent = value ?? "–"
+          shown.classList.toggle("unset", value === undefined)
+          // On a 0–5 scale: 0–1 red, 2–3 yellow, 4–5 green. Flipped for "0 is best"
+          // metrics (stress, pain), so green always means a good day.
+          const score = (m.higher_is_better ? (value ?? 0) : m.scale - (value ?? 0)) / m.scale
+          card.classList.remove("bad", "ok", "good")
+          card.classList.add(score < 0.4 ? "bad" : score < 0.8 ? "ok" : "good")
+          bars.childNodes.forEach((bar, i) => bar.classList.toggle("on", i < (value ?? 0)))
+          shown.classList.remove("bump")
+          void shown.offsetWidth // restart the bump animation
+          shown.classList.add("bump")
+        }
+        const set = (next) => {
+          if (locked || next === value) return
+          value = values[m.id] = next
+          paint()
+          save(async () => {
+            const entry = await ensureEntry(date)
+            await (value === undefined
+              ? api("entry_metric_values?entry_id=eq." + entry + "&metric_id=eq." + m.id, {
+                  method: "DELETE",
+                })
+              : upsert("entry_metric_values", "entry_id,metric_id", [
+                  { entry_id: entry, metric_id: m.id, value },
+                ]))
+          })
+        }
+        minus.onclick = () => set(Math.max(0, (value ?? 1) - 1))
+        plus.onclick = () => set(Math.min(m.scale, (value ?? 0) + 1))
+        reset.onclick = () => set(undefined)
+        paint()
+        return card
+      }
+
+      // Loaded once, then each view is drawn from it. Saves update it in place.
+      let data
+      async function load() {
+        const [habits, metrics, entries] = await Promise.all([
+          api("habits?archived=eq.false&order=sort_order&select=id,label"),
+          api(
+            "metrics?archived=eq.false&order=sort_order" +
+              "&select=id,label,scale,higher_is_better,timing",
+          ),
+          api(
+            "entries?entry_date=in.(" +
+              TODAY +
+              "," +
+              DAY +
+              ")&select=id,entry_date,reflection,intention_lived," +
+              "entry_habits(habit_id,done),entry_metric_values(metric_id,value)",
+          ),
+        ])
+        const values = { [TODAY]: {}, [DAY]: {} }
+        const done = {}
+        let today // the morning's row, for its lock
+        for (const e of entries) {
+          if (e.entry_date === TODAY) today = e
+          entryIds[e.entry_date] = e.id
+          for (const v of e.entry_metric_values) values[e.entry_date][v.metric_id] = v.value
+          if (e.entry_date === DAY) for (const h of e.entry_habits) done[h.habit_id] = h.done
+        }
+        data = { habits, metrics, values, done, today }
+        render()
+      }
+
+      // The morning is locked once its day's evening is started: a non-blank
+      // reflection, a lived rating, or any evening metric value. Same rule as
+      // eveningStarted (src/features/entries/lock.ts) and save_morning.
+      const morningLocked = () =>
+        /[^ ]/.test(data.today?.reflection ?? "") ||
+        data.today?.intention_lived != null ||
+        data.metrics.some((m) => m.timing === "evening" && data.values[TODAY][m.id] !== undefined)
+
+      const VIEWS = { morning: "#f59e0b", evening: "#818cf8", habits: "#4ade80" }
+
+      // The view is the URL hash, so the watch's back navigation returns to the menu.
+      function render() {
+        const view = location.hash.slice(1)
+        scrollTo(0, 0)
+        if (!(view in VIEWS)) {
+          return document.body.replaceChildren(
+            ...Object.entries(VIEWS).map(([id, color]) => {
+              const a = el("a", "nav", id[0].toUpperCase() + id.slice(1))
+              a.href = "#" + id
+              a.style.background = color
+              return a
+            }),
+          )
+        }
+        const date = view === "morning" ? TODAY : DAY
+        const cards =
+          view === "habits"
+            ? data.habits.map((h) => habitButton(h, data))
+            : data.metrics
+                .filter((m) => m.timing === view)
+                .map((m) =>
+                  metricCard(m, date, data.values[date], view === "morning" && morningLocked()),
+                )
+        const back = el("a", "back", "‹")
+        back.href = "#"
+        document.body.replaceChildren(
+          back,
+          ...(cards.length ? cards : [el("p", "", "Nothing here")]),
+        )
+      }
+      addEventListener("hashchange", () => data && render())
 
       // Any failure shows the form with its reason ("Load failed" = unreachable).
       session ? load().catch(login) : login()
