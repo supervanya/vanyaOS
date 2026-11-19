@@ -35,13 +35,14 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
-function renderSlider() {
+function renderSlider(touchAxisMargin = 0) {
   const onValueChange = vi.fn<(values: number[]) => void>()
   const onValueCommit = vi.fn<(values: number[]) => void>()
   const onPointerDown = vi.fn<(event: React.PointerEvent) => void>()
   render(
     <Slider
       defaultValue={[10]}
+      touchAxisMargin={touchAxisMargin}
       onValueChange={onValueChange}
       onValueCommit={onValueCommit}
       onPointerDown={onPointerDown}
@@ -60,6 +61,33 @@ const finger = (clientX: number, clientY: number) => ({
 })
 
 describe("Slider, touch", () => {
+  it("waits through a tied start on the thumb and accepts the next horizontal move", () => {
+    const { thumb, onPointerDown, onValueChange, onValueCommit } = renderSlider(1)
+    fireEvent.pointerDown(thumb, finger(10, 10))
+    fireEvent.pointerMove(thumb, finger(12, 12))
+    expect(onPointerDown).not.toHaveBeenCalled()
+    fireEvent.pointerMove(thumb, finger(21.33, 15))
+    expect(onPointerDown).toHaveBeenCalledTimes(1)
+    fireEvent.pointerMove(thumb, finger(28.67, 15))
+    fireEvent.pointerUp(thumb, finger(28.67, 15))
+    expect(onValueChange).toHaveBeenLastCalledWith([29])
+    expect(onValueCommit).toHaveBeenCalledTimes(1)
+  })
+
+  it.each([0, 12])(
+    "leaves the value alone when a near tie ends or turns vertical (%i px)",
+    (dy) => {
+      const { track, onPointerDown, onValueChange, onValueCommit } = renderSlider(1)
+      fireEvent.pointerDown(track, finger(60, 10))
+      fireEvent.pointerMove(track, finger(62.33, 12))
+      if (dy) fireEvent.pointerMove(track, finger(63, 10 + dy))
+      fireEvent.pointerUp(track, finger(63, 12 + dy))
+      expect(onPointerDown).not.toHaveBeenCalled()
+      expect(onValueChange).not.toHaveBeenCalled()
+      expect(onValueCommit).not.toHaveBeenCalled()
+    },
+  )
+
   it("does nothing when a finger lands on the track", () => {
     const { track, thumb, onPointerDown, onValueChange } = renderSlider()
     fireEvent.pointerDown(track, finger(60, 10))
@@ -93,7 +121,7 @@ describe("Slider, touch", () => {
   it("slides once the finger moves along the track, and commits on release", () => {
     const { track, thumb, onPointerDown, onValueCommit } = renderSlider()
     fireEvent.pointerDown(track, finger(60, 10))
-    fireEvent.pointerMove(track, finger(63, 11))
+    fireEvent.pointerMove(track, finger(61, 11))
     expect(thumb.getAttribute("aria-valuenow")).toBe("10")
     fireEvent.pointerMove(track, finger(70, 12))
     expect(onPointerDown).toHaveBeenCalledTimes(1)

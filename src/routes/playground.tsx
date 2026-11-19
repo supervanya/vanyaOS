@@ -6,6 +6,8 @@ import confetti from "canvas-confetti"
 
 import { cn } from "@/lib/utils"
 import { MetricSlider } from "@/features/entries/MetricSlider"
+import { SliderDiagnostics } from "@/features/playground/SliderDiagnostics"
+import { lockSliderScroll } from "@/features/playground/lockSliderScroll"
 
 export const Route = createFileRoute("/playground")({ component: Playground })
 
@@ -297,33 +299,28 @@ const VARIANTS: { name: string; desc: string; el: React.ReactNode }[] = [
   },
 ]
 
-function SliderTestVariant() {
-  const [value, setValue] = useState<number | undefined>(undefined)
-  const [value2, setValue2] = useState<number | undefined>(20)
+function SliderTestRow({ row, initialValue }: { row: number; initialValue: number | undefined }) {
+  const [value, setValue] = useState(initialValue)
   return (
-    <div className="mt-4 flex flex-col gap-8">
+    <fieldset
+      ref={lockSliderScroll}
+      data-row={row}
+      data-scroll-lock="native"
+      data-value={value ?? "unset"}
+      className="max-w-full px-6 py-4"
+    >
+      <legend className="text-sm font-medium">
+        Row {row} · {value ?? "Unset"}
+      </legend>
       <MetricSlider
         value={value}
+        touchAxisMargin={1}
         max={100}
-        tone="danger"
-        onValueChange={(v) => {
-          setValue(v)
-          buzz()
-        }}
-        className="w-64"
+        tone={initialValue === undefined ? "danger" : "success"}
+        onValueChange={setValue}
+        className="w-full"
       />
-
-      <MetricSlider
-        value={value2}
-        max={100}
-        tone="success"
-        onValueChange={(v) => {
-          setValue2(v)
-          buzz()
-        }}
-        className="w-64"
-      />
-    </div>
+    </fieldset>
   )
 }
 
@@ -337,7 +334,19 @@ function Playground() {
         <ArrowLeft size={14} /> Back to reflection
       </Link>
 
-      <h1 className="text-lg font-semibold">Habit animation playground</h1>
+      <h1 className="text-lg font-semibold">Native scroll lock playground</h1>
+      <p className="text-xs text-muted-foreground">
+        Start on the track or thumb. Drag sideways, then down without lifting. The value should
+        change and the page should stay still. Start a fresh swipe vertically to scroll the page. To
+        clear a value, slide to zero and tap the thumb.
+      </p>
+      <SliderDiagnostics>
+        {[100, 20, 20, 20, 20, 20, 20, 20, 20, 10, undefined].map((initialValue, index) => (
+          <SliderTestRow key={index} row={index + 1} initialValue={initialValue} />
+        ))}
+      </SliderDiagnostics>
+
+      <h2 className="text-lg font-semibold">Habit animation playground</h2>
       <p className="mt-1 text-xs text-muted-foreground">
         Tap each habit to feel its completion animation (tap again to reset). None of them shift
         layout. The reflection screen currently uses <strong>A · Confetti</strong>.
@@ -354,16 +363,6 @@ function Playground() {
           </div>
         ))}
       </div>
-
-      <h1 className="text-lg font-semibold">Sliders to scroll with</h1>
-      <div className="mt-1 text-xs text-muted-foreground">
-        The reflection screen uses a custom slider that can be tapped or dragged to set a value, or
-        cleared back to unset. To clear, drag the slider all the way to the left and tap it once.
-        <br />
-        You should also be able to scroll up and down vertically without affecting the slider
-        values, but horizontal scroll should change the slider value.
-      </div>
-      <SliderTestVariant />
     </div>
   )
 }

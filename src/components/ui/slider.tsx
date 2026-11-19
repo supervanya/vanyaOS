@@ -4,12 +4,18 @@ import { Slider as SliderPrimitive } from "radix-ui"
 
 import { cn } from "@/lib/utils"
 
-type SliderProps = React.ComponentProps<typeof SliderPrimitive.Root>
+type SliderProps = React.ComponentProps<typeof SliderPrimitive.Root> & { touchAxisMargin?: number }
 
 /** How far a finger travels, in px, before a touch is a drag and not a tap. */
-const TOUCH_SLOP = 8
+const TOUCH_SLOP = 2
 
-type Touch = { x: number; y: number; phase: "pending" | "sliding" | "ignored" }
+function classifySliderMove(along: number, across: number, axisMargin: number) {
+  if (Math.max(along, across) < TOUCH_SLOP) return "pending"
+  if (Math.abs(along - across) < axisMargin) return "undecided"
+  return along > across ? "sliding" : "ignored"
+}
+
+type Touch = { x: number; y: number; phase: ReturnType<typeof classifySliderMove> }
 
 const isTouch = (e: React.PointerEvent) => e.pointerType === "touch" || e.pointerType === "pen"
 
@@ -27,16 +33,21 @@ const isTouch = (e: React.PointerEvent) => e.pointerType === "touch" || e.pointe
  *   (`touch-action: pan-y` on the root) and ends the touch with `pointercancel`.
  *
  * Mouse input is untouched.
+ *
+ * @see https://github.com/DavidHDev/react-bits/blob/main/src/hooks/useScrubGesture.js
  */
-function useScrollSafeTouch({
-  orientation,
-  onPointerDown,
-  onPointerMove,
-  onPointerUp,
-  onPointerCancel,
-  onValueChange,
-  onValueCommit,
-}: SliderProps) {
+function useScrollSafeTouch(
+  {
+    orientation,
+    onPointerDown,
+    onPointerMove,
+    onPointerUp,
+    onPointerCancel,
+    onValueChange,
+    onValueCommit,
+  }: SliderProps,
+  touchAxisMargin: number,
+) {
   const vertical = orientation === "vertical"
   const touches = React.useRef(new Map<number, Touch>())
   const replaying = React.useRef(false)
@@ -82,12 +93,10 @@ function useScrollSafeTouch({
       const dx = Math.abs(e.clientX - touch.x)
       const dy = Math.abs(e.clientY - touch.y)
       const [along, across] = vertical ? [dy, dx] : [dx, dy]
-      if (Math.max(along, across) < TOUCH_SLOP) return
-      if (across >= along) {
-        touch.phase = "ignored"
-        return
-      }
-      touch.phase = "sliding"
+      const phase = classifySliderMove(along, across, touchAxisMargin)
+      if (phase === "pending") return
+      touch.phase = phase
+      if (phase !== "sliding") return
       slid.current = null
       replay("pointerdown", e)
     },
@@ -97,7 +106,7 @@ function useScrollSafeTouch({
       touches.current.delete(e.pointerId)
       if (touch.phase === "sliding") return onPointerUp?.(e)
       e.preventDefault()
-      if (touch.phase === "ignored") return
+      if (touch.phase !== "pending") return
       // Lifted without moving: a tap. Render between the press and the release,
       // so Radix sees the value change and reports it through onValueCommit.
       flushSync(() => replay("pointerdown", e))
@@ -117,31 +126,23 @@ function useScrollSafeTouch({
   } satisfies SliderProps
 }
 
-function Slider({ className, min = 0, max = 100, ...props }: SliderProps) {
+function Slider({ className, min = 0, max = 100, touchAxisMargin = 0, ...props }: SliderProps) {
   const { value, defaultValue } = props
-  const _values = React.useMemo(
-    () => (Array.isArray(value) ? value : Array.isArray(defaultValue) ? defaultValue : [min, max]),
-    [value, defaultValue, min, max],
-  )
-  const touchHandlers = useScrollSafeTouch(props)
+  const thumbCount = value?.length ?? defaultValue?.length ?? 2
+  const touchHandlers = useScrollSafeTouch(props, touchAxisMargin)
 
   return (
     <SliderPrimitive.Root
       data-slot="slider"
+      data-touch-axis-margin={touchAxisMargin || undefined}
       min={min}
       max={max}
       className={cn(
         "relative flex w-full items-center select-none data-disabled:opacity-50",
-        // The page still scrolls across the slider; see useScrollSafeTouch.
-        "data-horizontal:touch-pan-y data-vertical:touch-pan-x",
-        // making the slider's hit area easier to hit on touchscreens:
-        // "pointer-coarse:my--11 pointer-coarse:h-11 pointer-coarse:before:absolute pointer-coarse:before:-inset-y-10",
-
-        // Touch target: 64px tall, extends past the slider without changing layout.
-        "before:absolute before:inset-x-0 before:-inset-y-4",
-        // DEBUG: use to check the hit area visually.
-        // "before:bg-pink-500/40",
-
+        // Allow vertical swipes to scroll through a horizontal slider.
+        "data-[orientation=horizontal]:touch-pan-y",
+        // Extend the hit area above and below the track without moving nearby rows.
+        "before:absolute before:inset-x-0 before:-inset-y-6",
         className,
       )}
       {...props}
@@ -153,7 +154,7 @@ function Slider({ className, min = 0, max = 100, ...props }: SliderProps) {
       >
         <SliderPrimitive.Range data-slot="slider-range" className="absolute h-full bg-primary" />
       </SliderPrimitive.Track>
-      {Array.from({ length: _values.length }, (_, index) => (
+      {Array.from({ length: thumbCount }, (_, index) => (
         <SliderPrimitive.Thumb
           data-slot="slider-thumb"
           key={index}
@@ -171,4 +172,4 @@ function Slider({ className, min = 0, max = 100, ...props }: SliderProps) {
   )
 }
 
-export { Slider }
+export { Slider, TOUCH_SLOP, classifySliderMove }
