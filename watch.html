@@ -89,10 +89,16 @@
       .card {
         flex-direction: column;
         justify-content: space-between;
-        --on: #16a34a;
       }
-      .card.lower {
-        --on: #dc2626; /* "0 is best" metrics, as on the evening page */
+      /* The value's tone, set by paint(): colors the filled bars and the number. */
+      .bad {
+        --on: #dc2626;
+      }
+      .ok {
+        --on: #eab308;
+      }
+      .good {
+        --on: #16a34a;
       }
       .label {
         font-size: 15px;
@@ -114,6 +120,10 @@
       }
       .value {
         font-size: 40px;
+      }
+      .value {
+        color: var(--on);
+        transition: color 0.2s;
       }
       .value.unset {
         color: #555; /* a grey dash, so it doesn't read as the − button */
@@ -266,7 +276,7 @@
       }
 
       function metricCard(m, value) {
-        const card = el("section", m.higher_is_better ? "card" : "card lower")
+        const card = el("section", "card")
         const minus = el("button", "step", "−")
         const shown = el("div", "value")
         const plus = el("button", "step", "+")
@@ -285,6 +295,11 @@
         const paint = () => {
           shown.textContent = value ?? "–"
           shown.classList.toggle("unset", value === undefined)
+          // On a 0–5 scale: 0–1 red, 2–3 yellow, 4–5 green. Flipped for "0 is best"
+          // metrics (stress, pain), so green always means a good day.
+          const score = (m.higher_is_better ? (value ?? 0) : m.scale - (value ?? 0)) / m.scale
+          card.classList.remove("bad", "ok", "good")
+          card.classList.add(score < 0.4 ? "bad" : score < 0.8 ? "ok" : "good")
           bars.childNodes.forEach((bar, i) => bar.classList.toggle("on", i < (value ?? 0)))
           shown.classList.remove("bump")
           void shown.offsetWidth // restart the bump animation
