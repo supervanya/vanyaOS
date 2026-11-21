@@ -12,7 +12,6 @@ import { MetricGroups } from "@/features/entries/MetricGroups"
 import { LivedRating } from "@/features/entries/LivedRating"
 import { MorningRecap } from "@/features/entries/MorningRecap"
 import { wellness, wellnessTone, type WellnessTone } from "@/features/entries/wellness"
-import { trendSeriesQuery } from "@/features/trends/queries"
 import { TaskBoard } from "@/features/tasks/TaskBoard"
 import { metricsAt } from "@/lib/config"
 import { defaultEntryDate, todayISO } from "@/lib/dates"
@@ -39,7 +38,6 @@ export const Route = createFileRoute("/reflect")({
   loaderDeps: ({ search }) => ({ date: search.date ?? defaultEntryDate() }),
   loader: async ({ context: { queryClient }, deps: { date } }) => {
     void queryClient.prefetchQuery(previousWellnessQuery(date))
-    void queryClient.prefetchQuery(trendSeriesQuery) // the date picker's heatmap
     await Promise.all([
       queryClient.ensureQueryData(configQuery),
       queryClient.ensureQueryData(dayQuery(date)),

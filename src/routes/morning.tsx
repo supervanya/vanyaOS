@@ -4,7 +4,6 @@ import { configQuery } from "@/features/config/queries"
 import { MorningDay, MorningSkeleton } from "@/features/entries/MorningDay"
 import { morningQuery } from "@/features/entries/queries"
 import { tasksQuery } from "@/features/tasks/queries"
-import { trendSeriesQuery } from "@/features/trends/queries"
 import { todayISO } from "@/lib/dates"
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/
@@ -17,7 +16,6 @@ export const Route = createFileRoute("/morning")({
     typeof search.date === "string" && ISO_DATE.test(search.date) ? { date: search.date } : {},
   loaderDeps: ({ search }) => ({ date: search.date ?? todayISO() }),
   loader: async ({ context: { queryClient }, deps: { date } }) => {
-    void queryClient.prefetchQuery(trendSeriesQuery) // the date picker's heatmap
     await Promise.all([
       queryClient.ensureQueryData(configQuery),
       queryClient.ensureQueryData(morningQuery(date)),

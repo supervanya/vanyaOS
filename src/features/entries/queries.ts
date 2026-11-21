@@ -1,8 +1,6 @@
 import { queryOptions } from "@tanstack/react-query"
 import { configQuery } from "@/features/config/queries"
-import { trendSeriesQuery } from "@/features/trends/queries"
-import { loadOrInitDay, loadOrInitMorning } from "./api"
-import { morningOnlyDates, wellnessByDate } from "./wellness"
+import { loadOrInitDay, loadOrInitMorning, loadPreviousWellness } from "./api"
 
 // A day as the editor should start it: the saved entry, a newer unsynced local
 // draft, or a fresh one. The autosave hook keeps this cache in step with its
@@ -24,24 +22,11 @@ export const morningQuery = (date: string) =>
       loadOrInitMorning(date, await client.ensureQueryData(configQuery)),
   })
 
-// Wellness of the most recent day before `date`, for Reflect's "vs last". A
-// day with only its morning is skipped: its score rests on a slider or two, and
-// the morning creates the row before any evening happens. Read from the Trends
-// history; `fetchQuery` reuses it unless it's stale, as it is right after a
-// save invalidates both.
+// Wellness of the most recent day before `date` whose evening is started, for
+// Reflect's "vs last".
 export const previousWellnessQuery = (date: string) =>
   queryOptions({
     queryKey: ["day", date, "previous-wellness"],
-    queryFn: async ({ client }) => {
-      const [config, series] = await Promise.all([
-        client.ensureQueryData(configQuery),
-        client.fetchQuery(trendSeriesQuery),
-      ])
-      const partial = morningOnlyDates(series, config.metrics)
-      // Sorted by date, so the last one before `date` is the latest.
-      const previous = [...wellnessByDate(series, config)].findLast(
-        ([d]) => d < date && !partial.has(d),
-      )
-      return previous?.[1] ?? null
-    },
+    queryFn: async ({ client }) =>
+      loadPreviousWellness(date, await client.ensureQueryData(configQuery)),
   })

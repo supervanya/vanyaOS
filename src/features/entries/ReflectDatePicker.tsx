@@ -119,6 +119,42 @@ export function ReflectDatePicker({
   onSelect: (date: string) => void
 }) {
   const [open, setOpen] = useState(false)
+  const pick = (iso: string) => {
+    setOpen(false)
+    if (iso !== date) onSelect(iso)
+  }
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger
+        aria-label={`Pick a date (${label})`}
+        className="min-w-[88px] rounded px-1 py-0.5 text-center tabular-nums underline decoration-dotted underline-offset-4 hover:text-foreground"
+      >
+        {label}
+      </PopoverTrigger>
+      <PopoverContent
+        align="center"
+        collisionPadding={16}
+        className="flex w-[min(384px,calc(100vw-2rem))] flex-col gap-4 rounded-[20px] p-5 shadow-xl"
+      >
+        <MonthCalendar date={date} maxDate={maxDate} pick={pick} />
+      </PopoverContent>
+    </Popover>
+  )
+}
+
+// The open calendar, opening on `date`'s month. It's mounted only while open,
+// so the history it's colored from is read only then: a save marks that
+// history stale, and it refetches on the next open instead of on every save.
+function MonthCalendar({
+  date,
+  maxDate,
+  pick,
+}: {
+  date: string
+  maxDate: string
+  pick: (date: string) => void
+}) {
   const [month, setMonth] = useState(() => firstOfMonth(dateFromISO(date)))
   const { data: config } = useSuspenseQuery(configQuery)
   // Optional: the calendar opens at once and the colors fill in when loaded.
@@ -145,162 +181,140 @@ export function ReflectDatePicker({
   const daysInMonth = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate()
   const monthName = month.toLocaleDateString(undefined, { month: "long" })
 
-  const pick = (iso: string) => {
-    setOpen(false)
-    if (iso !== date) onSelect(iso)
-  }
   const shiftMonth = (delta: number) =>
     setMonth(new Date(month.getFullYear(), month.getMonth() + delta, 1))
 
   return (
-    <Popover
-      open={open}
-      onOpenChange={(next) => {
-        if (next) setMonth(firstOfMonth(dateFromISO(date)))
-        setOpen(next)
-      }}
-    >
-      <PopoverTrigger
-        aria-label={`Pick a date (${label})`}
-        className="min-w-[88px] rounded px-1 py-0.5 text-center tabular-nums underline decoration-dotted underline-offset-4 hover:text-foreground"
-      >
-        {label}
-      </PopoverTrigger>
-      <PopoverContent
-        align="center"
-        collisionPadding={16}
-        className="flex w-[min(384px,calc(100vw-2rem))] flex-col gap-4 rounded-[20px] p-5 shadow-xl"
-      >
-        <div className="flex items-center justify-between gap-2">
-          <h2 className="pl-1 text-[17px] font-semibold tracking-tight">
-            {monthName}{" "}
-            <span className="font-medium text-muted-foreground">{month.getFullYear()}</span>
-          </h2>
-          <div className="flex items-center gap-0.5">
-            <button
-              type="button"
-              onClick={() => pick(maxDate)}
-              className="mr-1.5 h-8 rounded-full border px-3 text-[13px] font-medium text-foreground/80 hover:bg-accent"
-            >
-              Today
-            </button>
-            <button
-              type="button"
-              aria-label="Previous month"
-              onClick={() => shiftMonth(-1)}
-              className="flex size-10 items-center justify-center rounded-full text-foreground/80 hover:bg-accent"
-            >
-              <ChevronLeft size={18} />
-            </button>
-            <button
-              type="button"
-              aria-label="Next month"
-              disabled={atLastMonth}
-              onClick={() => shiftMonth(1)}
-              className="flex size-10 items-center justify-center rounded-full text-foreground/80 enabled:hover:bg-accent disabled:opacity-30"
-            >
-              <ChevronRight size={18} />
-            </button>
-          </div>
+    <>
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="pl-1 text-[17px] font-semibold tracking-tight">
+          {monthName}{" "}
+          <span className="font-medium text-muted-foreground">{month.getFullYear()}</span>
+        </h2>
+        <div className="flex items-center gap-0.5">
+          <button
+            type="button"
+            onClick={() => pick(maxDate)}
+            className="mr-1.5 h-8 rounded-full border px-3 text-[13px] font-medium text-foreground/80 hover:bg-accent"
+          >
+            Today
+          </button>
+          <button
+            type="button"
+            aria-label="Previous month"
+            onClick={() => shiftMonth(-1)}
+            className="flex size-10 items-center justify-center rounded-full text-foreground/80 hover:bg-accent"
+          >
+            <ChevronLeft size={18} />
+          </button>
+          <button
+            type="button"
+            aria-label="Next month"
+            disabled={atLastMonth}
+            onClick={() => shiftMonth(1)}
+            className="flex size-10 items-center justify-center rounded-full text-foreground/80 enabled:hover:bg-accent disabled:opacity-30"
+          >
+            <ChevronRight size={18} />
+          </button>
         </div>
+      </div>
 
-        <Calendar
-          mode="single"
-          required
-          selected={dateFromISO(date)}
-          onSelect={(d) => pick(isoFromDate(d))}
-          month={month}
-          onMonthChange={setMonth}
-          hideNavigation
-          weekStartsOn={1}
-          disabled={{ after: max }}
-          endMonth={max}
-          className="w-full p-0"
-          formatters={{
-            formatWeekdayName: (d) =>
-              d.toLocaleDateString(undefined, { weekday: "short" }).slice(0, 2),
-          }}
-          classNames={{
-            root: "w-full",
-            months: "flex flex-col",
-            month: "flex w-full flex-col",
-            month_caption: "sr-only",
-            month_grid: "w-full border-collapse",
-            weekdays: "flex gap-1.5",
-            weekday:
-              "flex h-6 flex-1 items-center justify-center text-xs font-medium text-muted-foreground select-none",
-            week: "mt-1.5 flex w-full gap-1.5",
-            day: "flex-1 p-0 select-none",
-            today: "",
-            outside: "opacity-40",
-            disabled: "",
-            hidden: "invisible",
-          }}
-          modifiers={{
-            good: (d) => toneOf(isoFromDate(d)) === "good",
-            ok: (d) => toneOf(isoFromDate(d)) === "ok",
-            bad: (d) => toneOf(isoFromDate(d)) === "bad",
-            logged: (d) => toneOf(isoFromDate(d)) === "logged",
-            morningOnly: (d) => morningOnly.has(isoFromDate(d)),
-          }}
-          labels={{
-            labelDayButton: (d, modifiers, options, dateLib) =>
-              `${labelDayButton(d, modifiers, options, dateLib)}${modifiers.morningOnly ? ", morning only" : ""}`,
-          }}
-          components={{ DayButton: ScoreDayButton }}
-        />
+      <Calendar
+        mode="single"
+        required
+        selected={dateFromISO(date)}
+        onSelect={(d) => pick(isoFromDate(d))}
+        month={month}
+        onMonthChange={setMonth}
+        hideNavigation
+        weekStartsOn={1}
+        disabled={{ after: max }}
+        endMonth={max}
+        className="w-full p-0"
+        formatters={{
+          formatWeekdayName: (d) =>
+            d.toLocaleDateString(undefined, { weekday: "short" }).slice(0, 2),
+        }}
+        classNames={{
+          root: "w-full",
+          months: "flex flex-col",
+          month: "flex w-full flex-col",
+          month_caption: "sr-only",
+          month_grid: "w-full border-collapse",
+          weekdays: "flex gap-1.5",
+          weekday:
+            "flex h-6 flex-1 items-center justify-center text-xs font-medium text-muted-foreground select-none",
+          week: "mt-1.5 flex w-full gap-1.5",
+          day: "flex-1 p-0 select-none",
+          today: "",
+          outside: "opacity-40",
+          disabled: "",
+          hidden: "invisible",
+        }}
+        modifiers={{
+          good: (d) => toneOf(isoFromDate(d)) === "good",
+          ok: (d) => toneOf(isoFromDate(d)) === "ok",
+          bad: (d) => toneOf(isoFromDate(d)) === "bad",
+          logged: (d) => toneOf(isoFromDate(d)) === "logged",
+          morningOnly: (d) => morningOnly.has(isoFromDate(d)),
+        }}
+        labels={{
+          labelDayButton: (d, modifiers, options, dateLib) =>
+            `${labelDayButton(d, modifiers, options, dateLib)}${modifiers.morningOnly ? ", morning only" : ""}`,
+        }}
+        components={{ DayButton: ScoreDayButton }}
+      />
 
-        <div className="flex flex-col gap-3 border-t pt-4 text-xs text-muted-foreground">
-          {logged > 0 ? (
-            <>
-              <span className="flex items-center gap-1">
-                <span>
-                  <span className="font-semibold text-foreground tabular-nums">{logged}</span> of{" "}
-                  {daysInMonth} days logged
+      <div className="flex flex-col gap-3 border-t pt-4 text-xs text-muted-foreground">
+        {logged > 0 ? (
+          <>
+            <span className="flex items-center gap-1">
+              <span>
+                <span className="font-semibold text-foreground tabular-nums">{logged}</span> of{" "}
+                {daysInMonth} days logged
+              </span>
+              {morningOnlyCount > 0 && (
+                <span className="flex items-center gap-1">
+                  {" · "}
+                  <Sun aria-hidden="true" size={11} strokeWidth={2.5} />
+                  <span className="font-semibold text-foreground tabular-nums">
+                    {morningOnlyCount}
+                  </span>{" "}
+                  morning only
                 </span>
-                {morningOnlyCount > 0 && (
-                  <span className="flex items-center gap-1">
-                    {" · "}
-                    <Sun aria-hidden="true" size={11} strokeWidth={2.5} />
-                    <span className="font-semibold text-foreground tabular-nums">
-                      {morningOnlyCount}
-                    </span>{" "}
-                    morning only
-                  </span>
-                )}
-              </span>
-              <div className="flex h-1.5 gap-0.5" aria-hidden="true">
-                {TONES.filter((t) => counts[t] > 0).map((t) => (
-                  <div
-                    key={t}
-                    className={cn("basis-0 rounded-full", TONE[t].solid)}
-                    style={{ flexGrow: counts[t] }}
-                  />
-                ))}
-              </div>
-            </>
-          ) : (
-            <span>Nothing logged in {monthName} yet</span>
-          )}
-          <div className="flex justify-between">
-            {TONES.map((t) => (
-              <span key={t} className="flex items-center gap-1.5">
-                <span
-                  aria-hidden="true"
-                  className={cn(
-                    "size-2.5 rounded-[3px]",
-                    t === "logged"
-                      ? "border-[1.5px] border-dashed border-muted-foreground/60"
-                      : TONE[t].solid,
-                  )}
+              )}
+            </span>
+            <div className="flex h-1.5 gap-0.5" aria-hidden="true">
+              {TONES.filter((t) => counts[t] > 0).map((t) => (
+                <div
+                  key={t}
+                  className={cn("basis-0 rounded-full", TONE[t].solid)}
+                  style={{ flexGrow: counts[t] }}
                 />
-                {TONE[t].label}
-                <span className="font-semibold text-foreground tabular-nums">{counts[t]}</span>
-              </span>
-            ))}
-          </div>
+              ))}
+            </div>
+          </>
+        ) : (
+          <span>Nothing logged in {monthName} yet</span>
+        )}
+        <div className="flex justify-between">
+          {TONES.map((t) => (
+            <span key={t} className="flex items-center gap-1.5">
+              <span
+                aria-hidden="true"
+                className={cn(
+                  "size-2.5 rounded-[3px]",
+                  t === "logged"
+                    ? "border-[1.5px] border-dashed border-muted-foreground/60"
+                    : TONE[t].solid,
+                )}
+              />
+              {TONE[t].label}
+              <span className="font-semibold text-foreground tabular-nums">{counts[t]}</span>
+            </span>
+          ))}
         </div>
-      </PopoverContent>
-    </Popover>
+      </div>
+    </>
   )
 }
