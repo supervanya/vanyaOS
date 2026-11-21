@@ -136,7 +136,8 @@ describe("useEntryAutosave", () => {
     expect(saveDay).not.toHaveBeenCalled()
 
     await wait(800)
-    expect(saveDay).toHaveBeenCalledWith(edit(1), config)
+    // Sent with the day as loaded, to send only what changed since.
+    expect(saveDay).toHaveBeenCalledWith(edit(1), config, day)
     expect(loadDraft(day.date)).toBeNull()
   })
 
@@ -146,13 +147,13 @@ describe("useEntryAutosave", () => {
     act(() => result.current.setEntry(edit(2)))
     await wait(800)
     expect(saveDay).toHaveBeenCalledTimes(1)
-    expect(saveDay).toHaveBeenCalledWith(edit(2), config)
+    expect(saveDay).toHaveBeenCalledWith(edit(2), config, day)
   })
 
-  it("syncs a leftover draft as soon as it loads", async () => {
+  it("syncs a leftover draft as soon as it loads, all of it", async () => {
     loaded(true)
     await wait(800)
-    expect(saveDay).toHaveBeenCalledWith(day, config)
+    expect(saveDay).toHaveBeenCalledWith(day, config, null)
   })
 
   it("puts the synced entry in the day cache for other screens", async () => {
@@ -187,7 +188,7 @@ describe("useEntryAutosave", () => {
     finishFirst()
     await wait(0)
     expect(saveDay).toHaveBeenCalledTimes(2)
-    expect(saveDay).toHaveBeenLastCalledWith(edit(2), config)
+    expect(saveDay).toHaveBeenLastCalledWith(edit(2), config, edit(1))
   })
 
   it("sends the pending save on unmount instead of dropping it", async () => {
@@ -195,7 +196,7 @@ describe("useEntryAutosave", () => {
     act(() => result.current.setEntry(edit(1)))
     unmount()
     await wait(0)
-    expect(saveDay).toHaveBeenCalledWith(edit(1), config)
+    expect(saveDay).toHaveBeenCalledWith(edit(1), config, day)
     expect(loadDraft(day.date)).toBeNull()
   })
 
@@ -253,6 +254,17 @@ describe("useEntryAutosave", () => {
     act(() => result.current.setEntry(edit(1)))
     await wait(800)
     expect(getSaveState()).toBe("failed")
+  })
+
+  it("sends a failed edit again with the next one", async () => {
+    vi.mocked(saveDay).mockRejectedValueOnce(new Error("offline"))
+    const { result } = loaded(false)
+    act(() => result.current.setEntry(edit(1)))
+    await wait(800)
+    act(() => result.current.setEntry(edit(2)))
+    await wait(800)
+    // Still measured from the day as loaded, so edit 1's changes go too.
+    expect(saveDay).toHaveBeenLastCalledWith(edit(2), config, day)
   })
 })
 
@@ -322,7 +334,7 @@ describe("useMorningAutosave", () => {
     expect(cachedMorning()).toEqual({ entry: morningEdit(1), unsynced: true, locked: false })
 
     await wait(800)
-    expect(saveMorning).toHaveBeenCalledWith(morningEdit(1), config)
+    expect(saveMorning).toHaveBeenCalledWith(morningEdit(1), config, morning)
     expect(saveDay).not.toHaveBeenCalled()
     expect(loadMorningDraft(day.date)).toBeNull()
     expect(cachedMorning()).toEqual({ entry: morningEdit(1), unsynced: false, locked: false })
@@ -331,7 +343,7 @@ describe("useMorningAutosave", () => {
   it("syncs a leftover morning draft as soon as it loads", async () => {
     loadedMorning(true)
     await wait(800)
-    expect(saveMorning).toHaveBeenCalledWith(morning, config)
+    expect(saveMorning).toHaveBeenCalledWith(morning, config, null)
   })
 
   it("copies a saved morning into the day cache, leaving the evening half alone", async () => {

@@ -34,7 +34,9 @@ type Edited = { date: string; updatedAt: string }
 type Half<T extends Edited> = {
   saveDraft: (entry: T) => void
   clearDraft: (entry: T) => void
-  save: (entry: T, config: LoadedConfig) => Promise<void>
+  // Sends what changed since `since`, the entry as last synced (all of it
+  // when that's unknown).
+  save: (entry: T, config: LoadedConfig, since: T | null) => Promise<void>
   // Puts an edit not yet synced into the cache, at once.
   cacheEdit: (queryClient: QueryClient, entry: T, config: LoadedConfig) => void
   // Puts the saved entry into the cache once its sync lands.
@@ -167,7 +169,9 @@ function useAutosave<T extends Edited>(
 ) {
   const queryClient = useQueryClient()
   const [entry, setEntry] = useState(loaded.entry)
-  const baseline = useRef<T | null>(loaded.unsynced ? null : loaded.entry)
+  // The entry as Postgres last had it from this editor: each sync sends only
+  // what changed since. Unknown (null) for a draft that never synced.
+  const synced = useRef<T | null>(loaded.unsynced ? null : loaded.entry)
   // The sync waiting on the debounce, if any.
   const pending = useRef<(() => void) | null>(null)
   // Marks the entry unsaved in the top bar from the first edit until the sync
@@ -177,7 +181,7 @@ function useAutosave<T extends Edited>(
   const stopped = useRef(false)
 
   useEffect(() => {
-    if (entry === baseline.current || stopped.current) return
+    if (entry === synced.current || stopped.current) return
     half.saveDraft(entry)
     half.cacheEdit(queryClient, entry, config)
     unsaved.current ??= beginSave()
@@ -185,7 +189,7 @@ function useAutosave<T extends Edited>(
       pending.current = null
       const settle = unsaved.current
       unsaved.current = null
-      syncEntry(half, entry, config, queryClient, settle, stopped)
+      syncEntry(half, entry, config, queryClient, settle, stopped, synced)
     }
     pending.current = sync
     const timer = setTimeout(sync, SYNC_DEBOUNCE_MS)
@@ -211,6 +215,7 @@ function syncEntry<T extends Edited>(
   queryClient: QueryClient,
   settle: SettleSave | null,
   stopped: { current: boolean },
+  synced: { current: T | null },
 ) {
   syncing = syncing.then(async () => {
     // A save queued before a final refusal would only be refused again.
@@ -219,7 +224,8 @@ function syncEntry<T extends Edited>(
       return
     }
     try {
-      await half.save(entry, config)
+      await half.save(entry, config, synced.current)
+      synced.current = entry
       half.clearDraft(entry)
       half.cacheSaved(queryClient, entry, config)
       settle?.("saved")

@@ -136,16 +136,8 @@ describe("loadOrInitDay", () => {
       intention: "",
       intentionLived: null,
       metrics: {},
-      habits: { steps: false },
+      habits: {},
     })
-  })
-
-  it("starts every habit unchecked on a day the morning created", async () => {
-    results.entries = { data: { ...savedRow, reflection: "" }, error: null }
-    results.entry_habits = { data: [], error: null }
-
-    const { entry } = await loadOrInitDay(date, config)
-    expect(entry.habits).toEqual({ steps: false })
   })
 
   it("keeps a saved day's habits as saved", async () => {
@@ -335,7 +327,7 @@ describe("saveMorning", () => {
   }
 
   it("sends the intention and only the morning metrics", async () => {
-    await saveMorning(morning, split)
+    await saveMorning(morning, split, null)
     expect(rpc).toHaveBeenLastCalledWith("save_morning", {
       entry_date: date,
       theme: "recovery",
@@ -345,17 +337,25 @@ describe("saveMorning", () => {
   })
 
   it("sends an unset morning metric as null, to clear it", async () => {
-    await saveMorning({ ...morning, metrics: {} }, split)
+    await saveMorning({ ...morning, metrics: {} }, split, null)
     expect(rpc).toHaveBeenLastCalledWith(
       "save_morning",
       expect.objectContaining({ metric_values: [{ metric_id: "metric-sleep", value: null }] }),
     )
   })
 
+  it("sends only the morning metrics that changed since the last sync", async () => {
+    await saveMorning(morning, split, { ...morning, intention: "" })
+    expect(rpc).toHaveBeenLastCalledWith(
+      "save_morning",
+      expect.objectContaining({ intention: "stay calm", metric_values: [] }),
+    )
+  })
+
   it("throws the refusal of a locked morning, recognisably", async () => {
     const locked = { message: "morning_locked", code: "MLOCK" }
     rpc.mockResolvedValueOnce({ data: null, error: locked })
-    const err: unknown = await saveMorning(morning, split).catch((e: unknown) => e)
+    const err: unknown = await saveMorning(morning, split, null).catch((e: unknown) => e)
     expect(err).toBe(locked)
     expect(isMorningLocked(err)).toBe(true)
   })
@@ -380,7 +380,7 @@ describe("saveDay", () => {
   }
 
   it("sends the lived rating with the evening half", async () => {
-    await saveDay(entry, config)
+    await saveDay(entry, config, null)
     expect(rpc).toHaveBeenLastCalledWith("save_day", {
       entry_date: date,
       theme: "recovery",
@@ -392,10 +392,36 @@ describe("saveDay", () => {
   })
 
   it("sends an unrated day as an empty rating", async () => {
-    await saveDay({ ...entry, intentionLived: null }, config)
+    await saveDay({ ...entry, intentionLived: null }, config, null)
     expect(rpc).toHaveBeenLastCalledWith(
       "save_day",
       expect.objectContaining({ intention_lived: "" }),
+    )
+  })
+
+  it("sends only the values and checks that changed since the last sync", async () => {
+    const since = { ...entry, metrics: { mood: 3 }, habits: { steps: true } }
+    await saveDay({ ...entry, metrics: { mood: 4 } }, config, since)
+    expect(rpc).toHaveBeenLastCalledWith(
+      "save_day",
+      expect.objectContaining({
+        metric_values: [{ metric_id: "metric-mood", value: 4 }],
+        habit_checks: [],
+      }),
+    )
+  })
+
+  it("sends a cleared value as null and an unticked habit as not done", async () => {
+    await saveDay({ ...entry, metrics: {}, habits: {} }, config, {
+      ...entry,
+      metrics: { mood: 3 },
+    })
+    expect(rpc).toHaveBeenLastCalledWith(
+      "save_day",
+      expect.objectContaining({
+        metric_values: [{ metric_id: "metric-mood", value: null }],
+        habit_checks: [{ habit_id: "habit-steps", done: false }],
+      }),
     )
   })
 })

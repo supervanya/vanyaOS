@@ -199,6 +199,7 @@ describe("the lived rating through the evening autosave", () => {
     expect(saveDay).toHaveBeenLastCalledWith(
       expect.objectContaining({ date, intentionLived: "yes" }),
       config,
+      expect.anything(),
     )
 
     fireEvent.click(screen.getByRole("checkbox", { name: "Yes" }))
@@ -208,6 +209,7 @@ describe("the lived rating through the evening autosave", () => {
     expect(saveDay).toHaveBeenLastCalledWith(
       expect.objectContaining({ intentionLived: null }),
       config,
+      expect.anything(),
     )
   })
 })

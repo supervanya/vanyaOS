@@ -16,9 +16,11 @@
   - Morning lock: once that day's evening is started (eveningStarted in
     src/features/entries/lock.ts, the rule save_morning enforces), the morning
     sliders are read-only, as on /morning.
-  - Saves upsert that day's `entries` row first. A habit tap then writes every
-    habit's state, so untapped habits read as missed in Trends, as the evening
-    page saves them. A metric writes only its own value; ✕ deletes it (unset).
+  - Saves upsert that day's `entries` row first. A habit tap then writes only
+    that habit, so it can't undo a tap made elsewhere since this page loaded,
+    and adds the other habits unchecked where they have no check yet, so they
+    read as missed in Trends, as save_day does. A metric writes only its own
+    value; ✕ deletes it (unset).
   - Saves run one at a time, so quick taps land in order. A failed save reloads
     the page's state from the server.
 -->
@@ -250,10 +252,11 @@
         return text ? JSON.parse(text) : null
       }
 
-      const upsert = (table, conflict, rows) =>
+      // `resolution` is "merge" to overwrite a row that exists, "ignore" to keep it.
+      const upsert = (table, conflict, rows, resolution = "merge") =>
         api(table + "?on_conflict=" + conflict, {
           method: "POST",
-          headers: { Prefer: "resolution=merge-duplicates" },
+          headers: { Prefer: "resolution=" + resolution + "-duplicates" },
           body: JSON.stringify(rows),
         })
 
@@ -299,10 +302,14 @@
           b.classList.toggle("done", (done[h.id] = !done[h.id]))
           save(async () => {
             const entry = await ensureEntry(DAY)
+            await upsert("entry_habits", "entry_id,habit_id", [
+              { entry_id: entry, habit_id: h.id, done: done[h.id] },
+            ])
             await upsert(
               "entry_habits",
               "entry_id,habit_id",
-              habits.map((x) => ({ entry_id: entry, habit_id: x.id, done: !!done[x.id] })),
+              habits.map((x) => ({ entry_id: entry, habit_id: x.id, done: false })),
+              "ignore",
             )
           })
         }
