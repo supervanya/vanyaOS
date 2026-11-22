@@ -15,6 +15,8 @@ import {
   saveDay,
   saveMorning,
   type DayEntry,
+  type LoadedDay,
+  type LoadedMorning,
   type MorningEntry,
 } from "./api"
 import { dayQuery, morningQuery } from "./queries"
@@ -82,7 +84,7 @@ function holdNextRead() {
   let finish = () => {}
   vi.mocked(loadOrInitDay).mockReturnValueOnce(
     new Promise((resolve) => {
-      finish = () => resolve({ entry: day, unsynced: false })
+      finish = () => resolve({ entry: day, synced: [day] })
     }),
   )
   return finish
@@ -111,18 +113,22 @@ afterEach(async () => {
 })
 
 let queryClient: QueryClient
+const wrapper = ({ children }: { children: ReactNode }) => (
+  <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+)
 
-function loaded(unsynced: boolean) {
+// The day as a screen opens it, from the cache: Postgres holds it, unless
+// `synced` says otherwise.
+function loaded(synced: LoadedDay["synced"] = [day]) {
   queryClient = new QueryClient()
-  const wrapper = ({ children }: { children: ReactNode }) => (
-    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
-  )
-  return renderHook(() => useEntryAutosave(config, { entry: day, unsynced }), { wrapper })
+  const start = { entry: day, synced }
+  queryClient.setQueryData(dayQuery(day.date).queryKey, start)
+  return renderHook(() => useEntryAutosave(config, start), { wrapper })
 }
 
 describe("useEntryAutosave", () => {
   it("saves nothing when a day is loaded", async () => {
-    const { result } = loaded(false)
+    const { result } = loaded()
     await wait(800)
     expect(result.current.entry).toBe(day)
     expect(loadDraft(day.date)).toBeNull()
@@ -130,43 +136,61 @@ describe("useEntryAutosave", () => {
   })
 
   it("drafts an edit at once and syncs it after the debounce", async () => {
-    const { result } = loaded(false)
+    const { result } = loaded()
     act(() => result.current.setEntry(edit(1)))
     expect(loadDraft(day.date)).toEqual(edit(1))
     expect(saveDay).not.toHaveBeenCalled()
 
     await wait(800)
     // Sent with the day as loaded, to send only what changed since.
-    expect(saveDay).toHaveBeenCalledWith(edit(1), config, day)
+    expect(saveDay).toHaveBeenCalledWith(edit(1), config, [day])
     expect(loadDraft(day.date)).toBeNull()
   })
 
   it("syncs a burst of edits once, with the latest value", async () => {
-    const { result } = loaded(false)
+    const { result } = loaded()
     act(() => result.current.setEntry(edit(1)))
     act(() => result.current.setEntry(edit(2)))
     await wait(800)
     expect(saveDay).toHaveBeenCalledTimes(1)
-    expect(saveDay).toHaveBeenCalledWith(edit(2), config, day)
+    expect(saveDay).toHaveBeenCalledWith(edit(2), config, [day])
   })
 
-  it("syncs a leftover draft as soon as it loads, all of it", async () => {
-    loaded(true)
+  it("syncs a leftover draft as soon as it loads, measured from the day as saved", async () => {
+    const saved = { ...day, reflection: "saved" }
+    loaded([saved])
     await wait(800)
-    expect(saveDay).toHaveBeenCalledWith(day, config, null)
+    expect(saveDay).toHaveBeenCalledWith(day, config, [saved])
+  })
+
+  it("takes over an edit from a screen left mid-save, without sending it all again", async () => {
+    const finishFirst = holdNextSave()
+    const { result, unmount } = loaded()
+    act(() => result.current.setEntry(edit(1)))
+    unmount() // e.g. /reflect → the dashboard, before the save lands
+    const next = cachedDay()
+    expect(next).toEqual({ entry: edit(1), synced: [day] })
+    if (!next) return
+    renderHook(() => useEntryAutosave(config, next), { wrapper })
+
+    finishFirst()
+    await wait(800)
+    // Measured from what the first save confirmed: nothing left to send.
+    expect(saveDay).toHaveBeenCalledTimes(2)
+    expect(saveDay).toHaveBeenLastCalledWith(edit(1), config, [edit(1)])
   })
 
   it("puts the synced entry in the day cache for other screens", async () => {
-    const { result } = loaded(false)
+    const { result } = loaded()
     act(() => result.current.setEntry(edit(1)))
-    expect(cachedDay()).toEqual({ entry: edit(1), unsynced: true })
+    expect(cachedDay()).toEqual({ entry: edit(1), synced: [day] })
     await wait(800)
-    expect(cachedDay()).toEqual({ entry: edit(1), unsynced: false })
+    expect(cachedDay()).toEqual({ entry: edit(1), synced: [edit(1)] })
   })
 
   it("keeps a newer draft when an older save finishes", async () => {
     const finishFirst = holdNextSave()
-    const { result } = loaded(false)
+    const { result } = loaded()
     act(() => result.current.setEntry(edit(1)))
     await wait(800)
     act(() => result.current.setEntry(edit(2)))
@@ -178,7 +202,7 @@ describe("useEntryAutosave", () => {
 
   it("runs saves one at a time, so an older one can't finish last", async () => {
     const finishFirst = holdNextSave()
-    const { result } = loaded(false)
+    const { result } = loaded()
     act(() => result.current.setEntry(edit(1)))
     await wait(800)
     act(() => result.current.setEntry(edit(2)))
@@ -188,37 +212,36 @@ describe("useEntryAutosave", () => {
     finishFirst()
     await wait(0)
     expect(saveDay).toHaveBeenCalledTimes(2)
-    expect(saveDay).toHaveBeenLastCalledWith(edit(2), config, edit(1))
+    expect(saveDay).toHaveBeenLastCalledWith(edit(2), config, [edit(1)])
   })
 
   it("sends the pending save on unmount instead of dropping it", async () => {
-    const { result, unmount } = loaded(false)
+    const { result, unmount } = loaded()
     act(() => result.current.setEntry(edit(1)))
     unmount()
     await wait(0)
-    expect(saveDay).toHaveBeenCalledWith(edit(1), config, day)
+    expect(saveDay).toHaveBeenCalledWith(edit(1), config, [day])
     expect(loadDraft(day.date)).toBeNull()
   })
 
   it("keeps the newest edit in the day cache when an older save finishes", async () => {
     const finishFirst = holdNextSave()
-    const { result } = loaded(false)
+    const { result } = loaded()
     act(() => result.current.setEntry(edit(1)))
     await wait(800)
     act(() => result.current.setEntry(edit(2)))
 
     finishFirst()
     await wait(0)
-    expect(cachedDay()).toEqual({ entry: edit(2), unsynced: true })
+    expect(cachedDay()).toEqual({ entry: edit(2), synced: [edit(1)] })
 
     await wait(800)
-    expect(cachedDay()).toEqual({ entry: edit(2), unsynced: false })
+    expect(cachedDay()).toEqual({ entry: edit(2), synced: [edit(2)] })
   })
 
   it("keeps an edit in the day cache when an older read of the day lands after it", async () => {
-    const { result } = loaded(false)
+    const { result } = loaded()
     queryClient.setQueryData(configQuery.queryKey, config)
-    queryClient.setQueryData(dayQuery(day.date).queryKey, { entry: day, unsynced: false })
     // A background read (e.g. on window focus) starts before the edit...
     const finishRead = holdNextRead()
     const read = queryClient.fetchQuery({ ...dayQuery(day.date), staleTime: 0 })
@@ -229,16 +252,16 @@ describe("useEntryAutosave", () => {
     // ...and returns its older snapshot while the edit's save is in flight.
     finishRead()
     await act(() => read)
-    expect(cachedDay()).toEqual({ entry: edit(1), unsynced: true })
+    expect(cachedDay()).toEqual({ entry: edit(1), synced: [day] })
 
     finishSave()
     await wait(0)
-    expect(cachedDay()).toEqual({ entry: edit(1), unsynced: false })
+    expect(cachedDay()).toEqual({ entry: edit(1), synced: [edit(1)] })
   })
 
   it("shows the edit as saving from the first keystroke until its sync lands", async () => {
     const finishSave = holdNextSave()
-    const { result } = loaded(false)
+    const { result } = loaded()
     act(() => result.current.setEntry(edit(1)))
     expect(getSaveState()).toBe("saving")
     await wait(800)
@@ -250,7 +273,7 @@ describe("useEntryAutosave", () => {
 
   it("shows the edit as not synced when its sync fails", async () => {
     vi.mocked(saveDay).mockRejectedValueOnce(new Error("offline"))
-    const { result } = loaded(false)
+    const { result } = loaded()
     act(() => result.current.setEntry(edit(1)))
     await wait(800)
     expect(getSaveState()).toBe("failed")
@@ -258,23 +281,25 @@ describe("useEntryAutosave", () => {
 
   it("sends a failed edit again with the next one", async () => {
     vi.mocked(saveDay).mockRejectedValueOnce(new Error("offline"))
-    const { result } = loaded(false)
+    const { result } = loaded()
     act(() => result.current.setEntry(edit(1)))
     await wait(800)
     act(() => result.current.setEntry(edit(2)))
     await wait(800)
-    // Still measured from the day as loaded, so edit 1's changes go too.
-    expect(saveDay).toHaveBeenLastCalledWith(edit(2), config, day)
+    // Edit 1 may have landed with its answer lost: measured from both, so
+    // whatever it changed goes again.
+    expect(saveDay).toHaveBeenLastCalledWith(edit(2), config, [day, edit(1)])
   })
 })
 
 describe("useEntryAutosave beside a morning", () => {
   it("keeps the morning half the day cache already holds", async () => {
-    const { result } = loaded(false)
+    const { result } = loaded()
     // The morning was saved after this evening editor opened.
+    const withMorning = { ...day, intention: "stay calm", metrics: { sleep: 4 } }
     queryClient.setQueryData(dayQuery(day.date).queryKey, {
-      entry: { ...day, intention: "stay calm", metrics: { sleep: 4 } },
-      unsynced: false,
+      entry: withMorning,
+      synced: [withMorning],
     })
     act(() => result.current.setEntry({ ...edit(1), metrics: { mood: 3 } }))
     expect(cachedDay()?.entry).toMatchObject({
@@ -285,7 +310,6 @@ describe("useEntryAutosave beside a morning", () => {
     await wait(800)
     expect(cachedDay()).toMatchObject({
       entry: { intention: "stay calm", metrics: { mood: 3, sleep: 4 } },
-      unsynced: false,
     })
   })
 })
@@ -306,60 +330,63 @@ const morningEdit = (n: number): MorningEntry => ({
 })
 const locked = { message: "morning_locked", code: "MLOCK" }
 
-function loadedMorning(unsynced: boolean) {
+// As loaded(), for the morning.
+function loadedMorning(synced: LoadedMorning["synced"] = [morning]) {
   queryClient = new QueryClient()
-  const wrapper = ({ children }: { children: ReactNode }) => (
-    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
-  )
-  return renderHook(() => useMorningAutosave(config, { entry: morning, unsynced, locked: false }), {
-    wrapper,
-  })
+  const start = { entry: morning, synced, locked: false }
+  queryClient.setQueryData(morningQuery(day.date).queryKey, start)
+  return renderHook(() => useMorningAutosave(config, start), { wrapper })
 }
 
 const cachedMorning = () => queryClient.getQueryData(morningQuery(day.date).queryKey)
 
 describe("useMorningAutosave", () => {
   it("saves nothing when a morning is loaded", async () => {
-    loadedMorning(false)
+    loadedMorning()
     await wait(800)
     expect(loadMorningDraft(day.date)).toBeNull()
     expect(saveMorning).not.toHaveBeenCalled()
   })
 
   it("drafts a morning edit under its own key and syncs it after the debounce", async () => {
-    const { result } = loadedMorning(false)
+    const { result } = loadedMorning()
     act(() => result.current.setEntry(morningEdit(1)))
     expect(loadMorningDraft(day.date)).toEqual(morningEdit(1))
     expect(loadDraft(day.date)).toBeNull()
-    expect(cachedMorning()).toEqual({ entry: morningEdit(1), unsynced: true, locked: false })
+    expect(cachedMorning()).toEqual({ entry: morningEdit(1), synced: [morning], locked: false })
 
     await wait(800)
-    expect(saveMorning).toHaveBeenCalledWith(morningEdit(1), config, morning)
+    expect(saveMorning).toHaveBeenCalledWith(morningEdit(1), config, [morning])
     expect(saveDay).not.toHaveBeenCalled()
     expect(loadMorningDraft(day.date)).toBeNull()
-    expect(cachedMorning()).toEqual({ entry: morningEdit(1), unsynced: false, locked: false })
+    expect(cachedMorning()).toEqual({
+      entry: morningEdit(1),
+      synced: [morningEdit(1)],
+      locked: false,
+    })
   })
 
   it("syncs a leftover morning draft as soon as it loads", async () => {
-    loadedMorning(true)
+    const saved = { ...morning, intention: "saved" }
+    loadedMorning([saved])
     await wait(800)
-    expect(saveMorning).toHaveBeenCalledWith(morning, config, null)
+    expect(saveMorning).toHaveBeenCalledWith(morning, config, [saved])
   })
 
   it("copies a saved morning into the day cache, leaving the evening half alone", async () => {
-    const { result } = loadedMorning(false)
+    const { result } = loadedMorning()
     const evening = { ...edit(1), metrics: { mood: 2, sleep: 1 } }
-    queryClient.setQueryData(dayQuery(day.date).queryKey, { entry: evening, unsynced: true })
+    queryClient.setQueryData(dayQuery(day.date).queryKey, { entry: evening, synced: [day] })
     act(() => result.current.setEntry(morningEdit(3)))
     await wait(800)
     expect(cachedDay()).toEqual({
       entry: { ...evening, intention: "intention 3", metrics: { mood: 2, sleep: 3 } },
-      unsynced: true,
+      synced: [day],
     })
   })
 
   it("leaves an uncached day uncached", async () => {
-    const { result } = loadedMorning(false)
+    const { result } = loadedMorning()
     act(() => result.current.setEntry(morningEdit(1)))
     await wait(800)
     expect(cachedDay()).toBeUndefined()
@@ -367,7 +394,7 @@ describe("useMorningAutosave", () => {
 
   it("keeps the morning draft when a sync fails, and tries again on the next edit", async () => {
     vi.mocked(saveMorning).mockRejectedValueOnce(new Error("offline"))
-    const { result } = loadedMorning(false)
+    const { result } = loadedMorning()
     act(() => result.current.setEntry(morningEdit(1)))
     await wait(800)
     expect(toast.error).toHaveBeenCalledWith("Sync failed, kept locally: offline")
@@ -381,7 +408,7 @@ describe("useMorningAutosave", () => {
 
   it("on a locked morning: one toast, the draft dropped, the morning locked and refetched", async () => {
     vi.mocked(saveMorning).mockRejectedValueOnce(locked)
-    const { result } = loadedMorning(false)
+    const { result } = loadedMorning()
     const invalidate = vi.spyOn(queryClient, "invalidateQueries")
     act(() => result.current.setEntry(morningEdit(1)))
     await wait(800)
@@ -410,7 +437,7 @@ describe("useMorningAutosave", () => {
         refuse = () => reject(locked)
       }),
     )
-    const { result } = loadedMorning(false)
+    const { result } = loadedMorning()
     act(() => result.current.setEntry(morningEdit(1)))
     await wait(800)
     act(() => result.current.setEntry(morningEdit(2)))

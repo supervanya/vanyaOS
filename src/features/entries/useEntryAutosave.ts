@@ -1,4 +1,9 @@
-import { useQueryClient, type QueryClient } from "@tanstack/react-query"
+import {
+  useQueryClient,
+  type DataTag,
+  type QueryClient,
+  type QueryKey,
+} from "@tanstack/react-query"
 import { useEffect, useRef, useState } from "react"
 import { toast } from "sonner"
 import type { LoadedConfig } from "@/features/config/api"
@@ -34,9 +39,13 @@ type Edited = { date: string; updatedAt: string }
 type Half<T extends Edited> = {
   saveDraft: (entry: T) => void
   clearDraft: (entry: T) => void
-  // Sends what changed since `since`, the entry as last synced (all of it
-  // when that's unknown).
-  save: (entry: T, config: LoadedConfig, since: T | null) => Promise<void>
+  // Sends what differs from any of `since`, the versions Postgres may hold
+  // (all of it when that's unknown).
+  save: (entry: T, config: LoadedConfig, since: T[] | null) => Promise<void>
+  // The cache this half's editors start from. Its `synced` (see LoadedDay) is
+  // shared by all of them, so one that takes over mid-save diffs against the
+  // same versions.
+  key: (date: string) => DataTag<QueryKey, { synced: T[] }, Error>
   // Puts an edit not yet synced into the cache, at once.
   cacheEdit: (queryClient: QueryClient, entry: T, config: LoadedConfig) => void
   // Puts the saved entry into the cache once its sync lands.
@@ -68,24 +77,28 @@ const evening: Half<DayEntry> = {
   saveDraft,
   clearDraft,
   save: saveDay,
+  key: (date) => dayQuery(date).queryKey,
   cacheEdit: (queryClient, entry, config) => {
     const dayKey = dayQuery(entry.date).queryKey
     // A read of this day that started before the edit would land its older
     // snapshot on top of it; cancelling reverts it at once and drops its result.
     void queryClient.cancelQueries({ queryKey: dayKey, exact: true })
-    queryClient.setQueryData(dayKey, (day) => ({
-      entry: day ? withMorning(entry, day.entry, config) : entry,
-      unsynced: true,
-    }))
+    queryClient.setQueryData(
+      dayKey,
+      (day) => day && { ...day, entry: withMorning(entry, day.entry, config) },
+    )
   },
   cacheSaved: (queryClient, entry, config) => {
-    // Other screens showing this day pick up the saved version, unless the
-    // cache already holds a newer edit.
-    queryClient.setQueryData(dayQuery(entry.date).queryKey, (day) =>
-      day && day.entry.updatedAt > entry.updatedAt
-        ? day
-        : { entry: day ? withMorning(entry, day.entry, config) : entry, unsynced: false },
-    )
+    // Postgres now holds `entry`. Other screens showing this day pick it up,
+    // unless the cache already holds a newer edit. A read that started before
+    // the save would land without it, so it's cancelled first.
+    const dayKey = dayQuery(entry.date).queryKey
+    void queryClient.cancelQueries({ queryKey: dayKey, exact: true })
+    queryClient.setQueryData(dayKey, (day): LoadedDay | undefined => {
+      if (!day || day.entry.updatedAt > entry.updatedAt) return day && { ...day, synced: [entry] }
+      const saved = withMorning(entry, day.entry, config)
+      return { entry: saved, synced: [saved] }
+    })
     refreshWellness(queryClient, entry.date)
   },
   isFinal: () => false,
@@ -99,24 +112,34 @@ const morning: Half<MorningEntry> = {
   saveDraft: saveMorningDraft,
   clearDraft: clearMorningDraft,
   save: saveMorning,
+  key: (date) => morningQuery(date).queryKey,
   cacheEdit: (queryClient, entry) => {
     const morningKey = morningQuery(entry.date).queryKey
     void queryClient.cancelQueries({ queryKey: morningKey, exact: true })
-    queryClient.setQueryData(morningKey, { entry, unsynced: true, locked: false })
+    queryClient.setQueryData(morningKey, (m) => m && { ...m, entry })
   },
   cacheSaved: (queryClient, entry, config) => {
-    queryClient.setQueryData(morningQuery(entry.date).queryKey, (m) =>
-      m && m.entry.updatedAt > entry.updatedAt ? m : { entry, unsynced: false, locked: false },
+    const morningKey = morningQuery(entry.date).queryKey
+    void queryClient.cancelQueries({ queryKey: morningKey, exact: true })
+    queryClient.setQueryData(
+      morningKey,
+      (m): LoadedMorning | undefined =>
+        m &&
+        (m.entry.updatedAt > entry.updatedAt
+          ? { ...m, synced: [entry] }
+          : { entry, synced: [entry], locked: false }),
     )
-    // Only the morning half changes, and the day keeps its own `updatedAt`
-    // and unsynced flag: those track the evening's edits. A day read that
-    // started before the save would land without it, so it's cancelled first.
+    // Only the morning half changes, and the day keeps its own `updatedAt`:
+    // that tracks the evening's edits. Its evening half is untouched, so a day
+    // Postgres held still is. A day read that started before the save would
+    // land without it, so it's cancelled first.
     const dayKey = dayQuery(entry.date).queryKey
     void queryClient.cancelQueries({ queryKey: dayKey, exact: true })
-    queryClient.setQueryData(
-      dayKey,
-      (day) => day && { ...day, entry: withMorning(day.entry, entry, config) },
-    )
+    queryClient.setQueryData(dayKey, (day): LoadedDay | undefined => {
+      if (!day) return day
+      const next = withMorning(day.entry, entry, config)
+      return { entry: next, synced: day.synced.includes(day.entry) ? [next] : day.synced }
+    })
     refreshWellness(queryClient, entry.date)
   },
   isFinal: isMorningLocked,
@@ -165,13 +188,12 @@ export function useMorningAutosave(config: LoadedConfig, loaded: LoadedMorning) 
 function useAutosave<T extends Edited>(
   half: Half<T>,
   config: LoadedConfig,
-  loaded: { entry: T; unsynced: boolean },
+  loaded: { entry: T; synced: T[] },
 ) {
   const queryClient = useQueryClient()
   const [entry, setEntry] = useState(loaded.entry)
-  // The entry as Postgres last had it from this editor: each sync sends only
-  // what changed since. Unknown (null) for a draft that never synced.
-  const synced = useRef<T | null>(loaded.unsynced ? null : loaded.entry)
+  // The entry as loaded, if Postgres holds it already: it needs no save.
+  const saved = useRef(loaded.synced.includes(loaded.entry) ? loaded.entry : null)
   // The sync waiting on the debounce, if any.
   const pending = useRef<(() => void) | null>(null)
   // Marks the entry unsaved in the top bar from the first edit until the sync
@@ -181,7 +203,7 @@ function useAutosave<T extends Edited>(
   const stopped = useRef(false)
 
   useEffect(() => {
-    if (entry === synced.current || stopped.current) return
+    if (entry === saved.current || stopped.current) return
     half.saveDraft(entry)
     half.cacheEdit(queryClient, entry, config)
     unsaved.current ??= beginSave()
@@ -189,7 +211,7 @@ function useAutosave<T extends Edited>(
       pending.current = null
       const settle = unsaved.current
       unsaved.current = null
-      syncEntry(half, entry, config, queryClient, settle, stopped, synced)
+      syncEntry(half, entry, config, queryClient, settle, stopped)
     }
     pending.current = sync
     const timer = setTimeout(sync, SYNC_DEBOUNCE_MS)
@@ -215,8 +237,8 @@ function syncEntry<T extends Edited>(
   queryClient: QueryClient,
   settle: SettleSave | null,
   stopped: { current: boolean },
-  synced: { current: T | null },
 ) {
+  const key = half.key(entry.date)
   syncing = syncing.then(async () => {
     // A save queued before a final refusal would only be refused again.
     if (stopped.current) {
@@ -224,12 +246,14 @@ function syncEntry<T extends Edited>(
       return
     }
     try {
-      await half.save(entry, config, synced.current)
-      synced.current = entry
+      await half.save(entry, config, queryClient.getQueryData(key)?.synced ?? null)
       half.clearDraft(entry)
       half.cacheSaved(queryClient, entry, config)
       settle?.("saved")
     } catch (err: unknown) {
+      // Postgres may hold it anyway, if only the answer was lost: what it
+      // changed is sent again until a later save is confirmed.
+      queryClient.setQueryData(key, (d) => d && { ...d, synced: [...d.synced, entry] })
       settle?.("failed")
       if (half.isFinal(err)) {
         stopped.current = true

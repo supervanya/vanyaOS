@@ -2,8 +2,10 @@
 -- so a value written elsewhere meanwhile (the watch) isn't overwritten with a
 -- stale copy. Untouched habits used to be sent as unchecked, which is what made
 -- them read as missed in Trends rather than "no entry"; save_day now records
--- that itself: every active habit with no check on the day gets an unchecked
--- one, and an existing check is never touched. Otherwise as before.
+-- that itself, the first time a day gets any habit checks: every active habit
+-- gets an unchecked one before the sent checks land. Later saves leave the
+-- set alone, so a habit added since isn't a miss on a day before it existed.
+-- Otherwise as before.
 create or replace function public.save_day(
   entry_date date,
   theme text,
@@ -52,15 +54,16 @@ begin
     set value = excluded.value;
 
   insert into public.entry_habits (entry_id, habit_id, done)
+  select saved_id, h.id, false
+  from public.habits h
+  where h.user_id = auth.uid() and not h.archived
+    and not exists (select 1 from public.entry_habits e where e.entry_id = saved_id)
+  on conflict on constraint entry_habits_pkey do nothing;
+
+  insert into public.entry_habits (entry_id, habit_id, done)
   select saved_id, h.habit_id, h.done
   from jsonb_to_recordset(save_day.habit_checks) as h(habit_id uuid, done boolean)
   on conflict on constraint entry_habits_pkey do update
     set done = excluded.done;
-
-  insert into public.entry_habits (entry_id, habit_id, done)
-  select saved_id, h.id, false
-  from public.habits h
-  where h.user_id = auth.uid() and not h.archived
-  on conflict on constraint entry_habits_pkey do nothing;
 end;
 $$;

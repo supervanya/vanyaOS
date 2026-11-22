@@ -48,23 +48,25 @@ afterEach(cleanup)
 
 describe("IntentionGlance", () => {
   it("shows the intention as a link to /morning", () => {
-    renderGlance({ entry: { ...entry, intention: "  one thing at a time\n" }, unsynced: false })
+    const set = { ...entry, intention: "  one thing at a time\n" }
+    renderGlance({ entry: set, synced: [set] })
     expect(card()?.getAttribute("href")).toBe("/morning")
     expect(card()?.textContent).toContain("one thing at a time")
   })
 
   it("is absent when the day has no intention text", () => {
-    renderGlance({ entry: { ...entry, intention: " \n " }, unsynced: false })
+    const blank = { ...entry, intention: " \n " }
+    renderGlance({ entry: blank, synced: [blank] })
     expect(card()).toBeNull()
   })
 
   it("picks up a morning saved this session, without a refetch", async () => {
-    renderGlance({ entry, unsynced: false })
+    renderGlance({ entry, synced: [entry] })
     expect(card()).toBeNull()
     act(() => {
       queryClient.setQueryData(dayQuery(date).queryKey, {
         entry: { ...entry, intention: "call mum" },
-        unsynced: false,
+        synced: [{ ...entry, intention: "call mum" }],
       })
     })
     expect((await screen.findByRole("link")).textContent).toContain("call mum")

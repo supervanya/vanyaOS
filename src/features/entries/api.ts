@@ -165,9 +165,11 @@ export async function loadPreviousWellness(
   return wellness({ metrics }, config)
 }
 
-// A day as the page should show it. `unsynced` means it came from a local
-// draft that never reached Postgres, so it still needs saving.
-export type LoadedDay = { entry: DayEntry; unsynced: boolean }
+// A day as the page should show it, and `synced`: each version of it Postgres
+// may hold, as far as this tab knows — the one it last confirmed, then any sent
+// since without an answer. A save sends whatever differs from any of them; an
+// entry that's one of them needs no save.
+export type LoadedDay = { entry: DayEntry; synced: [DayEntry, ...DayEntry[]] }
 
 // Reconciles the remote entry with any local draft, preferring whichever is
 // freshest by `updatedAt` — protects an in-progress edit from a dropped sync.
@@ -178,12 +180,11 @@ export async function loadOrInitDay(date: string, config: LoadedConfig): Promise
     loadDay(date, config),
     Promise.resolve(loadDraft(date)),
   ])
+  const saved = remote ?? (await newEntry(date, config))
   if (draft && (!remote || draft.updatedAt > remote.updatedAt))
-    return { entry: withMorning(draft, remote ?? EMPTY_MORNING, config), unsynced: true }
-  return { entry: remote ?? (await newEntry(date, config)), unsynced: false }
+    return { entry: withMorning(draft, saved, config), synced: [saved] }
+  return { entry: saved, synced: [saved] }
 }
-
-const EMPTY_MORNING = { intention: "", metrics: {} }
 
 const morningIds = (config: LoadedConfig) =>
   new Set(metricsAt(config.metrics, "morning").map((m) => m.id))
@@ -218,10 +219,14 @@ function morningOf(day: DayEntry, config: LoadedConfig): MorningEntry {
   }
 }
 
-// A morning as /morning should show it. `unsynced`: from a local draft that
-// never reached Postgres. `locked`: the day's evening was started when it was
-// read, so `save_morning` refuses it and /morning shows it read-only.
-export type LoadedMorning = { entry: MorningEntry; unsynced: boolean; locked: boolean }
+// A morning as /morning should show it. `synced`: as in LoadedDay. `locked`:
+// the day's evening was started when it was read, so `save_morning` refuses it
+// and /morning shows it read-only.
+export type LoadedMorning = {
+  entry: MorningEntry
+  synced: [MorningEntry, ...MorningEntry[]]
+  locked: boolean
+}
 
 // The morning's counterpart of loadOrInitDay: an unsynced morning draft, else
 // the saved morning half, else a blank morning.
@@ -241,9 +246,7 @@ export async function loadOrInitMorning(
     Promise.resolve(loadMorningDraft(date)),
   ])
   const locked = remote !== null && eveningStarted(remote, config.metrics)
-  if (draft && locked) discardMorningDraft(date)
-  else if (draft) return { entry: draft, unsynced: true, locked: false }
-  const entry: MorningEntry = remote
+  const saved: MorningEntry = remote
     ? morningOf(remote, config)
     : {
         date,
@@ -252,7 +255,9 @@ export async function loadOrInitMorning(
         metrics: {},
         updatedAt: new Date().toISOString(),
       }
-  return { entry, unsynced: false, locked }
+  if (draft && locked) discardMorningDraft(date)
+  else if (draft) return { entry: draft, synced: [saved], locked: false }
+  return { entry: saved, synced: [saved], locked }
 }
 
 // Saves the evening half — the entry row, evening metric values and habit
@@ -261,25 +266,29 @@ export async function loadOrInitMorning(
 // `metric_values` and never touches `intention`, so this can't clobber the
 // morning half.
 //
-// Only the metric values and habit checks that differ from `since` — the day
-// as this editor last saved or loaded it — are sent, so one written elsewhere
-// meanwhile (the watch) isn't overwritten with a stale copy. With no `since`
-// (an unsynced draft), every one is sent.
+// Only the metric values and habit checks that differ from one of `since` —
+// the versions Postgres may hold (see LoadedDay) — are sent, so one written
+// elsewhere meanwhile (the watch) isn't overwritten with a stale copy. With no
+// `since`, every one is sent.
 export async function saveDay(
   entry: DayEntry,
   config: LoadedConfig,
-  since: DayEntry | null,
+  since: DayEntry[] | null,
 ): Promise<void> {
   // Set metrics go with their value, unset ones as null so a slider reset to
   // "no value" clears it. Archived or unknown metrics have no row id and are
   // skipped, so their history is left alone.
   const metricValues = Object.entries(config.metricRowId).flatMap(([key, metricId]) => {
     const value = entry.metrics[key] ?? null
-    return since && (since.metrics[key] ?? null) === value ? [] : [{ metric_id: metricId, value }]
+    return since?.every((s) => (s.metrics[key] ?? null) === value)
+      ? []
+      : [{ metric_id: metricId, value }]
   })
   const habitChecks = Object.entries(config.habitRowId).flatMap(([key, habitId]) => {
     const done = entry.habits[key] ?? false
-    return since && (since.habits[key] ?? false) === done ? [] : [{ habit_id: habitId, done }]
+    return since?.every((s) => (s.habits[key] ?? false) === done)
+      ? []
+      : [{ habit_id: habitId, done }]
   })
 
   const { error } = await supabase.rpc("save_day", {
@@ -296,19 +305,19 @@ export async function saveDay(
 
 // Saves the morning half — the intention and morning-timed metric values — in
 // one transaction (the `save_morning` function). Only morning metrics are sent,
-// and as in saveDay only those that differ from `since`, unset ones as null to
-// clear them; `save_morning` filters by timing again in SQL. Once the day's
-// evening is started the function refuses (see isMorningLocked) and nothing is
-// saved.
+// and as in saveDay only those that differ from one of `since`, unset ones as
+// null to clear them; `save_morning` filters by timing again in SQL. Once the
+// day's evening is started the function refuses (see isMorningLocked) and
+// nothing is saved.
 export async function saveMorning(
   entry: MorningEntry,
   config: LoadedConfig,
-  since: MorningEntry | null,
+  since: MorningEntry[] | null,
 ): Promise<void> {
   const metricValues = metricsAt(config.metrics, "morning").flatMap((m) => {
     const metricId = config.metricRowId[m.id]
     const value = entry.metrics[m.id] ?? null
-    return !metricId || (since && (since.metrics[m.id] ?? null) === value)
+    return !metricId || since?.every((s) => (s.metrics[m.id] ?? null) === value)
       ? []
       : [{ metric_id: metricId, value }]
   })

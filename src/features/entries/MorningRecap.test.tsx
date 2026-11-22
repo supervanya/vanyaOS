@@ -62,7 +62,7 @@ afterEach(() => {
 // The day in the cache, never refetched (no network here).
 function cacheDay(entry: DayEntry) {
   queryClient = new QueryClient({ defaultOptions: { queries: { staleTime: Infinity } } })
-  queryClient.setQueryData(dayQuery(date).queryKey, { entry, unsynced: false })
+  queryClient.setQueryData(dayQuery(date).queryKey, { entry, synced: [entry] })
   return ({ children }: { children: ReactNode }) => (
     <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
   )
@@ -167,11 +167,10 @@ describe("MorningRecap", () => {
 })
 
 // The chips wired to the evening editor, as on /reflect.
+const evening = { ...day, intention: "stay calm" }
+
 function Evening() {
-  const { entry, setEntry } = useEntryAutosave(config, {
-    entry: { ...day, intention: "stay calm" },
-    unsynced: false,
-  })
+  const { entry, setEntry } = useEntryAutosave(config, { entry: evening, synced: [evening] })
   return (
     <LivedRating
       date={date}

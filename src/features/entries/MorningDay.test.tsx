@@ -123,14 +123,14 @@ afterEach(async () => {
 
 describe("MorningDay", () => {
   it("edits an unlocked morning", () => {
-    renderPage({ entry: morning, unsynced: false, locked: false })
+    renderPage({ entry: morning, synced: [morning], locked: false })
     expect(intention()?.textContent).toBe("stay calm")
     expect(screen.getByRole("slider")).toBeDefined()
     expect(lockedCard()).toBeNull()
   })
 
   it("shows a locked morning read-only, saying why, with the task board live", async () => {
-    renderPage({ entry: morning, unsynced: false, locked: true })
+    renderPage({ entry: morning, synced: [morning], locked: true })
     const card = lockedCard()
     expect(card?.textContent).toContain("the evening for this day has been started")
     expect(card?.textContent).toContain("stay calm")
@@ -145,15 +145,16 @@ describe("MorningDay", () => {
   })
 
   it("says so when a locked morning set nothing", () => {
-    renderPage({ entry: { ...morning, intention: "", metrics: {} }, unsynced: false, locked: true })
+    const blank = { ...morning, intention: "", metrics: {} }
+    renderPage({ entry: blank, synced: [blank], locked: true })
     expect(lockedCard()?.textContent).toContain("No intention was set.")
   })
 
   it("locks once this session writes the day's evening, without a refetch", async () => {
-    renderPage({ entry: morning, unsynced: false, locked: false })
+    renderPage({ entry: morning, synced: [morning], locked: false })
     // A habit tap on the dashboard doesn't start the evening...
     act(() => {
-      queryClient.setQueryData(dayQuery(date).queryKey, { entry: day, unsynced: false })
+      queryClient.setQueryData(dayQuery(date).queryKey, { entry: day, synced: [day] })
     })
     await wait(0)
     expect(intention()).not.toBeNull()
@@ -162,7 +163,7 @@ describe("MorningDay", () => {
     act(() => {
       queryClient.setQueryData(dayQuery(date).queryKey, {
         entry: { ...day, reflection: "tired" },
-        unsynced: true,
+        synced: [day],
       })
     })
     await wait(0)
@@ -176,10 +177,10 @@ describe("MorningDay", () => {
     // What the refetch finds: the morning as the server has it, now locked.
     vi.mocked(loadOrInitMorning).mockResolvedValue({
       entry: morning,
-      unsynced: false,
+      synced: [morning],
       locked: true,
     })
-    renderPage({ entry: morning, unsynced: false, locked: false })
+    renderPage({ entry: morning, synced: [morning], locked: false })
 
     const box = intention()
     if (!box) throw new Error("no intention box")
@@ -203,11 +204,8 @@ describe("MorningDay", () => {
 
   describe("Skip today", () => {
     const skip = () => screen.queryByRole("button", { name: "Skip today" })
-    const blank = {
-      entry: { ...morning, intention: "", metrics: {} },
-      unsynced: false,
-      locked: false,
-    }
+    const blankMorning = { ...morning, intention: "", metrics: {} }
+    const blank: LoadedMorning = { entry: blankMorning, synced: [blankMorning], locked: false }
 
     it("is offered on today's blank morning before noon, and skips to the dashboard", () => {
       vi.setSystemTime(new Date(2026, 8, 12, 9, 0))
@@ -230,7 +228,7 @@ describe("MorningDay", () => {
 
     it("isn't offered on a set morning, after noon, or on another day", () => {
       vi.setSystemTime(new Date(2026, 8, 12, 9, 0))
-      renderPage({ entry: morning, unsynced: false, locked: false })
+      renderPage({ entry: morning, synced: [morning], locked: false })
       expect(skip()).toBeNull()
       cleanup()
 

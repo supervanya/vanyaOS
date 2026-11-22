@@ -189,28 +189,30 @@ describe("loadOrInitDay with an evening draft", () => {
       updatedAt: "2026-09-24T22:00:00.000Z",
     })
 
-    const { entry, unsynced } = await loadOrInitDay(date, split)
-    expect(unsynced).toBe(true)
+    const { entry, synced } = await loadOrInitDay(date, split)
     expect(entry).toMatchObject({
       reflection: "draft",
       intention: "stay calm",
       metrics: { mood: 1, sleep: 2 },
     })
+    // Still to send: measured from the day as saved.
+    expect(synced).toEqual([expect.objectContaining({ reflection: savedRow.reflection })])
   })
 })
 
 describe("loadOrInitMorning", () => {
   it("loads the morning half of a saved day, locked once its evening is started", async () => {
     savedBothHalves()
+    const saved = {
+      date,
+      theme: "recovery",
+      intention: "stay calm",
+      metrics: { sleep: 2 },
+      updatedAt: savedRow.updated_at,
+    }
     expect(await loadOrInitMorning(date, split)).toEqual({
-      entry: {
-        date,
-        theme: "recovery",
-        intention: "stay calm",
-        metrics: { sleep: 2 },
-        updatedAt: savedRow.updated_at,
-      },
-      unsynced: false,
+      entry: saved,
+      synced: [saved],
       locked: true,
     })
   })
@@ -227,8 +229,8 @@ describe("loadOrInitMorning", () => {
 
   it("starts a blank morning when the day has no row", async () => {
     results.entries = { data: null, error: null }
-    const { entry, unsynced } = await loadOrInitMorning(date, split)
-    expect(unsynced).toBe(false)
+    const { entry, synced } = await loadOrInitMorning(date, split)
+    expect(synced).toEqual([entry])
     expect(entry).toMatchObject({ date, theme: "recovery", intention: "", metrics: {} })
   })
 
@@ -248,7 +250,7 @@ describe("loadOrInitMorning", () => {
     saveMorningDraft(draft)
     expect(await loadOrInitMorning(date, split)).toEqual({
       entry: draft,
-      unsynced: true,
+      synced: [expect.objectContaining({ metrics: { sleep: 2 } })],
       locked: false,
     })
   })
@@ -278,7 +280,7 @@ describe("loadOrInitMorning", () => {
     saveMorningDraft(draft)
     expect(await loadOrInitMorning(date, split)).toEqual({
       entry: draft,
-      unsynced: true,
+      synced: [expect.objectContaining({ intention: "" })],
       locked: false,
     })
   })
@@ -292,8 +294,8 @@ describe("loadOrInitMorning", () => {
       metrics: {},
       updatedAt: "2026-09-24T22:00:00.000Z",
     })
-    const { entry, unsynced, locked } = await loadOrInitMorning(date, split)
-    expect(unsynced).toBe(false)
+    const { entry, synced, locked } = await loadOrInitMorning(date, split)
+    expect(synced).toEqual([entry])
     expect(locked).toBe(true)
     expect(entry.intention).toBe("stay calm")
     expect(loadMorningDraft(date)).toBeNull()
@@ -311,8 +313,8 @@ describe("loadOrInitMorning", () => {
       intentionLived: null,
       updatedAt: "2026-09-24T22:00:00.000Z",
     })
-    const { entry, unsynced } = await loadOrInitMorning(date, split)
-    expect(unsynced).toBe(false)
+    const { entry, synced } = await loadOrInitMorning(date, split)
+    expect(synced).toEqual([entry])
     expect(entry.intention).toBe("")
   })
 })
@@ -345,7 +347,7 @@ describe("saveMorning", () => {
   })
 
   it("sends only the morning metrics that changed since the last sync", async () => {
-    await saveMorning(morning, split, { ...morning, intention: "" })
+    await saveMorning(morning, split, [{ ...morning, intention: "" }])
     expect(rpc).toHaveBeenLastCalledWith(
       "save_morning",
       expect.objectContaining({ intention: "stay calm", metric_values: [] }),
@@ -401,7 +403,7 @@ describe("saveDay", () => {
 
   it("sends only the values and checks that changed since the last sync", async () => {
     const since = { ...entry, metrics: { mood: 3 }, habits: { steps: true } }
-    await saveDay({ ...entry, metrics: { mood: 4 } }, config, since)
+    await saveDay({ ...entry, metrics: { mood: 4 } }, config, [since])
     expect(rpc).toHaveBeenLastCalledWith(
       "save_day",
       expect.objectContaining({
@@ -412,14 +414,27 @@ describe("saveDay", () => {
   })
 
   it("sends a cleared value as null and an unticked habit as not done", async () => {
-    await saveDay({ ...entry, metrics: {}, habits: {} }, config, {
-      ...entry,
-      metrics: { mood: 3 },
-    })
+    await saveDay({ ...entry, metrics: {}, habits: {} }, config, [
+      { ...entry, metrics: { mood: 3 } },
+    ])
     expect(rpc).toHaveBeenLastCalledWith(
       "save_day",
       expect.objectContaining({
         metric_values: [{ metric_id: "metric-mood", value: null }],
+        habit_checks: [{ habit_id: "habit-steps", done: false }],
+      }),
+    )
+  })
+
+  it("sends what differs from any version Postgres may hold", async () => {
+    // Steps was ticked by a save whose answer never came: it may have landed.
+    const confirmed = { ...entry, metrics: { mood: 3 }, habits: { steps: false } }
+    const unanswered = { ...confirmed, habits: { steps: true } }
+    await saveDay(confirmed, config, [confirmed, unanswered])
+    expect(rpc).toHaveBeenLastCalledWith(
+      "save_day",
+      expect.objectContaining({
+        metric_values: [],
         habit_checks: [{ habit_id: "habit-steps", done: false }],
       }),
     )
