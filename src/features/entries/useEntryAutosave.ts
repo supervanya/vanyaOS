@@ -49,10 +49,12 @@ type Half<T extends Edited> = {
 const kept = (err: unknown) => `Sync failed, kept locally: ${errorMessage(err)}`
 
 // Every day's wellness counts both halves, so either one landing changes later
-// days' "vs last" deltas and the Trends history.
-function refreshWellness(queryClient: QueryClient) {
+// days' "vs last" deltas and the Trends history. The saved day's own "vs last"
+// only looks at earlier days, so it stays.
+function refreshWellness(queryClient: QueryClient, date: string) {
   void queryClient.invalidateQueries({
-    predicate: (query) => query.queryKey[2] === "previous-wellness",
+    predicate: ({ queryKey: [, day, kind] }) =>
+      kind === "previous-wellness" && typeof day === "string" && day > date,
   })
   void queryClient.invalidateQueries({ queryKey: trendSeriesQuery.queryKey })
 }
@@ -82,7 +84,7 @@ const evening: Half<DayEntry> = {
         ? day
         : { entry: day ? withMorning(entry, day.entry, config) : entry, unsynced: false },
     )
-    refreshWellness(queryClient)
+    refreshWellness(queryClient, entry.date)
   },
   isFinal: () => false,
   refused: () => {},
@@ -113,7 +115,7 @@ const morning: Half<MorningEntry> = {
       dayKey,
       (day) => day && { ...day, entry: withMorning(day.entry, entry, config) },
     )
-    refreshWellness(queryClient)
+    refreshWellness(queryClient, entry.date)
   },
   isFinal: isMorningLocked,
   // The other device started the evening: the edit can never be saved, so its

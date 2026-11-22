@@ -7,6 +7,7 @@ import {
   loadOrInitDay,
   loadMorningDraft,
   loadOrInitMorning,
+  loadPreviousWellness,
   saveDay,
   saveDraft,
   saveMorning,
@@ -24,7 +25,11 @@ const results: Record<string, Result> = {}
 type Query = Promise<Result> & {
   select: () => Query
   eq: () => Query
+  in: () => Query
+  or: () => Query
+  lt: () => Query
   order: () => Query
+  limit: () => Query
   maybeSingle: () => Promise<Result>
 }
 function query(table: string): Query {
@@ -32,7 +37,11 @@ function query(table: string): Query {
   const builder: Query = Object.assign(result, {
     select: () => builder,
     eq: () => builder,
+    in: () => builder,
+    or: () => builder,
+    lt: () => builder,
     order: () => builder,
+    limit: () => builder,
     maybeSingle: () => result,
   })
   return builder
@@ -388,5 +397,45 @@ describe("saveDay", () => {
       "save_day",
       expect.objectContaining({ intention_lived: "" }),
     )
+  })
+})
+
+describe("loadPreviousWellness", () => {
+  // Which day counts as "previous" is the query's filter, checked against the
+  // local database; this covers scoring the row it returns.
+  const scored: LoadedConfig = {
+    ...config,
+    metrics: [
+      { id: "mood", label: "Mood", group: "G", higherIsBetter: true, scale: 5, timing: "evening" },
+      {
+        id: "sleep",
+        label: "Sleep",
+        group: "G",
+        higherIsBetter: true,
+        scale: 5,
+        timing: "morning",
+      },
+    ],
+    metricRowId: { mood: "metric-mood", sleep: "metric-sleep" },
+  }
+
+  it("scores both halves of the day, skipping archived metrics", async () => {
+    results.entries = {
+      data: {
+        evening: [{ metric_id: "metric-mood" }],
+        entry_metric_values: [
+          { metric_id: "metric-mood", value: 4 },
+          { metric_id: "metric-sleep", value: 2 },
+          { metric_id: "metric-archived", value: 0 },
+        ],
+      },
+      error: null,
+    }
+    expect(await loadPreviousWellness("2026-11-05", scored)).toBe(3)
+  })
+
+  it("is null with no earlier day", async () => {
+    results.entries = { data: null, error: null }
+    expect(await loadPreviousWellness("2026-11-05", scored)).toBeNull()
   })
 })

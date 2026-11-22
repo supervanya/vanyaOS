@@ -10,6 +10,7 @@ import { metricsAt } from "@/lib/config"
 import { isOneOf, isRecord, oneOf } from "@/lib/parse"
 import { supabase } from "@/lib/supabaseClient"
 import { eveningStarted } from "./lock"
+import { wellness } from "./wellness"
 
 // The evening's answer to "did I live this morning's intention?" — pinned by a
 // CHECK constraint on `entries.intention_lived`. Null until it's tapped.
@@ -134,6 +135,39 @@ async function newEntry(date: string, config: LoadedConfig): Promise<DayEntry> {
     intentionLived: null,
     updatedAt: new Date().toISOString(),
   }
+}
+
+// Wellness of the latest day before `date` whose evening is started (the rule
+// in lock.ts), for Reflect's "vs last": a day with only its morning or only
+// habit ticks isn't one to compare against. One row, however long the history.
+// `evening` is the day's evening-timed values, there only to test for one.
+export async function loadPreviousWellness(
+  date: string,
+  config: LoadedConfig,
+): Promise<number | null> {
+  const eveningIds = metricsAt(config.metrics, "evening").flatMap(
+    (m) => config.metricRowId[m.id] ?? [],
+  )
+  const { data, error } = await supabase
+    .from("entries")
+    .select("evening:entry_metric_values(metric_id), entry_metric_values(metric_id, value)")
+    .in("evening.metric_id", eveningIds)
+    .or("reflection.neq.,intention_lived.not.is.null,evening.not.is.null")
+    .lt("entry_date", date)
+    .order("entry_date", { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  if (error) throw error
+  if (!data) return null
+  const keyById = Object.fromEntries(
+    Object.entries(config.metricRowId).map(([key, id]) => [id, key]),
+  )
+  const metrics: Record<string, number> = {}
+  for (const v of data.entry_metric_values) {
+    const key = keyById[v.metric_id]
+    if (key) metrics[key] = v.value
+  }
+  return wellness({ metrics }, config)
 }
 
 // A day as the page should show it. `unsynced` means it came from a local
