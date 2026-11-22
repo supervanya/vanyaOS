@@ -138,18 +138,17 @@ describe("opensOnMorning", () => {
     habitRowId: {},
   }
   const today = "2026-11-12"
-  const morning = (patch: Partial<MorningEntry> = {}): LoadedMorning => ({
-    entry: {
+  const morning = (patch: Partial<MorningEntry> = {}): LoadedMorning => {
+    const entry = {
       date: today,
       theme: "recovery",
       intention: "",
       metrics: {},
       updatedAt: "2026-11-12T06:00:00.000Z",
       ...patch,
-    },
-    unsynced: false,
-    locked: false,
-  })
+    }
+    return { entry, synced: [entry], locked: false }
+  }
   const client = (loaded?: LoadedMorning, saved: MorningPrefs | null = prefs) => {
     const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
     qc.setQueryData(configQuery.queryKey, config)
@@ -173,7 +172,7 @@ describe("opensOnMorning", () => {
   it("opens on a blank morning, and not on one with an unsynced draft", async () => {
     const now = morningOf(8)
     expect(await opensOnMorning(client(morning()), now)).toBe(true)
-    const draft = { ...morning({ intention: "write" }), unsynced: true }
+    const draft = { ...morning({ intention: "write" }), synced: morning().synced }
     expect(await opensOnMorning(client(draft), now)).toBe(false)
   })
 
@@ -190,7 +189,7 @@ describe("opensOnMorning", () => {
       intentionLived: null,
       updatedAt: "2026-11-12T07:00:00.000Z",
     }
-    qc.setQueryData(dayQuery(today).queryKey, { entry: day, unsynced: true })
+    qc.setQueryData(dayQuery(today).queryKey, { entry: day, synced: [{ ...day, reflection: "" }] })
     expect(await opensOnMorning(qc, now)).toBe(false)
   })
 
@@ -256,9 +255,10 @@ describe("the initial landing", () => {
       habitRowId: {},
     } satisfies LoadedConfig)
     qc.setQueryData(prefsQuery.queryKey, prefs)
+    const saved = { date: today, theme: "recovery", ...blank, updatedAt: "" }
     qc.setQueryData(mq(today).queryKey, {
-      entry: { date: today, theme: "recovery", ...blank, updatedAt: "" },
-      unsynced: false,
+      entry: saved,
+      synced: [saved],
       locked: false,
     } satisfies LoadedMorning)
 
