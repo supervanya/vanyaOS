@@ -129,17 +129,15 @@ const morning: Half<MorningEntry> = {
           ? { ...m, synced: [entry] }
           : { entry, synced: [entry], locked: false }),
     )
-    // Only the morning half changes, and the day keeps its own `updatedAt`:
-    // that tracks the evening's edits. Its evening half is untouched, so a day
-    // Postgres held still is. A day read that started before the save would
-    // land without it, so it's cancelled first.
+    // Only the morning half changes, and the day keeps its own `updatedAt`
+    // and `synced`: those track the evening's edits. A day read that started
+    // before the save would land without it, so it's cancelled first.
     const dayKey = dayQuery(entry.date).queryKey
     void queryClient.cancelQueries({ queryKey: dayKey, exact: true })
-    queryClient.setQueryData(dayKey, (day): LoadedDay | undefined => {
-      if (!day) return day
-      const next = withMorning(day.entry, entry, config)
-      return { entry: next, synced: day.synced.includes(day.entry) ? [next] : day.synced }
-    })
+    queryClient.setQueryData(
+      dayKey,
+      (day) => day && { ...day, entry: withMorning(day.entry, entry, config) },
+    )
     refreshWellness(queryClient, entry.date)
   },
   isFinal: isMorningLocked,
@@ -192,8 +190,11 @@ function useAutosave<T extends Edited>(
 ) {
   const queryClient = useQueryClient()
   const [entry, setEntry] = useState(loaded.entry)
-  // The entry as loaded, if Postgres holds it already: it needs no save.
-  const saved = useRef(loaded.synced.includes(loaded.entry) ? loaded.entry : null)
+  // The entry as loaded, if every version Postgres may hold is this edit of it
+  // (by `updatedAt`: the cache copies objects): it needs no save.
+  const saved = useRef(
+    loaded.synced.every((s) => s.updatedAt === loaded.entry.updatedAt) ? loaded.entry : null,
+  )
   // The sync waiting on the debounce, if any.
   const pending = useRef<(() => void) | null>(null)
   // Marks the entry unsaved in the top bar from the first edit until the sync

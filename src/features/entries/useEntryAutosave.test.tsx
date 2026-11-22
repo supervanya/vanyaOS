@@ -157,10 +157,22 @@ describe("useEntryAutosave", () => {
   })
 
   it("syncs a leftover draft as soon as it loads, measured from the day as saved", async () => {
-    const saved = { ...day, reflection: "saved" }
+    const saved = { ...day, reflection: "saved", updatedAt: "2026-09-12T07:00:00.000Z" }
     loaded([saved])
     await wait(800)
     expect(saveDay).toHaveBeenCalledWith(day, config, [saved])
+  })
+
+  it("saves nothing when a screen reopens the day it just saved", async () => {
+    const { result, unmount } = loaded()
+    act(() => result.current.setEntry(edit(1)))
+    await wait(800)
+    unmount()
+    const next = cachedDay()
+    if (!next) throw new Error("no cached day")
+    renderHook(() => useEntryAutosave(config, next), { wrapper })
+    await wait(800)
+    expect(saveDay).toHaveBeenCalledTimes(1)
   })
 
   it("takes over an edit from a screen left mid-save, without sending it all again", async () => {
@@ -367,7 +379,7 @@ describe("useMorningAutosave", () => {
   })
 
   it("syncs a leftover morning draft as soon as it loads", async () => {
-    const saved = { ...morning, intention: "saved" }
+    const saved = { ...morning, intention: "saved", updatedAt: "2026-09-12T06:00:00.000Z" }
     loadedMorning([saved])
     await wait(800)
     expect(saveMorning).toHaveBeenCalledWith(morning, config, [saved])

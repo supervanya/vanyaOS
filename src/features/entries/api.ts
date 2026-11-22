@@ -168,7 +168,7 @@ export async function loadPreviousWellness(
 // A day as the page should show it, and `synced`: each version of it Postgres
 // may hold, as far as this tab knows — the one it last confirmed, then any sent
 // since without an answer. A save sends whatever differs from any of them; an
-// entry that's one of them needs no save.
+// entry they all share an `updatedAt` with needs no save.
 export type LoadedDay = { entry: DayEntry; synced: [DayEntry, ...DayEntry[]] }
 
 // Reconciles the remote entry with any local draft, preferring whichever is
